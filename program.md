@@ -10,10 +10,11 @@ To set up a new experiment, work with the user to:
 2. **Create the branch**: First confirm this directory is actually a git repo, then create `autokaggle/<tag>` from the current default branch.
 3. **Read the in-scope files**: The repo is small. Read these files for full context:
    - `README.md` — repository context.
-   - `prepare.py` — fixed constants, data prep. Do not modify.
-   - `train.py` — the file you modify. Preprocessing, hyperparameters.
-   - If any of `README.md`, `train.py`, or `pyproject.toml` are missing, stop and tell the human the repo is not ready for autonomous runs yet.
-4. **Verify data exists**: Check that `./data/` contains train set, test set and cross-validation ids. If not, tell the human to run `uv run prepare.py`.
+   - `prepare.py` — fixed constants, data prep, cross-validation harness. Do not modify.
+   - `runner.py` — fixed experiment entrypoint, timeout handling. Do not modify.
+   - `train.py` — the file you modify. Preprocessing, features, hyperparameters.
+   - If any of `README.md`, `runner.py`, `train.py`, or `pyproject.toml` are missing, stop and tell the human the repo is not ready for autonomous runs yet.
+4. **Verify data exists**: Check that `./data/` contains train set, test set and cross-validation ids. If not, tell the human to run `uv run python prepare.py`.
 5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
 6. **Confirm and go**: Confirm setup looks good.
 
@@ -21,35 +22,39 @@ Once you get confirmation, kick off the experimentation.
 
 ## Experimentation
 
-Each experiment runs on the local cpu. The training script runs for a **fixed time budget of 20 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+Each experiment runs on the local cpu. The runner enforces a **hard time budget of 20 minutes** (wall clock training time, excluding startup/compilation). You launch one experiment as: `uv run python runner.py`.
 
 **What you CAN do:**
-- Modify `train.py` — this is the only file you edit. Everything is fair game: feature engineering, preprocessing, hyperparameters, training loop, etc. You want to build the best-performing binary classification model.
+- Modify `train.py` — this is the only file you edit. Everything is fair game inside the single-experiment model definition: feature engineering, preprocessing, and hyperparameters. You want to build the best-performing binary classification model.
 
 **What you CANNOT do:**
 - Modify `prepare.py`. It is read-only. It contains the data loading and fixed cross-validation splitting.
+- Modify `runner.py`. It is read-only. It contains the experiment entrypoint, timeout handling, and result reporting.
 - Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
-- Modify the evaluation harness. The `evaluate` function in `prepare.py` is the ground truth metric.
+- Modify the evaluation harness. The `evaluate_model` function in `prepare.py` and the timeout logic in `runner.py` are the ground truth protocol.
 
-**The goal is simple: get the highest mean area under the receiver operating characteristic curve (roc_auc) across cross-validation folds.** Since the time budget is fixed, you don't need to worry about training time — it's always 20 minutes. Everything is fair game: add additional features or prune existing ones, change the hyperparameters. The only constraint is that the code runs without crashing and finishes within the time budget.
+**The goal is simple: get the highest mean area under the receiver operating characteristic curve (roc_auc) across cross-validation folds.** The time budget is an upper bound, not a target. If a run finishes in one minute, log it and move on to the next experiment. The only constraints are that the code runs without crashing and finishes within the time budget.
 
 **Simplicity criterion**: All else being equal, simpler is better. A small improvement that adds ugly complexity is not worth it. Conversely, removing something and getting equal or better results is a great outcome — that's a simplification win. When evaluating whether to keep a change, weigh the complexity cost against the improvement magnitude. A 0.00001 roc_auc improvement that adds 20 lines of hacky code? Probably not worth it. A 0.00001 roc_auc improvement from deleting code? Definitely keep. An improvement of ~0 but much simpler code? Keep.
 
-**The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
+**The first run**: Your very first run should always be to establish the baseline, so you will run the baseline experiment as is through `runner.py`.
 
 ## Output format
 
-Once the script finishes it prints a summary like this:
+Once the runner finishes successfully it prints a summary like this:
 
 ```
 ---
-mean_cv_roc_auc:  0.915923
-std_cv_roc_auc:   0.001244
-training_seconds: 1200.1
-total_seconds:    1224.9
+experiment_name:   baseline_hist_gradient_boosting
+status:            ok
+mean_cv_roc_auc:   0.915923
+std_cv_roc_auc:    0.001244
+completed_folds:   5/5
+training_seconds:  43.4
+total_seconds:     44.2
 ```
 
-Note that the script is configured to always stop after 20 minutes, so depending on the computing platform of this computer the numbers might look different. You can extract the key metric from the log file:
+If a run times out or crashes, `mean_cv_roc_auc` will be absent from the log. You can extract the key metric from a successful run with:
 
 ```bash
 grep "^mean_cv_roc_auc:" run.log
@@ -89,16 +94,16 @@ LOOP FOREVER:
 1. Look at the git state: record the current branch and starting commit before you edit anything
 2. Tune `train.py` with an experimental idea by directly hacking the code.
 3. git commit
-4. Run the experiment: `uv run train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
+4. Run the experiment: `uv run python runner.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
 5. Read out the results: `grep "^mean_cv_roc_auc:" run.log`
-6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
+6. If the grep output is empty, the run timed out or crashed. Run `tail -n 50 run.log` to read the timeout summary or Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
 7. Record the results in the tsv (NOTE: do not commit the results.tsv file, leave it untracked by git)
 8. If roc_auc improved (higher), you "advance" the branch, keeping the git commit
 9. If roc_auc is equal or worse, reset back to the starting commit you recorded before the experiment
 
 The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
 
-**Timeout**: Each experiment should take ~20 minutes total (+ a few seconds for startup and eval overhead). If a run exceeds 25 minutes, kill it and treat it as a failure (discard and revert).
+**Timeout**: Each experiment must finish within 20 minutes of training time. If the runner kills it for exceeding the budget, treat it as a failure (discard and revert).
 
 **Crashes**: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
 
