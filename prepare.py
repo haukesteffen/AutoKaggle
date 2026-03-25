@@ -11,6 +11,12 @@ TRAIN_PATH = DATA_DIR / "train.csv"
 TEST_PATH = DATA_DIR / "test.csv"
 FOLDS_PATH = DATA_DIR / "folds.csv"
 COMPETITION = "playground-series-s6e3"
+ID_COLUMN = "id"
+TARGET_COLUMN = "Churn"
+POSITIVE_LABEL = "Yes"
+NEGATIVE_LABEL = "No"
+FOLD_ROW_INDEX_COLUMN = "row_idx"
+FOLD_COLUMN = "fold"
 N_SPLITS = 5
 RANDOM_STATE = 42
 
@@ -50,7 +56,7 @@ def main():
 
     with FOLDS_PATH.open("w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["row_idx", "fold"])
+        writer.writerow([FOLD_ROW_INDEX_COLUMN, FOLD_COLUMN])
         for i, fold in enumerate(folds):
             writer.writerow([i, fold])
 
