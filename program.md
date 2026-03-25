@@ -13,7 +13,7 @@ To set up a new experiment, work with the user to:
    - `prepare.py` — fixed constants, data prep. Do not modify.
    - `train.py` — the file you modify. Preprocessing, hyperparameters.
    - If any of `README.md`, `train.py`, or `pyproject.toml` are missing, stop and tell the human the repo is not ready for autonomous runs yet.
-4. **Verify data exists**: Check that `./.cache/` contains train set, test set and cross-validation ids. If not, tell the human to run `uv run prepare.py`.
+4. **Verify data exists**: Check that `./data/` contains train set, test set and cross-validation ids. If not, tell the human to run `uv run prepare.py`.
 5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
 6. **Confirm and go**: Confirm setup looks good.
 

@@ -126,6 +126,7 @@ celerybeat.pid
 .env.*
 !.env.example
 kaggle.json
+data/
 .venv
 env/
 venv/
