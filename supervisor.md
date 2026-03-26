@@ -21,11 +21,13 @@ You do **not** own:
 
 ## Setup
 
-1. Determine the run tag from the current branch name `autokaggle/<tag>`.
-2. Use the per-run local directory `artifacts/<run_tag>/`.
-3. Set your default wake-up cadence to 1 hour using `/loop`.
-4. You may change that cadence over time if the experiment state justifies it.
-5. Keep the cadence within a sane range:
+1. Confirm shared setup already created the run branch and that your current branch name is `autokaggle/<tag>`.
+2. Determine the run tag from that current branch name.
+3. Do not create, switch, or retarget branches during role setup. If you are not already on the prepared run branch, stop and tell the human setup was not completed correctly.
+4. Use the per-run local directory `artifacts/<run_tag>/`.
+5. Set your default wake-up cadence to 1 hour using `/loop`.
+6. You may change that cadence over time if the experiment state justifies it.
+7. Keep the cadence within a sane range:
    - default: 1 hour
    - minimum: 30 minutes
    - maximum: 4 hours

@@ -14,11 +14,13 @@ Read this file first, then switch to the appropriate role document.
 
 ## Shared setup
 
-To set up a new run, work with the user to:
+Do this setup once before starting either long-lived role agent:
 
 1. **Agree on a run tag**: propose a tag based on today's date (for example `mar26`). The branch `autokaggle/<tag>` must not already exist.
-2. **Create the branch**: confirm this directory is a git repo, then create `autokaggle/<tag>` from the current default branch.
-3. **Read the in-scope files**: the repo is small. Read these files for full context:
+2. **Refresh local `main`**: confirm this directory is a git repo, switch to `main`, and make sure it is the clean branch tip you want to branch from. If a remote-tracking `origin/main` exists, fast-forward local `main` first. If `main` is dirty or cannot be updated cleanly, stop and resolve that before continuing.
+3. **Create the run branch explicitly from `main`**: create `autokaggle/<tag>` from `main` itself, not from `HEAD`, another run branch, or a dirty worktree.
+4. **Record the base commit**: note the short commit hash at the tip of the new branch right after creation. Both role agents should start from this same commit.
+5. **Read the in-scope files**: the repo is small. Read these files for full context:
    - `README.md`
    - `prepare.py`
    - `runner.py`
@@ -26,9 +28,9 @@ To set up a new run, work with the user to:
    - `experimenter.md`
    - `supervisor.md`
    - if any of `README.md`, `runner.py`, `train.py`, or `pyproject.toml` are missing, stop and tell the human the repo is not ready
-4. **Verify data exists**: check that `./data/` contains the train set, test set, and cross-validation ids. If not, tell the human to run `uv run python prepare.py`.
-5. **Use per-run local artifacts**: all mutable local state for this run lives under `artifacts/<run_tag>/`. These files are intentionally untracked by git.
-6. **Confirm and go**: once setup looks good, start the experimenter and supervisor in parallel.
+6. **Verify data exists**: check that `./data/` contains the train set, test set, and cross-validation ids. If not, tell the human to run `uv run python prepare.py`.
+7. **Use per-run local artifacts**: all mutable local state for this run lives under `artifacts/<run_tag>/`. These files are intentionally untracked by git.
+8. **Confirm and go**: once setup looks good, start the experimenter and supervisor in parallel. They should inherit the already-created run branch rather than creating or retargeting branches themselves.
 
 ## Shared artifact layout
 
@@ -80,7 +82,9 @@ These files are local runtime artifacts, not part of git history.
 
 ## Shared execution model
 
+- Setup is single-threaded and finishes before the experimenter and supervisor start.
 - The experimenter and supervisor run in separate agent sessions.
+- They both inherit the already-created `autokaggle/<tag>` branch and recorded base commit.
 - They coordinate only through the shared local files in `artifacts/<run_tag>/`.
 - The supervisor writes concise steering guidance; the experimenter decides how to apply it inside the experiment loop.
 - The notes file is considered updated when its `Revision:` changes.

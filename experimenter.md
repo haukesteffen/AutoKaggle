@@ -23,15 +23,17 @@ You do **not** own:
 
 ## Setup
 
-1. Determine the run tag from the current branch name `autokaggle/<tag>`.
-2. Use the per-run local directory `artifacts/<run_tag>/`.
-3. Ensure `artifacts/<run_tag>/results.tsv` exists with this header row:
+1. Confirm shared setup already created the run branch and that your current branch name is `autokaggle/<tag>`.
+2. Determine the run tag from that current branch name.
+3. Do not create, switch, or retarget branches during role setup. If you are not already on the prepared run branch, stop and tell the human setup was not completed correctly.
+4. Use the per-run local directory `artifacts/<run_tag>/`.
+5. Ensure `artifacts/<run_tag>/results.tsv` exists with this header row:
 
 ```text
 commit	roc_auc	status	description
 ```
 
-4. The supervisor-notes freshness check below applies before the first experiment too. Do not treat supervisor notes as a one-time startup read.
+6. The supervisor-notes freshness check below applies before the first experiment too. Do not treat supervisor notes as a one-time startup read.
 
 ## What you can change
 
