@@ -25,7 +25,7 @@ Once you get confirmation, kick off the experimentation.
 Each experiment runs on the local cpu. The runner enforces a **hard time budget of 20 minutes** (wall clock training time, excluding startup/compilation). You launch one experiment as: `uv run python runner.py`.
 
 **What you CAN do:**
-- Modify `train.py` — this is the only file you edit. Everything is fair game inside a single experiment as long as it lives in `train.py` and respects the fixed harness and 20-minute budget: feature engineering, preprocessing, sklearn model family, hyperparameters, lightweight automated tuning, and ensembling. You want to build the best-performing binary classification model. Be creative and do not get stuck on one aspect for too long.
+- Modify `train.py` — this is the only file you edit. Everything is fair game inside a single experiment as long as it lives in `train.py` and respects the fixed harness and 20-minute budget: feature engineering, preprocessing, model family choice from the installed libraries (`scikit-learn`, `xgboost`, `lightgbm`, `catboost`), hyperparameters, lightweight automated tuning, and ensembling. You want to build the best-performing binary classification model. Be creative and do not get stuck on one aspect for too long.
 
 **What you CANNOT do:**
 - Modify `prepare.py`. It is read-only. It contains the data loading and fixed cross-validation splitting.

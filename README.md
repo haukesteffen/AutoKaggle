@@ -6,7 +6,7 @@ The repository is split into a fixed harness plus an editable experiment file:
 
 - `prepare.py` owns data prep plus the fixed cross-validation contract.
 - `runner.py` owns the experiment entrypoint, timeout handling, and result reporting.
-- `train.py` is the single editable file for feature engineering, preprocessing, and model choice.
+- `train.py` is the single editable file for feature engineering, preprocessing, and model choice across the installed families (`scikit-learn`, `xgboost`, `lightgbm`, and `catboost`).
 
 ## Prerequisites
 
