@@ -31,7 +31,7 @@ You do **not** own:
 commit	roc_auc	status	description
 ```
 
-4. If `artifacts/<run_tag>/supervisor_notes.md` exists, read it before starting the first experiment.
+4. The supervisor-notes freshness check below applies before the first experiment too. Do not treat supervisor notes as a one-time startup read.
 
 ## What you can change
 
@@ -86,11 +86,22 @@ Log every experiment to `artifacts/<run_tag>/results.tsv` using these columns:
 
 Use tabs, not commas.
 
+## Supervisor notes freshness check
+
+Before every experiment, including the first one:
+
+1. Check whether `artifacts/<run_tag>/supervisor_notes.md` exists.
+2. If it does not exist, continue normally.
+3. If it exists, inspect its `Revision:` line.
+4. If the file has no `Revision:` line, or if the revision is new or unknown to you, read the full file immediately and treat it as fresh guidance.
+5. If the revision is unchanged from the last revision you saw, you may proceed without re-reading the full file.
+6. Do not edit `train.py`, commit, or start `runner.py` until this check is complete.
+
 ## Experiment loop
 
 LOOP FOREVER:
 
-1. Read `artifacts/<run_tag>/supervisor_notes.md` if it exists before starting a new experiment.
+1. Run the supervisor-notes freshness check above before starting the next experiment.
 2. Record the current branch and starting commit before you edit anything.
 3. Tune `train.py` with one concrete experimental idea.
 4. Commit the change.
@@ -119,9 +130,9 @@ tail -n 50 artifacts/<run_tag>/run.log
 
 ## Working with supervisor guidance
 
-- Treat the supervisor notes as the current steering document.
+- Treat the highest `Revision:` you have observed as the current steering document.
 - Guidance is high priority, but not absolute.
-- If the guidance is stale, contradicted by recent evidence, or impossible to apply, use your judgment and note the deviation in the experiment description.
+- If the guidance from the latest revision is stale, contradicted by recent evidence, or impossible to apply, use your judgment and note the deviation in the experiment description.
 - Do not wait for the supervisor. If the notes file is missing, continue normally.
 
 ## Failure policy

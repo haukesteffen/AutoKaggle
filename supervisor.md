@@ -42,12 +42,16 @@ You may also read `experimenter.md` if you need to refresh the inner-loop contra
 
 ## Output
 
-Overwrite `artifacts/<run_tag>/supervisor_notes.md` with the current strategy. Do not append forever.
+When the strategy changes, overwrite `artifacts/<run_tag>/supervisor_notes.md` with the current strategy. Do not append forever.
+Whenever you overwrite the file, increment `Revision:` and refresh `Updated At:`. These fields are how the experimenter detects that the guidance changed.
 
 Use this fixed structure:
 
 ```md
 # Supervisor Notes
+
+Revision: 1
+Updated At: 2026-03-26T12:00:00Z
 
 ## Current Strategy
 - ...
@@ -87,7 +91,7 @@ At each wake-up:
 2. Inspect the current `train.py` to understand the active model direction.
 3. Inspect `artifacts/<run_tag>/run.log` if recent results suggest a crash or timeout trend.
 4. Decide whether the current strategy should stay the same, tighten, or rotate.
-5. Overwrite `artifacts/<run_tag>/supervisor_notes.md` with the updated strategy.
+5. If the strategy changed, overwrite `artifacts/<run_tag>/supervisor_notes.md`, increment `Revision:`, and refresh `Updated At:`. If the strategy is unchanged, leave the file untouched.
 6. Set your next `/loop` wake-up based on current experiment state.
 
 ## Early-run behavior

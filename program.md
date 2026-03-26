@@ -57,12 +57,14 @@ These files are local runtime artifacts, not part of git history.
 
 - May edit `train.py` and no other tracked file.
 - Owns experiment execution, git commits, keep/discard decisions, and updates to `artifacts/<run_tag>/results.tsv`.
-- Must read `artifacts/<run_tag>/supervisor_notes.md` before starting each new experiment, if it exists.
+- Must check `artifacts/<run_tag>/supervisor_notes.md` before every experiment, including the first one.
+- If the notes file exists and its `Revision:` is new or unknown, must read the full file before editing `train.py` or starting `runner.py`.
 
 **Supervisor**
 
 - Must not edit `train.py`, `prepare.py`, `runner.py`, `program.md`, `experimenter.md`, or any other tracked file.
 - Owns `artifacts/<run_tag>/supervisor_notes.md`.
+- Must include `Revision:` and `Updated At:` in the notes file, and update both whenever the notes change.
 - Uses `/loop` to wake up on a fixed interval, defaulting to 1 hour.
 - May adjust its own `/loop` interval over time if the experiment state justifies it.
 
@@ -81,7 +83,9 @@ These files are local runtime artifacts, not part of git history.
 - The experimenter and supervisor run in separate agent sessions.
 - They coordinate only through the shared local files in `artifacts/<run_tag>/`.
 - The supervisor writes concise steering guidance; the experimenter decides how to apply it inside the experiment loop.
+- The notes file is considered updated when its `Revision:` changes.
 - If the supervisor notes are missing, the experimenter proceeds normally.
+- Before every experiment, including the first one, the experimenter must check the current notes revision and re-read the full file if that revision is new or unknown.
 - If the supervisor notes are stale or clearly contradicted by current evidence, the experimenter may override them and should note the reason in the experiment description.
 
 Once the run starts, both roles are autonomous and should continue until interrupted by the human.
