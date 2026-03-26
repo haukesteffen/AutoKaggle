@@ -1,112 +1,87 @@
 # autokaggle
 
-This is an experiment to have an Agent compete in Kaggle's Playground Competition "Predict Customer Churn" (S6E3).
+This repository supports two long-lived agent roles working in parallel on Kaggle's Playground Competition "Predict Customer Churn" (S6E3):
 
-## Setup
+- The **experimenter** owns the experiment loop and is the only role allowed to edit `train.py`.
+- The **supervisor** periodically reviews the run history and current model direction, then writes steering guidance for the experimenter.
 
-To set up a new experiment, work with the user to:
+The detailed instructions for each role live in:
 
-1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar5`). The branch `autokaggle/<tag>` must not already exist — this is a fresh run.
-2. **Create the branch**: First confirm this directory is actually a git repo, then create `autokaggle/<tag>` from the current default branch.
-3. **Read the in-scope files**: The repo is small. Read these files for full context:
-   - `README.md` — repository context.
-   - `prepare.py` — fixed constants, data prep, cross-validation harness. Do not modify.
-   - `runner.py` — fixed experiment entrypoint, timeout handling. Do not modify.
-   - `train.py` — the file you modify. Preprocessing, features, hyperparameters.
-   - If any of `README.md`, `runner.py`, `train.py`, or `pyproject.toml` are missing, stop and tell the human the repo is not ready for autonomous runs yet.
-4. **Verify data exists**: Check that `./data/` contains train set, test set and cross-validation ids. If not, tell the human to run `uv run python prepare.py`.
-5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
-6. **Confirm and go**: Confirm setup looks good.
+- `experimenter.md`
+- `supervisor.md`
 
-Once you get confirmation, kick off the experimentation.
+Read this file first, then switch to the appropriate role document.
 
-## Experimentation
+## Shared setup
 
-Each experiment runs on the local cpu. The runner enforces a **hard time budget of 20 minutes** (wall clock training time, excluding startup/compilation). You launch one experiment as: `uv run python runner.py`.
+To set up a new run, work with the user to:
 
-**What you CAN do:**
-- Modify `train.py` — this is the only file you edit. Everything is fair game inside a single experiment as long as it lives in `train.py` and respects the fixed harness and 20-minute budget: feature engineering, preprocessing, model family choice from the installed libraries (`scikit-learn`, `xgboost`, `lightgbm`, `catboost`), hyperparameters, lightweight automated tuning, and ensembling. You want to build the best-performing binary classification model. Be creative and do not get stuck on one aspect for too long.
+1. **Agree on a run tag**: propose a tag based on today's date (for example `mar26`). The branch `autokaggle/<tag>` must not already exist.
+2. **Create the branch**: confirm this directory is a git repo, then create `autokaggle/<tag>` from the current default branch.
+3. **Read the in-scope files**: the repo is small. Read these files for full context:
+   - `README.md`
+   - `prepare.py`
+   - `runner.py`
+   - `train.py`
+   - `experimenter.md`
+   - `supervisor.md`
+   - if any of `README.md`, `runner.py`, `train.py`, or `pyproject.toml` are missing, stop and tell the human the repo is not ready
+4. **Verify data exists**: check that `./data/` contains the train set, test set, and cross-validation ids. If not, tell the human to run `uv run python prepare.py`.
+5. **Use per-run local artifacts**: all mutable local state for this run lives under `artifacts/<run_tag>/`. These files are intentionally untracked by git.
+6. **Confirm and go**: once setup looks good, start the experimenter and supervisor in parallel.
 
-**What you CANNOT do:**
-- Modify `prepare.py`. It is read-only. It contains the data loading and fixed cross-validation splitting.
-- Modify `runner.py`. It is read-only. It contains the experiment entrypoint, timeout handling, and result reporting.
-- Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
-- Modify the evaluation harness. The `evaluate_model` function in `prepare.py` and the timeout logic in `runner.py` are the ground truth protocol.
+## Shared artifact layout
 
-**The goal is simple: get the highest mean area under the receiver operating characteristic curve (roc_auc) across cross-validation folds.** The time budget is an upper bound, not a target. If a run finishes in one minute, log it and move on to the next experiment. The only constraints are that the code runs without crashing and finishes within the time budget.
+The run tag is the suffix in the dedicated branch name, such as:
 
-**Simplicity criterion**: All else being equal, simpler is better. A small improvement that adds ugly complexity is not worth it. Conversely, removing something and getting equal or better results is a great outcome — that's a simplification win. When evaluating whether to keep a change, weigh the complexity cost against the improvement magnitude. A 0.00001 roc_auc improvement that adds 20 lines of hacky code? Probably not worth it. A 0.00001 roc_auc improvement from deleting code? Definitely keep. An improvement of ~0 but much simpler code? Keep.
+- `autokaggle/mar26` -> run tag `mar26`
+- `autokaggle/mar26-cpu0` -> run tag `mar26-cpu0`
 
-**The first run**: Your very first run should always be to establish the baseline, so you will run the baseline experiment as is through `runner.py`.
+All mutable local files for a run live under:
 
-## Output format
-
-Once the runner finishes successfully it prints a summary like this:
-
-```
----
-experiment_name:   baseline_hist_gradient_boosting
-status:            ok
-mean_cv_roc_auc:   0.915923
-std_cv_roc_auc:    0.001244
-completed_folds:   5/5
-training_seconds:  43.4
-total_seconds:     44.2
+```text
+artifacts/<run_tag>/
 ```
 
-If a run times out or crashes, `mean_cv_roc_auc` will be absent from the log. You can extract the key metric from a successful run with:
+The expected files are:
 
-```bash
-grep "^mean_cv_roc_auc:" run.log
-```
+- `artifacts/<run_tag>/results.tsv`
+- `artifacts/<run_tag>/run.log`
+- `artifacts/<run_tag>/supervisor_notes.md`
 
-## Logging results
+These files are local runtime artifacts, not part of git history.
 
-When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated — commas break in descriptions).
+## Shared role boundaries
 
-The TSV has a header row and 4 columns:
+**Experimenter**
 
-```
-commit  roc_auc status description
-```
+- May edit `train.py` and no other tracked file.
+- Owns experiment execution, git commits, keep/discard decisions, and updates to `artifacts/<run_tag>/results.tsv`.
+- Must read `artifacts/<run_tag>/supervisor_notes.md` before starting each new experiment, if it exists.
 
-1. git commit hash (short, 7 chars)
-2. roc_auc achieved (e.g. 0.915923) — use 0.000000 for crashes
-3. status: `keep`, `discard`, or `crash`
-4. short text description of what this experiment tried
+**Supervisor**
 
-Example:
+- Must not edit `train.py`, `prepare.py`, `runner.py`, `program.md`, `experimenter.md`, or any other tracked file.
+- Owns `artifacts/<run_tag>/supervisor_notes.md`.
+- Uses `/loop` to wake up on a fixed interval, defaulting to 1 hour.
+- May adjust its own `/loop` interval over time if the experiment state justifies it.
 
-```
-commit	roc_auc	status	description
-a1b2c3d	0.914900    keep	baseline
-b2c3d4e	0.915201	keep	change max_depth to 4
-c3d4e5f	0.883325	discard	add categorical feature crosses
-d4e5f6g	0.000000	crash	optuna tuning (thread contention)
-```
+## Shared constraints
 
-## The experiment loop
+- `prepare.py` is read-only. It owns data preparation and the fixed cross-validation split.
+- `runner.py` is read-only. It owns timeout handling and result reporting.
+- Do not install new packages or modify dependencies.
+- The evaluation harness in `prepare.py` and `runner.py` is the ground truth protocol.
+- Each experiment must finish within the hard 20-minute time budget enforced by `runner.py`.
+- The goal is to maximize mean cross-validation roc_auc.
+- Simpler solutions are preferred when performance is equal or nearly equal.
 
-The experiment runs on a dedicated branch (e.g. `autokaggle/mar5` or `autokaggle/mar5-cpu0`).
+## Shared execution model
 
-LOOP FOREVER:
+- The experimenter and supervisor run in separate agent sessions.
+- They coordinate only through the shared local files in `artifacts/<run_tag>/`.
+- The supervisor writes concise steering guidance; the experimenter decides how to apply it inside the experiment loop.
+- If the supervisor notes are missing, the experimenter proceeds normally.
+- If the supervisor notes are stale or clearly contradicted by current evidence, the experimenter may override them and should note the reason in the experiment description.
 
-1. Look at the git state: record the current branch and starting commit before you edit anything
-2. Tune `train.py` with an experimental idea by directly hacking the code.
-3. git commit
-4. Run the experiment: `uv run python runner.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
-5. Read out the results: `grep "^mean_cv_roc_auc:" run.log`
-6. If the grep output is empty, the run timed out or crashed. Run `tail -n 50 run.log` to read the timeout summary or Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
-7. Record the results in the tsv (NOTE: do not commit the results.tsv file, leave it untracked by git)
-8. If roc_auc improved (higher), you "advance" the branch, keeping the git commit
-9. If roc_auc is equal or worse, reset back to the starting commit you recorded before the experiment
-
-The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
-
-**Timeout**: Each experiment must finish within 20 minutes of training time. If the runner kills it for exceeding the budget, treat it as a failure (discard and revert).
-
-**Crashes**: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
-
-**NEVER STOP**: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working *indefinitely* until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
-
-As an example use case, a user might leave you running while they sleep. If each experiment takes you ~20 minutes then you can run approx 3/hour, for a total of about 24 over the duration of the average human sleep. The user then wakes up to experimental results, all completed by you while they slept!
+Once the run starts, both roles are autonomous and should continue until interrupted by the human.
