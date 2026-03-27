@@ -81,19 +81,8 @@ ON FileChanged($REPO/engineer-promotions.md):
 ## Submission Workflow
 
 ```
-1. Write promotion.py to load test-preds.npy and produce submission.csv
-   with "id" and "Churn" probability columns:
-
-   import numpy as np, pandas as pd
-   from pathlib import Path
-
-   HASH = "<hash>"
-   ARTIFACTS = Path("<root>/AutoKaggle/artifacts/<tag>/experiments") / HASH
-   TEST_PATH = Path("<root>/AutoKaggle/data/test.csv")
-
-   test_ids = pd.read_csv(TEST_PATH)["id"]
-   preds = np.load(ARTIFACTS / "test-preds.npy")
-   pd.DataFrame({"id": test_ids, "Churn": preds}).to_csv("submission.csv", index=False)
+1. Run promotion.py to produce submission.csv:
+   uv run python promotion.py --artifact-dir $ARTIFACTS/experiments/<hash>
 
 2. Run harness/promotion_runner.py --hash <hash> --tag <tag>
    This submits submission.csv via:
