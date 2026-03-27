@@ -112,16 +112,17 @@ def evaluate_model(
     feature_builder: FeatureBuilder,
     deadline: float,
     on_fold_complete: ProgressCallback | None = None,
-) -> EvaluationResult:
+) -> tuple[EvaluationResult, np.ndarray]:
     train_df = load_train_with_folds()
     raw_X, y = split_xy(train_df)
 
     fold_scores: list[float] = []
+    oof_preds = np.full(len(train_df), np.nan, dtype=float)
     training_start = time.perf_counter()
 
     for fold in sorted(train_df[FOLD_COLUMN].unique()):
         if time.monotonic() >= deadline:
-            return _timeout_result(fold_scores, training_start)
+            return _timeout_result(fold_scores, training_start, oof_preds)
 
         train_mask = train_df[FOLD_COLUMN] != fold
         valid_mask = ~train_mask
@@ -133,24 +134,30 @@ def evaluate_model(
         model = model_builder(X_train.head(0).copy())
         model.fit(X_train, y[train_mask.to_numpy()])
         if time.monotonic() >= deadline:
-            return _timeout_result(fold_scores, training_start)
+            return _timeout_result(fold_scores, training_start, oof_preds)
 
-        valid_pred = _predict_positive_scores(model, X_valid)
+        valid_pred = predict_positive_scores(model, X_valid)
+        oof_preds[valid_mask.to_numpy()] = valid_pred
         if time.monotonic() >= deadline:
-            return _timeout_result(fold_scores, training_start)
+            return _timeout_result(fold_scores, training_start, oof_preds)
 
         fold_scores.append(score_fold(y[valid_mask.to_numpy()], valid_pred))
         if on_fold_complete is not None:
             on_fold_complete(len(fold_scores))
 
     training_seconds = time.perf_counter() - training_start
-    return EvaluationResult(
-        fold_scores=fold_scores,
-        mean_score=float(np.mean(fold_scores)),
-        std_score=float(np.std(fold_scores)),
-        completed_folds=len(fold_scores),
-        training_seconds=training_seconds,
-        timed_out=False,
+    if np.isnan(oof_preds).any():
+        raise ValueError("missing out-of-fold predictions after successful evaluation")
+    return (
+        EvaluationResult(
+            fold_scores=fold_scores,
+            mean_score=float(np.mean(fold_scores)),
+            std_score=float(np.std(fold_scores)),
+            completed_folds=len(fold_scores),
+            training_seconds=training_seconds,
+            timed_out=False,
+        ),
+        oof_preds,
     )
 
 
@@ -168,7 +175,7 @@ def _validate_feature_columns(X_train: pd.DataFrame, X_valid: pd.DataFrame) -> N
         raise ValueError("build_features must return the same columns for train and valid splits")
 
 
-def _predict_positive_scores(model: Any, X_valid: pd.DataFrame) -> np.ndarray:
+def predict_positive_scores(model: Any, X_valid: pd.DataFrame) -> np.ndarray:
     if hasattr(model, "predict_proba"):
         pred = np.asarray(model.predict_proba(X_valid))
         if pred.ndim != 2 or pred.shape[1] < 2:
@@ -186,14 +193,19 @@ def _predict_positive_scores(model: Any, X_valid: pd.DataFrame) -> np.ndarray:
     raise TypeError("build_model must return an estimator with predict_proba or decision_function")
 
 
-def _timeout_result(fold_scores: list[float], training_start: float) -> EvaluationResult:
-    return EvaluationResult(
-        fold_scores=fold_scores,
-        mean_score=None,
-        std_score=None,
-        completed_folds=len(fold_scores),
-        training_seconds=time.perf_counter() - training_start,
-        timed_out=True,
+def _timeout_result(
+    fold_scores: list[float], training_start: float, oof_preds: np.ndarray
+) -> tuple[EvaluationResult, np.ndarray]:
+    return (
+        EvaluationResult(
+            fold_scores=fold_scores,
+            mean_score=None,
+            std_score=None,
+            completed_folds=len(fold_scores),
+            training_seconds=time.perf_counter() - training_start,
+            timed_out=True,
+        ),
+        oof_preds,
     )
 
 

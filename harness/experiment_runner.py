@@ -1,3 +1,4 @@
+import argparse
 import multiprocessing as mp
 import os
 import queue
@@ -5,6 +6,7 @@ import subprocess
 import sys
 import time
 import traceback
+from pathlib import Path
 
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(os.cpu_count() or 1))
 
@@ -12,6 +14,8 @@ from harness.dataset import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, eva
 
 
 def main() -> None:
+    args = _parse_args()
+
     try:
         _enforce_edit_boundary()
     except RuntimeError as exc:
@@ -29,6 +33,7 @@ def main() -> None:
     experiment_name = "unnamed"
     completed_folds = 0
     result: EvaluationResult | None = None
+    oof_preds = None
 
     while True:
         remaining = deadline - time.monotonic()
@@ -60,6 +65,7 @@ def main() -> None:
         if message_type == "result":
             experiment_name = message["experiment_name"]
             result = message["result"]
+            oof_preds = message["oof_preds"]
             break
         if message_type == "error":
             experiment_name = message["experiment_name"]
@@ -94,6 +100,15 @@ def main() -> None:
         result=result,
         total_seconds=total_seconds,
     )
+    if args.artifact_dir is not None:
+        if oof_preds is None:
+            print("artifact generation failed: worker did not return out-of-fold predictions", file=sys.stderr)
+            raise SystemExit(1)
+        try:
+            _generate_artifacts(args.artifact_dir, oof_preds)
+        except BaseException as exc:
+            print(f"artifact generation failed: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
 
 
 def _run_evaluation(messages: mp.Queue) -> None:
@@ -104,7 +119,7 @@ def _run_evaluation(messages: mp.Queue) -> None:
         experiment_name = getattr(experiment, "EXPERIMENT_NAME", experiment_name)
         messages.put({"type": "start", "experiment_name": experiment_name})
 
-        result = evaluate_model(
+        result, oof_preds = evaluate_model(
             model_builder=experiment.build_model,
             feature_builder=experiment.build_features,
             deadline=time.monotonic() + TIME_BUDGET_SECONDS,
@@ -117,6 +132,7 @@ def _run_evaluation(messages: mp.Queue) -> None:
                 "type": "result",
                 "experiment_name": experiment_name,
                 "result": result,
+                "oof_preds": oof_preds,
             }
         )
     except BaseException:
@@ -148,6 +164,12 @@ def _enforce_edit_boundary() -> None:
         raise RuntimeError(f"tracked edits outside experiment.py are not allowed during experiment runs: {joined}")
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--artifact-dir", type=Path)
+    return parser.parse_args()
+
+
 def _terminate_process(process: mp.Process) -> None:
     if process.is_alive():
         process.terminate()
@@ -155,6 +177,43 @@ def _terminate_process(process: mp.Process) -> None:
     if process.is_alive():
         process.kill()
         process.join(timeout=1)
+
+
+def _generate_artifacts(artifact_dir: Path, oof_preds) -> None:
+    import pickle
+
+    import numpy as np
+    import pandas as pd
+
+    import experiment
+    from harness.dataset import ID_COLUMN, TEST_PATH, load_train_with_folds, predict_positive_scores, split_xy
+
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    np.save(artifact_dir / "oof-preds.npy", oof_preds)
+
+    train_df = load_train_with_folds()
+    raw_X, y = split_xy(train_df)
+    X_full = experiment.build_features(raw_X.copy())
+    if not hasattr(X_full, "columns") or len(X_full) != len(raw_X):
+        raise TypeError("build_features must return a pandas DataFrame with the original row count")
+
+    model = experiment.build_model(X_full.head(0).copy())
+    model.fit(X_full, y)
+
+    with (artifact_dir / "model.pkl").open("wb") as f:
+        pickle.dump(model, f)
+
+    test_df = pd.read_csv(TEST_PATH).drop(columns=[ID_COLUMN])
+    X_test = experiment.build_features(test_df.copy())
+    if not hasattr(X_test, "columns") or len(X_test) != len(test_df):
+        raise TypeError("build_features must return a pandas DataFrame with the original row count")
+    if X_full.columns.tolist() != X_test.columns.tolist():
+        raise ValueError("build_features must return the same columns for train and test splits")
+
+    test_preds = predict_positive_scores(model, X_test)
+    np.save(artifact_dir / "test-preds.npy", test_preds)
+
+    print(f"artifacts written to {artifact_dir}")
 
 
 def _print_success_summary(experiment_name: str, result: EvaluationResult, total_seconds: float) -> None:
