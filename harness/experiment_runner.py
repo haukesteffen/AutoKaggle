@@ -8,7 +8,7 @@ import traceback
 
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(os.cpu_count() or 1))
 
-from prepare import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
+from harness.dataset import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
 
 
 def main() -> None:
@@ -99,14 +99,14 @@ def main() -> None:
 def _run_evaluation(messages: mp.Queue) -> None:
     experiment_name = "unnamed"
     try:
-        import train
+        import experiment
 
-        experiment_name = getattr(train, "EXPERIMENT_NAME", experiment_name)
+        experiment_name = getattr(experiment, "EXPERIMENT_NAME", experiment_name)
         messages.put({"type": "start", "experiment_name": experiment_name})
 
         result = evaluate_model(
-            model_builder=train.build_model,
-            feature_builder=train.build_features,
+            model_builder=experiment.build_model,
+            feature_builder=experiment.build_features,
             deadline=time.monotonic() + TIME_BUDGET_SECONDS,
             on_fold_complete=lambda completed: messages.put(
                 {"type": "progress", "completed_folds": completed}
@@ -142,10 +142,10 @@ def _enforce_edit_boundary() -> None:
         completed = subprocess.run(command, check=True, capture_output=True, text=True)
         changed_paths.update(line.strip() for line in completed.stdout.splitlines() if line.strip())
 
-    disallowed = sorted(path for path in changed_paths if path != "train.py")
+    disallowed = sorted(path for path in changed_paths if path != "experiment.py")
     if disallowed:
         joined = ", ".join(disallowed)
-        raise RuntimeError(f"tracked edits outside train.py are not allowed during experiment runs: {joined}")
+        raise RuntimeError(f"tracked edits outside experiment.py are not allowed during experiment runs: {joined}")
 
 
 def _terminate_process(process: mp.Process) -> None:

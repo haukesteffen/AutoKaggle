@@ -167,7 +167,6 @@ cython_debug/
 
 # AutoKaggle local artifacts
 artifacts/
-results.tsv
 catboost_info/
 .claude/
 

@@ -5,7 +5,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
-from prepare import RANDOM_STATE
+from harness.dataset import RANDOM_STATE
 
 
 EXPERIMENT_NAME = "baseline_hist_gradient_boosting"
