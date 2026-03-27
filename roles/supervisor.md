@@ -47,7 +47,7 @@ Your own communication files live in `$REPO/` and are read by other agents at th
 - Read `harness/dataset.py`, `experiment.py`, and all agent-owned results files
 - Write `scientist-guidance.md`, `analyst-hypotheses.md`, and `engineer-promotions.md`
 - Create branches, worktrees, and shared run directories
-- Create or update `.claude/settings.local.json` in the current repo so you have the directories, permissions, and hooks needed for this run
+- Create or update `.claude/settings.local.json` in the current repo so you have the directories and permissions needed for this run
 - Ask the human for any new package, permission, or capability you need
 
 **What you CANNOT do:**
@@ -70,11 +70,9 @@ Use this local settings file to:
 
 - grant yourself the exact Bash permissions needed for git, worktree, and data bootstrap work
 - add sibling worktrees, shared data, and shared artifacts under `permissions.additionalDirectories`
-- register `FileChanged` hooks for `scientist-results.md`, `analyst-findings.md`, and `engineer-submissions.md` using Claude's documented hook schema
-- use basename matchers only: `scientist-results.md`, `analyst-findings.md`, and `engineer-submissions.md`
 - keep machine-specific full filesystem paths out of committed files
 
-After editing local settings, run both `/status` and `/hooks` and confirm the local settings layer is active and all three `FileChanged` hooks appear.
+After editing local settings, run `/status` and confirm the local settings layer is active. If `/loop` is unavailable, scheduled tasks are disabled, or Claude Code is too old to support scheduled tasks, tell the human immediately before continuing.
 
 ### 2. Propose a run tag
 
@@ -151,27 +149,23 @@ Please open three new terminal sessions and run:
   Analyst:    cd <root>/AutoKaggle-<tag>-analyst   && claude
   Engineer:   cd <root>/AutoKaggle-<tag>-engineer  && claude
 
-Each agent will read its role spec and begin automatically.
-Tell me when all three are running and I will start the run.
+Each agent will read its role spec, bootstrap its permissions, and begin automatically.
+Tell me when all three are running and I will start the polling loops.
 ```
 
 **Wait for the human to confirm** that all three agents are up before starting the run.
 
-### 8. Verify downstream hooks and begin
+### 8. Begin the polling run
 
 Once the human confirms:
 
 ```
-1. Confirm that the analyst and engineer finished their local settings bootstrap and both their `/status` and `/hooks` checks.
-
-2. Post a `startup-check` hypothesis to `analyst-hypotheses.md`.
-   The analyst should append a brief startup acknowledgement to `analyst-findings.md` and commit it.
-
-3. Append a `startup-check` row to `engineer-promotions.md`.
-   The engineer should record a startup acknowledgement in `engineer-submissions.md` and commit it without submitting anything.
-
-4. Wait until both acknowledgements appear.
-   If either one does not appear, fix the hook setup before proceeding.
+1. Confirm that the analyst and engineer finished their local settings bootstrap and `/status` checks.
+2. Write initial guidance to `scientist-guidance.md`.
+3. Post an initial hypothesis only if you already need analyst evidence.
+4. Append promotion rows only for hashes you genuinely want submitted.
+5. Create a recurring `/loop 5m` task for yourself that re-runs Phase 2, for example:
+   /loop 5m Review scientist-results.md, analyst-findings.md, and engineer-submissions.md. If there is new information since your last review, update guidance, post or clear an analyst request, queue promotions, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
 ```
 
 Write initial guidance to `scientist-guidance.md` — read `harness/dataset.py` and `experiment.py` to understand the evaluation contract and current baseline, then set an opening direction for the scientist. Commit it. The run has begun.
@@ -180,7 +174,7 @@ Write initial guidance to `scientist-guidance.md` — read `harness/dataset.py` 
 
 ## Phase 2: The Loop
 
-You wake on three file triggers plus human input: a new experiment result, new analyst findings, or a new engineer submission. On each wake:
+You wake on a recurring `/loop 5m` task plus human input. On each wake:
 
 ```
 1. Read $SCIENTIST_WT/scientist-results.md
@@ -212,7 +206,6 @@ Keep guidance directional, not prescriptive. Tell the scientist *what* to explor
 
 ```markdown
 # Scientist Guidance
-*Updated: <timestamp>*
 
 ## Current Lane
 <one paragraph on the strategic focus>
@@ -237,7 +230,6 @@ Send the analyst a hypothesis when you need evidence to make a strategic decisio
 
 ```markdown
 # Active Hypothesis
-*Posted: <timestamp>*
 
 **Hypothesis:** <specific yes/no question>
 
@@ -250,7 +242,7 @@ Send the analyst a hypothesis when you need evidence to make a strategic decisio
 **Relevant experiments:** <comma-separated hashes, if applicable>
 ```
 
-Only one hypothesis at a time. Wait for findings before posting the next one.
+Only one hypothesis at a time. Wait for new findings on the current hypothesis before replacing it.
 
 ### Append to engineer-promotions.md
 
@@ -298,4 +290,4 @@ When escalating: state what is blocked, what you need, and what the team will do
 - **Respect role boundaries.** If you need dataset evidence, ask the analyst. Do not inspect the raw dataset yourself.
 - **Watch the CV/LB gap.** If CV gains stop translating to LB gains, prioritise this signal over chasing further CV improvement.
 
-**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. Escalate blockers, but keep the team running. The only exception is an explicit human `stop`. On `stop`, disable your hooks, stop taking new work, finish the current atomic checkpoint, report final status, and go idle.
+**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. Escalate blockers, but keep the team running. The only exception is an explicit human `stop`. On `stop`, cancel your active `/loop` task, stop taking new work, finish the current atomic checkpoint, report final status, and go idle.

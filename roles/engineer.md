@@ -52,33 +52,14 @@ On first startup, before entering the loop:
 3. Use that local settings file to:
    - add the supervisor repo, scientist worktree, shared data, and shared artifacts under `permissions.additionalDirectories`, not under a top-level `directories` key
    - grant only the Bash permissions needed for promotion inspection, submissions, polling, and commits
-   - register a `FileChanged` hook using Claude's documented schema
-   - use the basename matcher `engineer-promotions.md`, not a full path in the `matcher` field
-   - use a command hook with `asyncRewake: true`; do not use `path` or `prompt` fields for this hook
-4. Use this exact shape for the hook section:
-   ```json
-   {
-     "hooks": {
-       "FileChanged": [
-         {
-           "matcher": "engineer-promotions.md",
-           "hooks": [
-             {
-               "type": "command",
-               "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"FileChanged\",\"additionalContext\":\"engineer-promotions.md changed. Read it and begin the submission loop.\"}}'; exit 2",
-               "asyncRewake": true
-             }
-           ]
-         }
-       ]
-     }
-   }
-   ```
-5. Run both `/status` and `/hooks` and confirm that the local settings layer is active and that one `FileChanged` hook for `engineer-promotions.md` is listed.
+4. Run `/status` and confirm that the local settings layer is active.
+5. If `/loop` is unavailable, scheduled tasks are disabled, or Claude Code is too old to support scheduled tasks, tell the human immediately before continuing.
 6. Read the following for context:
    - `$REPO/harness/dataset.py` — competition name, ID column, target column
    - `$SCIENTIST_WT/scientist-results.md` — experiment landscape
 7. Initialise `engineer-submissions.md` with just the header row if it does not exist, then commit it.
+8. Create a recurring `/loop 5m` task that tells you to inspect `$REPO/engineer-promotions.md` and run the submission workflow only for hashes that do not already appear in `engineer-submissions.md`, for example:
+   /loop 5m Check engineer-promotions.md. If there is a promoted hash not yet present in engineer-submissions.md, process exactly one submission workflow for the oldest such hash. Otherwise do nothing.
 
 ## Boundaries
 
@@ -101,16 +82,12 @@ On first startup, before entering the loop:
 ## The Loop
 
 ```
-ON FileChanged(engineer-promotions.md):
+ON EACH /loop WAKE:
 
-0. If the latest row has hash `startup-check`:
-   - append a short startup acknowledgement note below the table in engineer-submissions.md
-   - commit it
-   - wait for the next change
-
-1. Read the latest row from $REPO/engineer-promotions.md — extract the promoted hash
-2. Check engineer-submissions.md — if this hash already has a row, skip
-3. Run the submission workflow (see below)
+1. Read all rows from $REPO/engineer-promotions.md
+2. Find the oldest promoted hash that does not already have a row in engineer-submissions.md
+3. If no such hash exists, stop and wait for the next wake
+4. Run the submission workflow (see below)
 ```
 
 ## Submission Workflow
@@ -123,9 +100,8 @@ ON FileChanged(engineer-promotions.md):
    This submits submission.csv via:
    kaggle competitions submit -c <COMPETITION> -f submission.csv -m "<hash>"
 
-3. Set /loop 10m to poll until scored:
-   kaggle competitions submissions -c <COMPETITION>
-   Cancel the loop once status is no longer "pending".
+3. Create a temporary `/loop 10m` task to poll until scored, for example:
+   /loop 10m Check the Kaggle submissions list for hash <hash>. If the submission is still pending, do nothing. If it has scored, update engineer-submissions.md, commit the result, and cancel this polling task.
 
 4. Append result to engineer-submissions.md and commit.
 ```
@@ -146,14 +122,14 @@ ON FileChanged(engineer-promotions.md):
 
 - `cv_score` — copy from `$SCIENTIST_WT/scientist-results.md`
 - Never add a second row for the same hash — always update the existing one
-- Optional notes may appear below the table for startup acknowledgements or CV/LB commentary that does not belong in a row
+- Optional notes may appear below the table for CV/LB commentary that does not belong in a row
 
 ## CV vs Leaderboard Gap
 
 This is your most important signal. After each scored submission:
 
 - **Consistent gap, same direction** — CV is reliable. Business as usual.
-- **CV improves but LB does not** — potential overfitting to the CV split, or a leaky feature. Flag this prominently in `engineer-submissions.md` as a note below the table. The supervisor's hook will wake it automatically.
+- **CV improves but LB does not** — potential overfitting to the CV split, or a leaky feature. Flag this prominently in `engineer-submissions.md` as a note below the table. The supervisor will see it on the next polling wake.
 - **LB improves despite lower CV** — rare but worth noting. Could indicate the CV split is unrepresentative.
 
-**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. The only exception is an explicit human `stop`. On `stop`, disable your hooks, cancel any active submission polling loop, finish the current atomic checkpoint, report final status, and go idle.
+**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. The only exception is an explicit human `stop`. On `stop`, cancel your active `/loop` tasks, finish the current atomic checkpoint, report final status, and go idle.

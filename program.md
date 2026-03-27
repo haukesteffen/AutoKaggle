@@ -67,26 +67,23 @@ cd <root>/AutoKaggle-<tag>-analyst && claude
 cd <root>/AutoKaggle-<tag>-engineer && claude
 ```
 
-Each agent reads its own role spec, bootstraps its local Claude settings, and begins autonomously. Tell the supervisor when all three are running — it will then start the hook-driven run.
+Each agent reads its own role spec, bootstraps its local Claude settings, and begins autonomously. Tell the supervisor when all three are running — it will then start the polling-driven run.
 
 ### Step 3 — Let each agent bootstrap local Claude settings
 
-Each agent should ask once, early, for permission to create or update `.claude/settings.local.json` in its current worktree. Use this untracked local file for per-agent permissions, `permissions.additionalDirectories`, and hook registration. Do not invent a top-level `directories` key.
+Each agent should ask once, early, for permission to create or update `.claude/settings.local.json` in its current worktree. Use this untracked local file for per-agent permissions and `permissions.additionalDirectories`. Do not invent a top-level `directories` key. Do not configure hooks for this repository.
 
 Keep the committed `.claude/settings.json` path-free and shared. Keep any machine-specific full filesystem paths only in local settings derived at runtime from the current repo and branch layout.
 
-For `FileChanged` hooks, use basename matchers such as `analyst-hypotheses.md` or `engineer-promotions.md`, not full filesystem paths in the `matcher` field.
+After bootstrapping local settings, each agent should run `/status` and confirm that the local settings layer is active.
 
-After bootstrapping local settings, each agent should run both `/status` and `/hooks` and confirm that the local settings layer is active and the expected hooks are present.
+The analyst, engineer, and supervisor should then enter recurring `/loop` tasks as described in their role specs. `/loop` scheduled tasks are session-scoped, fire only while Claude is open and idle, and expire after 3 days. If `/loop` is unavailable, scheduled tasks are disabled, or a loop disappears, the agent must tell the human immediately and recreate the task once the issue is resolved.
 
-### Step 4 — Verify hooks before calling the run live
+### Step 4 — Start polling loops and call the run live
 
-After all three role sessions are running and have bootstrapped local settings, the supervisor sends one sentinel update to each hook-driven inbox file:
+After all three role sessions are running and have bootstrapped local settings, the supervisor writes the opening guidance and any initial analyst hypothesis or promotion queue entries, then enters its own review loop.
 
-- `analyst-hypotheses.md` gets a `startup-check` hypothesis
-- `engineer-promotions.md` gets a `startup-check` row
-
-The receiving agent must acknowledge that sentinel before normal work starts. Do not consider the run live until those smoke tests pass.
+Do not use file hooks or sentinel writes in this repository. Coordination is polling-based.
 
 ---
 
@@ -158,8 +155,8 @@ A run ends when the human says `stop`. This overrides every autonomy instruction
 When `stop` is given, each agent should:
 
 1. Stop taking new work immediately.
-2. Disable its hooks in `.claude/settings.local.json`.
-3. Cancel any active polling or keepalive loop it started.
+2. Cancel any active `/loop` scheduled task it started.
+3. Do not create any new scheduled tasks.
 4. Finish only the current atomic checkpoint.
 5. Commit its owned status files if needed.
 6. Report a final status note, then go idle or exit.

@@ -54,34 +54,15 @@ On first startup, before entering the loop:
 3. Use that local settings file to:
    - add the supervisor repo, scientist worktree, shared data, and shared artifacts under `permissions.additionalDirectories`, not under a top-level `directories` key
    - grant only the Bash permissions needed for analysis, git inspection, and commits
-   - register a `FileChanged` hook using Claude's documented schema
-   - use the basename matcher `analyst-hypotheses.md`, not a full path in the `matcher` field
-   - use a command hook with `asyncRewake: true`; do not use `path` or `prompt` fields for this hook
-4. Use this exact shape for the hook section:
-   ```json
-   {
-     "hooks": {
-       "FileChanged": [
-         {
-           "matcher": "analyst-hypotheses.md",
-           "hooks": [
-             {
-               "type": "command",
-               "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"FileChanged\",\"additionalContext\":\"analyst-hypotheses.md changed. Read it and begin the analysis loop.\"}}'; exit 2",
-               "asyncRewake": true
-             }
-           ]
-         }
-       ]
-     }
-   }
-   ```
-5. Run both `/status` and `/hooks` and confirm that the local settings layer is active and that one `FileChanged` hook for `analyst-hypotheses.md` is listed.
+4. Run `/status` and confirm that the local settings layer is active.
+5. If `/loop` is unavailable, scheduled tasks are disabled, or Claude Code is too old to support scheduled tasks, tell the human immediately before continuing.
 6. Read the following for context:
    - `$DATA/train.csv` — raw features and target distribution
    - `$SCIENTIST_WT/scientist-results.md` — full experiment history
    - `$SCIENTIST_WT/experiment.py` — current state of feature engineering and model
 7. Initialise `analyst-findings.md` with just a header if it does not exist, then commit it.
+8. Create a recurring `/loop 5m` task that tells you to inspect `$REPO/analyst-hypotheses.md` and run the analysis workflow only when that file has changed since your last completed analysis, for example:
+   /loop 5m Check analyst-hypotheses.md. If it has changed since your last completed analysis, run the analysis workflow and commit the result. Otherwise do nothing.
 
 ## Boundaries
 
@@ -106,23 +87,20 @@ On first startup, before entering the loop:
 ## The Loop
 
 ```
-ON FileChanged(analyst-hypotheses.md):
-
-0. If the file contains a `startup-check` hypothesis:
-   - append a brief startup acknowledgement to `analyst-findings.md`
-   - commit it
-   - wait for the next change
+ON EACH /loop WAKE:
 
 1. Read the hypothesis from $REPO/analyst-hypotheses.md
-2. Answer the posted yes/no question directly. Do not broaden the task unless it is required to resolve that question.
-3. Write analysis.py to answer it (see below)
-4. Run the analysis harness:
+2. If the file has not changed since your last completed analysis, stop and wait for the next wake.
+3. If there is no active hypothesis in the file, stop and wait for the next wake.
+4. Answer the posted yes/no question directly. Do not broaden the task unless it is required to resolve that question.
+5. Write analysis.py to answer it (see below)
+6. Run the analysis harness:
    uv run python -m harness.analysis_runner \
      --hypothesis-file $REPO/analyst-hypotheses.md \
      --findings-file analyst-findings.md
-5. Review the appended entry in analyst-findings.md
-6. Fill in Verdict, Implications, and any Suggested next hypotheses
-7. Commit analysis.py and analyst-findings.md
+7. Review the appended entry in analyst-findings.md
+8. Fill in Verdict, Implications, and any Suggested next hypotheses
+9. Commit analysis.py and analyst-findings.md
 ```
 
 ## Writing analysis.py
@@ -156,7 +134,6 @@ The analysis runner appends one entry per run to `analyst-findings.md`:
 
 ```markdown
 ## <short title>
-*<timestamp>*
 
 **Hypothesis:** <copied from analyst-hypotheses.md>
 
@@ -183,4 +160,4 @@ Append only — do not overwrite previous entries. The supervisor reads the full
 - **Use tables and metrics.** Coefficients, feature importances, fold summaries, calibration bins, and correlations are good. Plots are not.
 - **Surface one level of extra signal when it matters.** If a broader pattern changes the decision, include it briefly rather than launching a second investigation.
 
-**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. The only exception is an explicit human `stop`. On `stop`, disable your hooks, stop taking new work, finish the current atomic checkpoint, report final status, and go idle.
+**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. The only exception is an explicit human `stop`. On `stop`, cancel your active `/loop` task, stop taking new work, finish the current atomic checkpoint, report final status, and go idle.
