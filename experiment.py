@@ -1,14 +1,14 @@
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from harness.dataset import RANDOM_STATE
 
 
-EXPERIMENT_NAME = "baseline_hist_gradient_boosting"
+EXPERIMENT_NAME = "baseline_logistic_regression"
 
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -26,6 +26,7 @@ def build_model(schema: pd.DataFrame) -> Pipeline:
                 Pipeline(
                     steps=[
                         ("imputer", SimpleImputer(strategy="median")),
+                        ("scaler", StandardScaler()),
                     ]
                 ),
                 numeric_columns,
@@ -35,7 +36,7 @@ def build_model(schema: pd.DataFrame) -> Pipeline:
                 Pipeline(
                     steps=[
                         ("imputer", SimpleImputer(strategy="most_frequent")),
-                        ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+                        ("encoder", OneHotEncoder(handle_unknown="ignore")),
                     ]
                 ),
                 categorical_columns,
@@ -46,6 +47,6 @@ def build_model(schema: pd.DataFrame) -> Pipeline:
     return Pipeline(
         steps=[
             ("preprocessor", preprocessor),
-            ("model", HistGradientBoostingClassifier(random_state=RANDOM_STATE)),
+            ("model", LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)),
         ]
     )
