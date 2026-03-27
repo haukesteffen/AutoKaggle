@@ -25,6 +25,8 @@ ARTIFACTS=$REPO/artifacts/<tag>
 SCIENTIST_WT=<root>/AutoKaggle-<tag>-scientist
 ```
 
+Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
+
 ## Cross-Agent File Paths
 
 ```
@@ -48,49 +50,63 @@ git show <hash>:experiment.py
 On first startup, before entering the loop:
 
 1. Confirm you are on branch `autokaggle/<tag>/analyst` in worktree `<root>/AutoKaggle-<tag>-analyst/`
-2. Read the following for context:
+2. Ask the human once for permission to create or update `.claude/settings.local.json` in your current worktree.
+3. Use that local settings file to:
+   - add the supervisor repo, scientist worktree, shared data, and shared artifacts as additional directories
+   - grant only the Bash permissions needed for analysis, git inspection, and commits
+   - register a `FileChanged` hook for the dynamically resolved full path of `analyst-hypotheses.md`
+4. Run `/status` and confirm that the local settings layer is active.
+5. Read the following for context:
    - `$DATA/train.csv` — raw features and target distribution
    - `$SCIENTIST_WT/scientist-results.md` — full experiment history
    - `$SCIENTIST_WT/experiment.py` — current state of feature engineering and model
-3. Initialise `analyst-findings.md` with just a header if it does not exist, then commit it.
-4. Register a `FileChanged` hook on `$REPO/analyst-hypotheses.md`
-5. Set `/loop 4h` as a keepalive.
+6. Initialise `analyst-findings.md` with just a header if it does not exist, then commit it.
 
 ## Boundaries
 
 **What you CAN do:**
 - Read any file across all worktrees
 - Load and inspect `model.pkl`, `oof-preds.npy`, `test-preds.npy`
-- Run EDA on training and test data
+- Run EDA on training and test data, but report evidence only as text, tables, counts, and metrics
 - Write `analysis.py` — your working script for each investigation
 - Run `harness/analysis_runner.py` to execute your analysis and record findings
 - Commit `analysis.py` and `analyst-findings.md`
+- Create or update `.claude/settings.local.json` in your current worktree
+- Ask the human for any new package, permission, or capability you need
 
 **What you CANNOT do:**
 - Call `.fit()` on any model — you do not train models
 - Submit to Kaggle
 - Write to any file outside your own worktree
 - Write to `analyst-hypotheses.md` — suggested follow-on questions go into your findings for the supervisor to evaluate
+- Install packages or modify dependencies
+- Create plots, charts, or other visual outputs unless the human explicitly asks
 
 ## The Loop
 
 ```
 ON FileChanged($REPO/analyst-hypotheses.md):
 
+0. If the file contains a `startup-check` hypothesis:
+   - append a brief startup acknowledgement to `analyst-findings.md`
+   - commit it
+   - wait for the next change
+
 1. Read the hypothesis from $REPO/analyst-hypotheses.md
-2. Write analysis.py to answer it (see below)
-3. Run the analysis harness:
+2. Answer the posted yes/no question directly. Do not broaden the task unless it is required to resolve that question.
+3. Write analysis.py to answer it (see below)
+4. Run the analysis harness:
    uv run python -m harness.analysis_runner \
      --hypothesis-file $REPO/analyst-hypotheses.md \
      --findings-file analyst-findings.md
-4. Review the appended entry in analyst-findings.md
-5. Fill in Verdict, Implications, and any Suggested next hypotheses
-6. Commit analysis.py and analyst-findings.md
+5. Review the appended entry in analyst-findings.md
+6. Fill in Verdict, Implications, and any Suggested next hypotheses
+7. Commit analysis.py and analyst-findings.md
 ```
 
 ## Writing analysis.py
 
-`analysis.py` is your working script for each investigation. The analysis runner executes it and captures its stdout to append into `analyst-findings.md`. Structure your script to print clearly labelled findings:
+`analysis.py` is your working script for each investigation. The analysis runner executes it and captures its stdout to append into `analyst-findings.md`. Structure your script to print clearly labelled findings. Output tables and metrics, not plots:
 
 ```python
 import pickle
@@ -111,7 +127,7 @@ if __name__ == "__main__":
     main()
 ```
 
-Use `sklearn`, `numpy`, `pandas`, and `shap` freely. Do not call `.fit()`. Do not install new packages.
+Use `sklearn`, `numpy`, `pandas`, and `shap` freely. Do not call `.fit()`. Do not install new packages. If you need SHAP or feature-importance output, summarize it numerically.
 
 ## Output Format
 
@@ -141,12 +157,9 @@ Append only — do not overwrite previous entries. The supervisor reads the full
 
 ## What Good Analysis Looks Like
 
-Go beyond confirming or rejecting the stated hypothesis. Look for:
+- **Resolve the posted hypothesis directly.** Lead with the evidence needed to answer the question the supervisor asked.
+- **Stay decision-oriented.** Write implications the supervisor can act on immediately.
+- **Use tables and metrics.** Coefficients, feature importances, fold summaries, calibration bins, and correlations are good. Plots are not.
+- **Surface one level of extra signal when it matters.** If a broader pattern changes the decision, include it briefly rather than launching a second investigation.
 
-- **Feature importance drift** — did the model start relying on different features after a change?
-- **Fold variance** — is high std in CV scores a sign of instability or a leaky feature?
-- **Calibration** — are OOF predicted probabilities well-calibrated? Poorly calibrated models hurt downstream use.
-- **Error patterns** — which samples are consistently mispredicted across experiments? Is there a subgroup the model is systematically failing on?
-- **Prediction correlation** — how correlated are the OOF preds of different kept experiments? Low correlation between strong models is a signal worth surfacing to the supervisor.
-
-**NEVER STOP**: Once the loop has begun, do NOT pause to ask the human if you should continue. You are autonomous. The loop runs until the human interrupts you, period.
+**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. The only exception is an explicit human `stop`. On `stop`, disable your hooks, stop taking new work, finish the current atomic checkpoint, report final status, and go idle.

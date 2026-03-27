@@ -168,6 +168,7 @@ cython_debug/
 # AutoKaggle local artifacts
 artifacts/
 catboost_info/
-.claude/
+.claude/*
+!.claude/settings.json
 
 .DS_Store

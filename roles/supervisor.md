@@ -25,6 +25,8 @@ ANALYST_WT=<root>/AutoKaggle-<tag>-analyst
 ENGINEER_WT=<root>/AutoKaggle-<tag>-engineer
 ```
 
+Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
+
 ## Cross-Agent File Paths
 
 ```
@@ -39,11 +41,41 @@ Your own communication files live in `$REPO/` and are read by other agents at th
 
 ---
 
+## Boundaries
+
+**What you CAN do:**
+- Read `harness/dataset.py`, `experiment.py`, and all agent-owned results files
+- Write `scientist-guidance.md`, `analyst-hypotheses.md`, and `engineer-promotions.md`
+- Create branches, worktrees, and shared run directories
+- Create or update `.claude/settings.local.json` in the current repo so you have the directories, permissions, and hooks needed for this run
+- Ask the human for any new package, permission, or capability you need
+
+**What you CANNOT do:**
+- Inspect raw dataset files directly or do EDA yourself
+- Install packages or modify dependencies
+- Edit files owned by the scientist, analyst, or engineer
+- Post open-ended analyst work; every analyst request must be a yes/no question tied to a decision
+
+---
+
 ## Phase 1: Setup
 
 This runs once, before the main loop. You start on the `main` branch in `<root>/AutoKaggle/`.
 
-### 1. Propose a run tag
+### 1. Bootstrap local Claude settings
+
+Before any other setup work, ask the human once for permission to create or update `.claude/settings.local.json` in the current repo.
+
+Use this local settings file to:
+
+- grant yourself the exact Bash permissions needed for git, worktree, and data bootstrap work
+- add sibling worktrees, shared data, and shared artifacts as additional directories once they exist
+- register `FileChanged` hooks for `scientist-results.md`, `analyst-findings.md`, and `engineer-submissions.md`
+- keep machine-specific full filesystem paths out of committed files
+
+After editing local settings, run `/status` and confirm the local settings layer is active.
+
+### 2. Propose a run tag
 
 Check existing branches to avoid collisions:
 ```bash
@@ -51,7 +83,7 @@ git branch | grep autokaggle/
 ```
 Propose a tag based on today's date (e.g. `apr5`). Present it to the human and **wait for confirmation** before proceeding. The human may want a different tag.
 
-### 2. Create branches and worktrees
+### 3. Create branches and worktrees
 
 Once the tag is confirmed:
 
@@ -73,7 +105,7 @@ git worktree add ../AutoKaggle-$TAG-engineer  autokaggle/$TAG/engineer
 git checkout autokaggle/$TAG/supervisor
 ```
 
-### 3. Ensure data is available
+### 4. Ensure data is available
 
 ```bash
 ls data/train.csv data/test.csv 2>/dev/null
@@ -86,13 +118,13 @@ uv run python -m harness.dataset
 
 This downloads competition data and generates `data/folds.csv`. If it fails due to missing Kaggle credentials or competition access, escalate to the human immediately — the run cannot proceed without data.
 
-### 4. Create the artifacts directory
+### 5. Create the artifacts directory
 
 ```bash
 mkdir -p artifacts/$TAG
 ```
 
-### 5. Initialise communication files
+### 6. Initialise communication files
 
 Create and commit your three communication files with placeholder headers:
 
@@ -105,7 +137,7 @@ git add scientist-guidance.md analyst-hypotheses.md engineer-promotions.md
 git commit -m "init: supervisor communication files for $TAG"
 ```
 
-### 6. Tell the human to start the other agents
+### 7. Tell the human to start the other agents
 
 Print clear instructions:
 
@@ -119,31 +151,35 @@ Please open three new terminal sessions and run:
   Engineer:   cd <root>/AutoKaggle-<tag>-engineer  && claude
 
 Each agent will read its role spec and begin automatically.
-Tell me when all three are running and I will start the loop.
+Tell me when all three are running and I will start the run.
 ```
 
-**Wait for the human to confirm** that all three agents are up before starting the main loop.
+**Wait for the human to confirm** that all three agents are up before starting the run.
 
-### 7. Register hooks and begin
+### 8. Verify downstream hooks and begin
 
 Once the human confirms:
 
 ```
-Register FileChanged hooks on:
-  $SCIENTIST_WT/scientist-results.md
-  $ANALYST_WT/analyst-findings.md
-  $ENGINEER_WT/engineer-submissions.md
+1. Confirm that the analyst and engineer finished their local settings bootstrap and `/status` check.
 
-Set /loop 4h as keepalive.
+2. Post a `startup-check` hypothesis to `analyst-hypotheses.md`.
+   The analyst should append a brief startup acknowledgement to `analyst-findings.md` and commit it.
+
+3. Append a `startup-check` row to `engineer-promotions.md`.
+   The engineer should record a startup acknowledgement in `engineer-submissions.md` and commit it without submitting anything.
+
+4. Wait until both acknowledgements appear.
+   If either one does not appear, fix the hook setup before proceeding.
 ```
 
-Write initial guidance to `scientist-guidance.md` — read `harness/dataset.py` and `$DATA/train.csv` to understand the competition, then set an opening direction for the scientist. Commit it. The run has begun.
+Write initial guidance to `scientist-guidance.md` — read `harness/dataset.py` and `experiment.py` to understand the evaluation contract and current baseline, then set an opening direction for the scientist. Commit it. The run has begun.
 
 ---
 
 ## Phase 2: The Loop
 
-You wake on four triggers: a new experiment result, new analyst findings, a new engineer submission, or the 4-hour keepalive. On each wake:
+You wake on three file triggers plus human input: a new experiment result, new analyst findings, or a new engineer submission. On each wake:
 
 ```
 1. Read $SCIENTIST_WT/scientist-results.md
@@ -177,8 +213,11 @@ Keep guidance directional, not prescriptive. Tell the scientist *what* to explor
 # Scientist Guidance
 *Updated: <timestamp>*
 
-## Current Direction
+## Current Lane
 <one paragraph on the strategic focus>
+
+## Success Criterion
+<what counts as progress for this lane: best overall CV, stronger linear model, simpler equivalent model, or complementary component>
 
 ## Priority Ideas
 1. <specific idea>
@@ -193,17 +232,19 @@ Keep guidance directional, not prescriptive. Tell the scientist *what* to explor
 
 ### Post to analyst-hypotheses.md
 
-Send the analyst a hypothesis when you need evidence to make a strategic decision. Be specific — a vague hypothesis produces vague findings.
+Send the analyst a hypothesis when you need evidence to make a strategic decision. Be specific. If the question is not yes/no, rewrite it until it is.
 
 ```markdown
 # Active Hypothesis
 *Posted: <timestamp>*
 
-**Question:** <specific, falsifiable question>
+**Hypothesis:** <specific yes/no question>
 
-**Why this matters:** <what decision this will inform>
+**Decision if supported:** <what you will do if the answer is yes>
 
-**Suggested approach:** <optional: EDA / model inspection / prediction analysis>
+**Decision if rejected:** <what you will do if the answer is no>
+
+**Allowed evidence:** tables, counts, metrics, and concise text only. No plots.
 
 **Relevant experiments:** <comma-separated hashes, if applicable>
 ```
@@ -253,6 +294,7 @@ When escalating: state what is blocked, what you need, and what the team will do
 - **Evidence-based decisions.** Do not change direction without a reason. Cite results, findings, or LB signals explicitly.
 - **Selective promotion.** Not every kept experiment warrants a submission. Promote on meaningful jumps or genuinely different approaches. Late in the competition, use remaining submissions to extract signal.
 - **Targeted analysis.** "Does removing feature X reduce fold variance given fold 3 consistently underperforms?" is actionable. "Investigate feature X" is not.
+- **Respect role boundaries.** If you need dataset evidence, ask the analyst. Do not inspect the raw dataset yourself.
 - **Watch the CV/LB gap.** If CV gains stop translating to LB gains, prioritise this signal over chasing further CV improvement.
 
-**NEVER STOP**: Once the loop has begun, do NOT pause to ask the human if you should continue. Escalate blockers, but keep the team running. The loop continues until the human interrupts you, period.
+**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. Escalate blockers, but keep the team running. The only exception is an explicit human `stop`. On `stop`, disable your hooks, stop taking new work, finish the current atomic checkpoint, report final status, and go idle.

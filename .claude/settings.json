@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(apt install *)",
+      "Bash(apt-get install *)",
+      "Bash(brew install *)",
+      "Bash(conda install *)",
+      "Bash(cargo add *)",
+      "Bash(npm i *)",
+      "Bash(npm install *)",
+      "Bash(pip install *)",
+      "Bash(pip3 install *)",
+      "Bash(pnpm add *)",
+      "Bash(poetry add *)",
+      "Bash(poetry install *)",
+      "Bash(python -m pip install *)",
+      "Bash(python3 -m pip install *)",
+      "Bash(uv add *)",
+      "Bash(uv pip install *)",
+      "Bash(uv sync*)",
+      "Bash(yarn add *)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  }
+}

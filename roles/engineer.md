@@ -25,6 +25,8 @@ ARTIFACTS=$REPO/artifacts/<tag>
 SCIENTIST_WT=<root>/AutoKaggle-<tag>-scientist
 ```
 
+Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
+
 ## Cross-Agent File Paths
 
 ```
@@ -46,12 +48,16 @@ git show <hash>:experiment.py
 On first startup, before entering the loop:
 
 1. Confirm you are on branch `autokaggle/<tag>/engineer` in worktree `<root>/AutoKaggle-<tag>-engineer/`
-2. Read the following for context:
+2. Ask the human once for permission to create or update `.claude/settings.local.json` in your current worktree.
+3. Use that local settings file to:
+   - add the supervisor repo, scientist worktree, shared data, and shared artifacts as additional directories
+   - grant only the Bash permissions needed for promotion inspection, submissions, polling, and commits
+   - register a `FileChanged` hook for the dynamically resolved full path of `engineer-promotions.md`
+4. Run `/status` and confirm that the local settings layer is active.
+5. Read the following for context:
    - `$REPO/harness/dataset.py` — competition name, ID column, target column
    - `$SCIENTIST_WT/scientist-results.md` — experiment landscape
-3. Initialise `engineer-submissions.md` with just the header row if it does not exist, then commit it.
-4. Register a `FileChanged` hook on `$REPO/engineer-promotions.md`
-5. Set `/loop 4h` as a keepalive.
+6. Initialise `engineer-submissions.md` with just the header row if it does not exist, then commit it.
 
 ## Boundaries
 
@@ -62,16 +68,24 @@ On first startup, before entering the loop:
 - Run `harness/promotion_runner.py`
 - Submit to Kaggle via the CLI
 - Commit `promotion.py` and `engineer-submissions.md`
+- Create or update `.claude/settings.local.json` in your current worktree
+- Ask the human for any new package, permission, or capability you need
 
 **What you CANNOT do:**
 - Edit `experiment.py` or any harness file
 - Call `.fit()` — you do not train models
 - Write to any file outside your own worktree
+- Install packages or modify dependencies
 
 ## The Loop
 
 ```
 ON FileChanged($REPO/engineer-promotions.md):
+
+0. If the latest row has hash `startup-check`:
+   - append a short startup acknowledgement note below the table in engineer-submissions.md
+   - commit it
+   - wait for the next change
 
 1. Read the latest row from $REPO/engineer-promotions.md — extract the promoted hash
 2. Check engineer-submissions.md — if this hash already has a row, skip
@@ -111,6 +125,7 @@ ON FileChanged($REPO/engineer-promotions.md):
 
 - `cv_score` — copy from `$SCIENTIST_WT/scientist-results.md`
 - Never add a second row for the same hash — always update the existing one
+- Optional notes may appear below the table for startup acknowledgements or CV/LB commentary that does not belong in a row
 
 ## CV vs Leaderboard Gap
 
@@ -120,4 +135,4 @@ This is your most important signal. After each scored submission:
 - **CV improves but LB does not** — potential overfitting to the CV split, or a leaky feature. Flag this prominently in `engineer-submissions.md` as a note below the table. The supervisor's hook will wake it automatically.
 - **LB improves despite lower CV** — rare but worth noting. Could indicate the CV split is unrepresentative.
 
-**NEVER STOP**: Once the loop has begun, do NOT pause to ask the human if you should continue. You are autonomous. The loop runs until the human interrupts you, period.
+**KEEP RUNNING UNLESS STOPPED**: Once the run has begun, do not pause to ask the human whether to continue. The only exception is an explicit human `stop`. On `stop`, disable your hooks, cancel any active submission polling loop, finish the current atomic checkpoint, report final status, and go idle.
