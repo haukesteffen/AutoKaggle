@@ -69,11 +69,12 @@ Before any other setup work, ask the human once for permission to create or upda
 Use this local settings file to:
 
 - grant yourself the exact Bash permissions needed for git, worktree, and data bootstrap work
-- add sibling worktrees, shared data, and shared artifacts as additional directories once they exist
-- register `FileChanged` hooks for `scientist-results.md`, `analyst-findings.md`, and `engineer-submissions.md`
+- add sibling worktrees, shared data, and shared artifacts under `permissions.additionalDirectories`
+- register `FileChanged` hooks for `scientist-results.md`, `analyst-findings.md`, and `engineer-submissions.md` using Claude's documented hook schema
+- use basename matchers only: `scientist-results.md`, `analyst-findings.md`, and `engineer-submissions.md`
 - keep machine-specific full filesystem paths out of committed files
 
-After editing local settings, run `/status` and confirm the local settings layer is active.
+After editing local settings, run both `/status` and `/hooks` and confirm the local settings layer is active and all three `FileChanged` hooks appear.
 
 ### 2. Propose a run tag
 
@@ -161,7 +162,7 @@ Tell me when all three are running and I will start the run.
 Once the human confirms:
 
 ```
-1. Confirm that the analyst and engineer finished their local settings bootstrap and `/status` check.
+1. Confirm that the analyst and engineer finished their local settings bootstrap and both their `/status` and `/hooks` checks.
 
 2. Post a `startup-check` hypothesis to `analyst-hypotheses.md`.
    The analyst should append a brief startup acknowledgement to `analyst-findings.md` and commit it.

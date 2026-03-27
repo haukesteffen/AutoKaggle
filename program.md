@@ -71,11 +71,13 @@ Each agent reads its own role spec, bootstraps its local Claude settings, and be
 
 ### Step 3 — Let each agent bootstrap local Claude settings
 
-Each agent should ask once, early, for permission to create or update `.claude/settings.local.json` in its current worktree. Use this untracked local file for per-agent permissions, additional directories, and hook registration.
+Each agent should ask once, early, for permission to create or update `.claude/settings.local.json` in its current worktree. Use this untracked local file for per-agent permissions, `permissions.additionalDirectories`, and hook registration. Do not invent a top-level `directories` key.
 
 Keep the committed `.claude/settings.json` path-free and shared. Keep any machine-specific full filesystem paths only in local settings derived at runtime from the current repo and branch layout.
 
-After bootstrapping local settings, each agent should run `/status` and confirm that the local settings layer is active.
+For `FileChanged` hooks, use basename matchers such as `analyst-hypotheses.md` or `engineer-promotions.md`, not full filesystem paths in the `matcher` field.
+
+After bootstrapping local settings, each agent should run both `/status` and `/hooks` and confirm that the local settings layer is active and the expected hooks are present.
 
 ### Step 4 — Verify hooks before calling the run live
 

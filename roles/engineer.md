@@ -50,14 +50,35 @@ On first startup, before entering the loop:
 1. Confirm you are on branch `autokaggle/<tag>/engineer` in worktree `<root>/AutoKaggle-<tag>-engineer/`
 2. Ask the human once for permission to create or update `.claude/settings.local.json` in your current worktree.
 3. Use that local settings file to:
-   - add the supervisor repo, scientist worktree, shared data, and shared artifacts as additional directories
+   - add the supervisor repo, scientist worktree, shared data, and shared artifacts under `permissions.additionalDirectories`, not under a top-level `directories` key
    - grant only the Bash permissions needed for promotion inspection, submissions, polling, and commits
-   - register a `FileChanged` hook for the dynamically resolved full path of `engineer-promotions.md`
-4. Run `/status` and confirm that the local settings layer is active.
-5. Read the following for context:
+   - register a `FileChanged` hook using Claude's documented schema
+   - use the basename matcher `engineer-promotions.md`, not a full path in the `matcher` field
+   - use a command hook with `asyncRewake: true`; do not use `path` or `prompt` fields for this hook
+4. Use this exact shape for the hook section:
+   ```json
+   {
+     "hooks": {
+       "FileChanged": [
+         {
+           "matcher": "engineer-promotions.md",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"FileChanged\",\"additionalContext\":\"engineer-promotions.md changed. Read it and begin the submission loop.\"}}'; exit 2",
+               "asyncRewake": true
+             }
+           ]
+         }
+       ]
+     }
+   }
+   ```
+5. Run both `/status` and `/hooks` and confirm that the local settings layer is active and that one `FileChanged` hook for `engineer-promotions.md` is listed.
+6. Read the following for context:
    - `$REPO/harness/dataset.py` — competition name, ID column, target column
    - `$SCIENTIST_WT/scientist-results.md` — experiment landscape
-6. Initialise `engineer-submissions.md` with just the header row if it does not exist, then commit it.
+7. Initialise `engineer-submissions.md` with just the header row if it does not exist, then commit it.
 
 ## Boundaries
 
@@ -80,7 +101,7 @@ On first startup, before entering the loop:
 ## The Loop
 
 ```
-ON FileChanged($REPO/engineer-promotions.md):
+ON FileChanged(engineer-promotions.md):
 
 0. If the latest row has hash `startup-check`:
    - append a short startup acknowledgement note below the table in engineer-submissions.md

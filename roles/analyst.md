@@ -52,15 +52,36 @@ On first startup, before entering the loop:
 1. Confirm you are on branch `autokaggle/<tag>/analyst` in worktree `<root>/AutoKaggle-<tag>-analyst/`
 2. Ask the human once for permission to create or update `.claude/settings.local.json` in your current worktree.
 3. Use that local settings file to:
-   - add the supervisor repo, scientist worktree, shared data, and shared artifacts as additional directories
+   - add the supervisor repo, scientist worktree, shared data, and shared artifacts under `permissions.additionalDirectories`, not under a top-level `directories` key
    - grant only the Bash permissions needed for analysis, git inspection, and commits
-   - register a `FileChanged` hook for the dynamically resolved full path of `analyst-hypotheses.md`
-4. Run `/status` and confirm that the local settings layer is active.
-5. Read the following for context:
+   - register a `FileChanged` hook using Claude's documented schema
+   - use the basename matcher `analyst-hypotheses.md`, not a full path in the `matcher` field
+   - use a command hook with `asyncRewake: true`; do not use `path` or `prompt` fields for this hook
+4. Use this exact shape for the hook section:
+   ```json
+   {
+     "hooks": {
+       "FileChanged": [
+         {
+           "matcher": "analyst-hypotheses.md",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"FileChanged\",\"additionalContext\":\"analyst-hypotheses.md changed. Read it and begin the analysis loop.\"}}'; exit 2",
+               "asyncRewake": true
+             }
+           ]
+         }
+       ]
+     }
+   }
+   ```
+5. Run both `/status` and `/hooks` and confirm that the local settings layer is active and that one `FileChanged` hook for `analyst-hypotheses.md` is listed.
+6. Read the following for context:
    - `$DATA/train.csv` — raw features and target distribution
    - `$SCIENTIST_WT/scientist-results.md` — full experiment history
    - `$SCIENTIST_WT/experiment.py` — current state of feature engineering and model
-6. Initialise `analyst-findings.md` with just a header if it does not exist, then commit it.
+7. Initialise `analyst-findings.md` with just a header if it does not exist, then commit it.
 
 ## Boundaries
 
@@ -85,7 +106,7 @@ On first startup, before entering the loop:
 ## The Loop
 
 ```
-ON FileChanged($REPO/analyst-hypotheses.md):
+ON FileChanged(analyst-hypotheses.md):
 
 0. If the file contains a `startup-check` hypothesis:
    - append a brief startup acknowledgement to `analyst-findings.md`
