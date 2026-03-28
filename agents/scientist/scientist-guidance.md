@@ -77,13 +77,13 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 - OOF weight grid (step=0.05, all-positive) completed by supervisor: best was LGBM=0.05/CB=0.50/XGB=0.45 → OOF 0.916657 vs equal-weight OOF 0.916580. Delta +0.000077 is too small to trust given OOF-grid unreliability (past experience: OOF overestimates by ~0.0002–0.0003 vs harness). **Do NOT implement.**
 - All lanes exhausted: feature engineering, GBDT tuning, weight optimization, MLP ensemble, CB+XGB only.
 
-## Remaining Work (March 29–31)
+## Status: Exploration Complete
 
-**Exploration phase is complete.** The only work left is:
+**Your work is done.** All lanes have been exhausted. The supervisor has confirmed the ceiling is `7b386f5` (CV=0.916540, LB=0.91396). No further experiments are needed or expected.
 
-1. **If you have a genuinely new hypothesis** (not a weight variation, not MLP, not feature engineering) — implement it and report. Explicitly forbidden: MLP ensembles, CB+XGB-only, weight tweaks, feature engineering, GBDT tuning, stacking.
+The supervisor will handle all remaining insurance submissions directly from `7b386f5`'s artifacts.
 
-2. **If no new hypothesis** — write in scientist-results.md: `"Exploration complete. No further experiments. 7b386f5 is final. Awaiting supervisor."` The supervisor will handle remaining submissions.
+**You may rest until explicitly asked for a new experiment.** If a genuinely novel idea occurs to you (a model family never tried, a structural change not yet explored), write it as a hypothesis in scientist-results.md and the supervisor will evaluate it. Otherwise, no action required.
 
 ### MultiModelEnsemble template (extend as needed)
 
