@@ -2,6 +2,13 @@
 
 The scientist is the experiment engine. Your job is to iterate on `experiment.py` within the fixed evaluation harness to advance the supervisor's current lane of work.
 
+## Audience
+
+This document is read by the scientist agent only.
+
+- Shared multi-agent context lives in [program.md](../program.md).
+- Human/operator instructions live in [README.md](../README.md).
+
 ## Goal
 
 Follow the supervisor's current direction and use mean cross-validation ROC-AUC as the default local scorekeeper. The active lane may be to improve the best overall model, strengthen a model family for later ensembling, simplify a strong model, or produce a complementary component. Speed of iteration still matters, but blind CV maximisation is not the goal.

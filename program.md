@@ -1,5 +1,13 @@
 # AutoKaggle
 
+## Audience
+
+This document is shared operational context for all agents.
+
+- Human/operator instructions live in [README.md](README.md).
+- Role-specific instructions live under [roles/](roles).
+- Agents should treat this file as the shared contract that sits between the human-facing README and the single-role specs.
+
 This is a project to have a full team of agents work together on the shared goal of winning a Kaggle Machine Learning Competition in the Playground Series.
 
 A Kaggle competition is a hosted ML benchmark where you train on a provided dataset and submit test-set predictions to a leaderboard. The Playground Series is the lightweight tabular version: small, fast, recurring competitions that emphasise experimentation over domain knowledge. In practice, they are mostly exercises in validation, feature engineering, model diversity, and ensembling.
@@ -32,58 +40,13 @@ Four roles, each running as an independent Claude Code session:
 
 ---
 
-## Starting a Run
+## Shared Runtime Assumptions
 
-### Step 1 — Start the supervisor
-
-Navigate to the repository root and start a Claude Code session:
-
-```bash
-cd <root>/AutoKaggle
-claude
-```
-
-Tell the supervisor: **"Start a new run."**
-
-The supervisor will:
-1. Propose a run tag (confirm or suggest an alternative)
-2. Create all branches and worktrees
-3. Download competition data if not already present
-4. Initialise communication files
-5. Tell you exactly what commands to run for the other three agents
-
-### Step 2 — Start the other three agents
-
-Once the supervisor gives you the go-ahead, open three new terminal sessions and run the commands it provides. They will be in the form:
-
-```bash
-# Terminal 2
-cd <root>/AutoKaggle-<tag>-scientist && claude
-
-# Terminal 3
-cd <root>/AutoKaggle-<tag>-analyst && claude
-
-# Terminal 4
-cd <root>/AutoKaggle-<tag>-engineer && claude
-```
-
-Each agent reads its own role spec, bootstraps its local Claude settings, and begins autonomously. Tell the supervisor when all three are running — it will then start the polling-driven run.
-
-### Step 3 — Let each agent bootstrap local Claude settings
-
-Each agent should ask once, early, for permission to create or update `.claude/settings.local.json` in its current worktree. Use this untracked local file for per-agent permissions and `permissions.additionalDirectories`. Do not invent a top-level `directories` key. Do not configure hooks for this repository.
-
-Keep the committed `.claude/settings.json` path-free and shared. Keep any machine-specific full filesystem paths only in local settings derived at runtime from the current repo and branch layout.
-
-After bootstrapping local settings, each agent should run `/status` and confirm that the local settings layer is active.
-
-The analyst, engineer, and supervisor should then enter recurring `/loop` tasks as described in their role specs. `/loop` scheduled tasks are session-scoped, fire only while Claude is open and idle, and expire after 3 days. If `/loop` is unavailable, scheduled tasks are disabled, or a loop disappears, the agent must tell the human immediately and recreate the task once the issue is resolved.
-
-### Step 4 — Start polling loops and call the run live
-
-After all three role sessions are running and have bootstrapped local settings, the supervisor writes the opening guidance and any initial analyst hypothesis or promotion queue entries, then enters its own review loop.
-
-Do not use file hooks or sentinel writes in this repository. Coordination is polling-based.
+- The human starts the supervisor first. The supervisor provisions the run tag, branches, worktrees, and initial tracked communication files before the rest of the team begins normal work.
+- Per-agent Claude settings belong in untracked `.claude/settings.local.json` files inside the current repo or worktree.
+- The committed [`.claude/settings.json`](.claude/settings.json) is shared and must stay path-free.
+- Coordination in this repository is polling-based. Do not rely on file hooks or sentinel writes as part of the documented control flow.
+- `/loop` scheduled tasks are session-scoped, fire only while Claude is open and idle, and expire after 3 days. If `/loop` is unavailable or scheduled tasks are disabled, the affected agent must tell the human immediately.
 
 ---
 
@@ -148,11 +111,11 @@ The scientist runs a tight loop: one idea, one commit, one 20-minute run, keep o
 
 The supervisor promotes selectively — clear score jumps or meaningfully different approaches. There are only 5 Kaggle submissions per day. Late in a competition it may be worth using submissions to extract LB signal even on smaller improvements.
 
-### Ending a Run
+### Stop Protocol
 
-A run ends when the human says `stop`. This overrides every autonomy instruction in the role specs.
+An explicit human `stop` overrides every autonomy instruction in the role specs.
 
-When `stop` is given, each agent should:
+When `stop` is given, every agent should:
 
 1. Stop taking new work immediately.
 2. Cancel any active `/loop` scheduled task it started.

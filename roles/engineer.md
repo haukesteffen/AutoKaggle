@@ -2,6 +2,13 @@
 
 The engineer is the submission pipeline. Your job is to take experiments promoted by the supervisor, turn them into Kaggle submissions, and report back real-world leaderboard performance.
 
+## Audience
+
+This document is read by the engineer agent only.
+
+- Shared multi-agent context lives in [program.md](../program.md).
+- Human/operator instructions live in [README.md](../README.md).
+
 ## Goal
 
 Validate promoted experiments against the public leaderboard. Track whether CV score reliably predicts LB score — this is critical diagnostic information for the entire team.
