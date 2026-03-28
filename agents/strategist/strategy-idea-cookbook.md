@@ -178,3 +178,42 @@ For each play, state:
 - Why it might help: leaderboard slots become information resources that must be spent deliberately
 - Try it if: the team needs to distinguish between a small set of serious candidates
 - Deprioritize if: the run is still so early that broad anchoring is more valuable
+
+## Cold-Start / Late-Entry Plays
+
+### Front-load model-family comparison when time is short
+
+- When to use it: when the run starts with 3 or fewer days remaining and no experiments have been run
+- Why it might help: the most information-dense question in tabular Playground competitions is whether tree models are dominant over linear ones; answering it on day one determines the allocation for all remaining work
+- Try it if: the run is in bootstrap phase with no LB history
+- Deprioritize if: model-family comparison is already settled from prior experiment history
+
+### Linear anchor before tree exploration
+
+- When to use it: always, at the very start of a cold run
+- Why it might help: provides a reproducible reference point; reveals if the feature space is already well-conditioned; identifies whether leakage or fold issues exist before committing tree-model iterations
+- Try it if: `experiment.py` contains a usable baseline that has not yet been evaluated
+- Deprioritize if: a strong, validated anchor already exists from a prior run or prior day
+
+### Compress to two-model ensemble when deadline is within 3 days
+
+- When to use it: when fewer than 4 days remain and no shortlist exists
+- Why it might help: in constrained time, a simple average of the best linear model and the best tree model is often more reliable than chasing a third family or complex stacking; it avoids late-phase validation debt
+- Try it if: two distinct model families have been evaluated and both have validated CV scores
+- Deprioritize if: one model family is clearly dominant and there is no complementary diversity to gain
+
+## ROC-AUC / Binary Classification Notes
+
+### Calibration may matter less than ranking
+
+- When to use it: as a reminder when tuning probability outputs
+- Why it might help: ROC-AUC is rank-based; well-calibrated probabilities are not required for the metric, so calibration fixes are low-priority unless ensemble weighting relies on them
+- Try it if: an analyst finding suggests calibration drift is affecting ensemble blending
+- Deprioritize if: the team is still in the anchoring phase
+
+### Class imbalance treatment requires analyst confirmation
+
+- When to use it: before applying class weights, oversampling, or threshold adjustments
+- Why it might help: treating a balanced dataset as imbalanced can hurt ROC-AUC; analyst should confirm the actual class distribution before the scientist applies imbalance corrections
+- Try it if: the churn rate appears low or the scientist proposes imbalance-specific changes
+- Deprioritize if: the analyst has already confirmed balanced class distribution
