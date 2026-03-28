@@ -22,10 +22,9 @@ Leaderboard scores are calculated with approximately 20% of the test data. The f
 
 Persistent roles:
 
-- **Supervisor** — strategic orchestrator and human interface. Synthesises signals from all other agents, consumes strategist recommendations, sets direction, commissions analysis, and promotes experiments to the leaderboard. Runs the setup phase before the main loop begins.
+- **Supervisor** — strategic orchestrator and human interface. Synthesises signals from all other agents, consumes strategist recommendations, sets direction, commissions analysis, decides what to submit, and maintains leaderboard history. Runs the setup phase before the main loop begins.
 - **Scientist** — experiment engine. Re-enters on `/loop` wakes, iterates on `agents/scientist/experiment.py`, and advances the supervisor's current lane of work within the fixed evaluation harness.
 - **Analyst** — signal quality expert. Inspects model artifacts and data to answer targeted yes/no hypotheses and surfaces patterns the scientist's loop cannot see.
-- **Engineer** — submission pipeline. Turns promoted experiment artifacts into Kaggle submissions and tracks CV/LB correlation.
 
 Episodic role:
 
@@ -35,7 +34,8 @@ Episodic role:
 
 ## Operating Rules
 
-- The supervisor coordinates strategy. It does not inspect raw dataset files itself. If it needs dataset evidence, it asks the analyst.
+- The supervisor coordinates strategy and owns submission timing, submission notes, and leaderboard bookkeeping.
+- The supervisor does not inspect raw dataset files itself. If it needs dataset evidence, it asks the analyst.
 - The strategist recommends the high-level plan. The supervisor translates that plan into operational guidance for the scientist and the rest of the team.
 - The analyst answers one active, falsifiable hypothesis at a time. Hypotheses should be yes/no questions tied to a concrete decision.
 - The analyst presents evidence in code, tables, counts, and metrics. Do not use plots unless the human explicitly asks.
@@ -67,6 +67,8 @@ Episodic role:
       program.md                     # shared agent contract
       supervisor/
         role.md
+        leaderboard-history.md       # supervisor-owned submission ledger
+        submission.py                # supervisor-owned submission prep helper
       strategist/
         role.md
         strategy-whitepaper.md
@@ -79,10 +81,6 @@ Episodic role:
         role.md
         analysis.py
         analyst-hypotheses.md        # shared inbox written by supervisor
-      engineer/
-        role.md
-        promotion.py
-        engineer-promotions.md       # shared inbox written by supervisor
     harness/                         # shared harness code
     data/                            # competition data (untracked, shared)
     artifacts/<tag>/                 # run artifacts (untracked, shared)
@@ -95,7 +93,6 @@ Episodic role:
 
   AutoKaggle-<tag>-scientist/        # scientist worktree
   AutoKaggle-<tag>-analyst/          # analyst worktree
-  AutoKaggle-<tag>-engineer/         # engineer worktree
 ```
 
 The supervisor has no separate worktree. It works from `AutoKaggle/` directly, on branch `autokaggle/<tag>/supervisor`.
@@ -112,10 +109,9 @@ All inter-agent coordination flows through files committed on each agent's branc
 | `agents/strategist/strategy-idea-cookbook.md` | Strategist | Strategist, Supervisor | `AutoKaggle/` |
 | `agents/scientist/scientist-guidance.md` | Supervisor | Scientist | `AutoKaggle/` |
 | `agents/analyst/analyst-hypotheses.md` | Supervisor | Analyst | `AutoKaggle/` |
-| `agents/engineer/engineer-promotions.md` | Supervisor | Engineer | `AutoKaggle/` |
+| `agents/supervisor/leaderboard-history.md` | Supervisor | Supervisor, Strategist | `AutoKaggle/` |
 | `agents/scientist/scientist-results.md` | Scientist | Supervisor, Analyst | `AutoKaggle-<tag>-scientist/` |
 | `agents/analyst/analyst-findings.md` | Analyst | Supervisor | `AutoKaggle-<tag>-analyst/` |
-| `agents/engineer/engineer-submissions.md` | Engineer | Supervisor | `AutoKaggle-<tag>-engineer/` |
 
 Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never committed. They live in `AutoKaggle/artifacts/<tag>/experiments/<hash>/` and are accessed by all agents via absolute path. Per-run logs and exit-code files may live beside them as untracked local runtime state.
 
@@ -127,7 +123,7 @@ Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never comm
 
 5-fold cross-validation with a fixed random seed, defined in `harness/dataset.py`. Fold assignments must not change mid-run. This would invalidate cross-experiment comparisons.
 
-CV score is the default local optimisation metric, but it is not the sole objective. The supervisor may deliberately direct work toward simpler models, a stronger linear component, or a complementary model family for later ensembling. The engineer tracks whether CV gains translate to LB gains. If they stop correlating, the supervisor treats this as a priority signal over chasing further CV improvement.
+CV score is the default local optimisation metric, but it is not the sole objective. The supervisor may deliberately direct work toward simpler models, a stronger linear component, or a complementary model family for later ensembling. The supervisor tracks whether CV gains translate to LB gains in `agents/supervisor/leaderboard-history.md`. If they stop correlating, treat this as a priority signal over chasing further CV improvement.
 
 The strategist decides the current phase using the current date, the competition deadline assumption, and the evidence accumulated so far. The whitepaper should explicitly state the current date, the deadline assumption, and the number of calendar days remaining using absolute dates.
 
@@ -137,7 +133,7 @@ The scientist runs a `/loop`-driven state machine: start one experiment, let it 
 
 ### Promotion
 
-The supervisor promotes selectively: clear score jumps or meaningfully different approaches. There are only 5 Kaggle submissions per day. Late in a competition it may be worth using submissions to extract LB signal even on smaller improvements.
+The supervisor submits selectively: clear score jumps or meaningfully different approaches. There are only 5 Kaggle submissions per day. Late in a competition it may be worth using submissions to extract LB signal even on smaller improvements.
 
 ### Stop Protocol
 

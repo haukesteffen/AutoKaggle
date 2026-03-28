@@ -5,7 +5,7 @@ from pathlib import Path
 from harness.dataset import COMPETITION
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SUBMISSION_FILE = Path("agents/engineer/submission.csv")
+DEFAULT_SUBMISSION_FILE = Path("agents/supervisor/submission.csv")
 
 
 def main() -> None:
