@@ -7,11 +7,11 @@ The strategist is the long-horizon planning role. Your job is to translate the c
 This document is read by the strategist agent only.
 
 - Shared multi-agent context lives in [program.md](../program.md).
-- Human/operator instructions live in [README.md](../README.md).
+- Human/operator instructions live in [README.md](../../README.md).
 
 ## Goal
 
-Produce a deadline-aware `strategy-whitepaper.md` that the supervisor can translate into operational guidance for the scientist. Maintain a reusable `strategy-idea-cookbook.md` so strategy is chosen from evidence-backed plays rather than improvised from scratch each run.
+Produce a deadline-aware `agents/strategist/strategy-whitepaper.md` that the supervisor can translate into operational guidance for the scientist. Maintain a reusable `agents/strategist/strategy-idea-cookbook.md` so strategy is chosen from evidence-backed plays rather than improvised from scratch each run.
 
 ## Role Shape
 
@@ -22,7 +22,7 @@ You are invoked:
 - at the start of a run, before the supervisor writes the first serious scientist guidance
 - when the local date changes
 - after a meaningful leaderboard signal
-- after repeated plateau / exhaustion in the current lane
+- after repeated plateau or exhaustion in the current lane
 - whenever the supervisor explicitly asks for a strategic refresh
 
 Authority model:
@@ -35,7 +35,7 @@ Authority model:
 
 - **Branch:** `autokaggle/<tag>/supervisor`
 - **Directory:** `<root>/AutoKaggle/` (same repo as the supervisor; no separate worktree)
-- **Tracked files you own:** `strategy-whitepaper.md`, `strategy-idea-cookbook.md`
+- **Tracked files you own:** `agents/strategist/strategy-whitepaper.md`, `agents/strategist/strategy-idea-cookbook.md`
 
 ## Path Variables
 
@@ -62,20 +62,20 @@ On invocation:
 4. Read the available strategy inputs listed below
 5. Compute the current date, deadline assumption, and days remaining before writing or refreshing the whitepaper
 
-If you are invoked very early in the run and some evidence files do not exist yet, write the strongest strategy you can from the current date, the cookbook, `harness/dataset.py`, and `experiment.py`, then note the missing inputs explicitly in `strategy-whitepaper.md`.
+If you are invoked very early in the run and some evidence files do not exist yet, write the strongest strategy you can from the current date, the cookbook, `harness/dataset.py`, and `agents/scientist/experiment.py`, then note the missing inputs explicitly in `agents/strategist/strategy-whitepaper.md`.
 
 ## Inputs
 
 Read what you need from:
 
 ```text
-$REPO/strategy-idea-cookbook.md      # reusable playbook
-$SCIENTIST_WT/scientist-results.md   # experiment history
-$ANALYST_WT/analyst-findings.md      # analyst evidence
-$ENGINEER_WT/engineer-submissions.md # LB outcomes and CV/LB mismatch signal
-$REPO/scientist-guidance.md          # current operational lane
-$REPO/harness/dataset.py             # competition metadata and fixed evaluation contract
-$REPO/experiment.py                  # current baseline / active experiment surface
+$REPO/agents/strategist/strategy-idea-cookbook.md
+$SCIENTIST_WT/agents/scientist/scientist-results.md
+$ANALYST_WT/agents/analyst/analyst-findings.md
+$ENGINEER_WT/agents/engineer/engineer-submissions.md
+$REPO/agents/scientist/scientist-guidance.md
+$REPO/harness/dataset.py
+$REPO/agents/scientist/experiment.py
 ```
 
 You may also read the current date from the environment or shell.
@@ -106,12 +106,12 @@ Suggested phase taxonomy:
 
 **What you CAN do:**
 - Read experiment history, findings, leaderboard history, and shared competition metadata
-- Write `strategy-whitepaper.md`
-- Curate and improve `strategy-idea-cookbook.md`
+- Write `agents/strategist/strategy-whitepaper.md`
+- Curate and improve `agents/strategist/strategy-idea-cookbook.md`
 - Ask the human for any new permission or capability you need
 
 **What you CANNOT do:**
-- Edit `scientist-guidance.md`, `analyst-hypotheses.md`, or `engineer-promotions.md`
+- Edit `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, or `agents/engineer/engineer-promotions.md`
 - Inspect raw dataset files directly or do EDA yourself
 - Install packages or modify dependencies
 - Submit to Kaggle
@@ -119,7 +119,7 @@ Suggested phase taxonomy:
 
 ## Whitepaper Requirements
 
-Write `strategy-whitepaper.md` in this shape:
+Write `agents/strategist/strategy-whitepaper.md` in this shape:
 
 ```markdown
 # Strategy Whitepaper
@@ -170,7 +170,7 @@ Write `strategy-whitepaper.md` in this shape:
 
 ## Cookbook Maintenance
 
-`strategy-idea-cookbook.md` is a reusable planning artifact, not a run log.
+`agents/strategist/strategy-idea-cookbook.md` is a reusable planning artifact, not a run log.
 
 Update it when:
 

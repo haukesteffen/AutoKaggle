@@ -5,8 +5,8 @@
 This document is the human/operator entry point.
 
 - Read this file if you are starting, monitoring, or stopping a run.
-- Agents should use [program.md](program.md) for shared context.
-- Each agent should use its own role spec under [roles/](roles).
+- Agents should use [agents/program.md](agents/program.md) for shared context.
+- Each agent should use its own role spec under `agents/<role>/role.md`.
 
 ## What This Repo Is
 
@@ -15,7 +15,7 @@ AutoKaggle is an experiment in running a small team of Claude Code agents agains
 The repository has two layers:
 
 - fixed harness code under [harness/](harness)
-- agent-edited task files such as [experiment.py](experiment.py) and [promotion.py](promotion.py)
+- agent-facing prompts, inboxes, and working files under [agents/](agents)
 
 The current documented operating model on `main` uses four long-lived roles plus one on-demand planning role:
 
@@ -30,12 +30,12 @@ That topology may change in future issues, but this README describes the current
 ## Document Map
 
 - [README.md](README.md): human/operator guide
-- [program.md](program.md): shared agent-facing context
-- [roles/supervisor.md](roles/supervisor.md): supervisor-only instructions
-- [roles/strategist.md](roles/strategist.md): strategist-only instructions
-- [roles/scientist.md](roles/scientist.md): scientist-only instructions
-- [roles/analyst.md](roles/analyst.md): analyst-only instructions
-- [roles/engineer.md](roles/engineer.md): engineer-only instructions
+- [agents/program.md](agents/program.md): shared agent-facing context
+- [agents/supervisor/role.md](agents/supervisor/role.md): supervisor-only instructions
+- [agents/strategist/role.md](agents/strategist/role.md): strategist-only instructions
+- [agents/scientist/role.md](agents/scientist/role.md): scientist-only instructions
+- [agents/analyst/role.md](agents/analyst/role.md): analyst-only instructions
+- [agents/engineer/role.md](agents/engineer/role.md): engineer-only instructions
 
 ## Prerequisites
 
@@ -43,7 +43,7 @@ That topology may change in future issues, but this README describes the current
 - Run `uv sync`.
 - Configure Kaggle authentication on your machine before starting a run.
 - Make sure your Kaggle account has access to the target competition and has accepted any required rules.
-- Start Claude Code from within the repository / worktree directories created for the run.
+- Start Claude Code from within the repository or worktree directories created for the run.
 
 ## Starting A Run
 
@@ -64,8 +64,8 @@ You are the supervisor, start a new run.
    - propose a run tag
    - create branches and worktrees
    - ensure competition data exists
-   - initialize the tracked communication files
-    - tell you which `claude` commands to run for the other roles
+   - initialize the tracked communication files under `agents/`
+   - tell you which `claude` commands to run for the other roles
 
 4. Open the additional terminals exactly as instructed by the supervisor.
 
@@ -76,7 +76,7 @@ cd <root>/AutoKaggle
 claude
 ```
 
-That strategist session is on-demand. It is not a permanent terminal like the supervisor / scientist / analyst / engineer sessions.
+That strategist session is on-demand. It is not a permanent terminal like the supervisor, scientist, analyst, and engineer sessions.
 
 6. Once the other role sessions are open, tell the supervisor they are running so it can start the run logic.
 
@@ -91,23 +91,23 @@ The human is expected to:
 
 Useful places to inspect:
 
-- [strategy-whitepaper.md](strategy-whitepaper.md) when present
-- [strategy-idea-cookbook.md](strategy-idea-cookbook.md)
-- [scientist-guidance.md](scientist-guidance.md) when present
-- [analyst-hypotheses.md](analyst-hypotheses.md) when present
-- [engineer-promotions.md](engineer-promotions.md) when present
+- [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md) when present
+- [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md)
+- [agents/scientist/scientist-guidance.md](agents/scientist/scientist-guidance.md) when present
+- [agents/analyst/analyst-hypotheses.md](agents/analyst/analyst-hypotheses.md) when present
+- [agents/engineer/engineer-promotions.md](agents/engineer/engineer-promotions.md) when present
 - `artifacts/<tag>/` for untracked run outputs
 
 ## Repository Layout
 
 Key tracked files:
 
-- [program.md](program.md): shared agent contract
-- [strategy-whitepaper.md](strategy-whitepaper.md): strategist-owned current plan
-- [strategy-idea-cookbook.md](strategy-idea-cookbook.md): strategist-owned reusable playbook
-- [experiment.py](experiment.py): scientist-owned experiment file
-- [analysis.py](analysis.py): analyst working script
-- [promotion.py](promotion.py): engineer submission-preparation script
+- [agents/program.md](agents/program.md): shared agent contract
+- [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md): strategist-owned current plan
+- [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md): strategist-owned reusable playbook
+- [agents/scientist/experiment.py](agents/scientist/experiment.py): scientist-owned experiment file
+- [agents/analyst/analysis.py](agents/analyst/analysis.py): analyst working script
+- [agents/engineer/promotion.py](agents/engineer/promotion.py): engineer submission-preparation script
 - [harness/dataset.py](harness/dataset.py): data contract and CV split logic
 - [harness/experiment_runner.py](harness/experiment_runner.py): experiment execution and timeout handling
 - [harness/analysis_runner.py](harness/analysis_runner.py): analysis execution and findings append flow

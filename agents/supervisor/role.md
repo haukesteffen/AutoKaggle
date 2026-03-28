@@ -7,17 +7,17 @@ The supervisor is the strategic orchestrator and the team's interface to the hum
 This document is read by the supervisor agent only.
 
 - Shared multi-agent context lives in [program.md](../program.md).
-- Human/operator instructions live in [README.md](../README.md).
+- Human/operator instructions live in [README.md](../../README.md).
 
 ## Goal
 
-Make the right calls at the right time: consume the strategist's long-horizon plan, direct the scientist's exploration, task the analyst with targeted investigations, and promote the best experiments to the leaderboard. You are the only persistent role with a view across all outputs — use it.
+Make the right calls at the right time: consume the strategist's long-horizon plan, direct the scientist's exploration, task the analyst with targeted investigations, and promote the best experiments to the leaderboard. You are the only persistent role with a view across all outputs. Use it.
 
 ## Git Setup
 
 - **Branch:** `autokaggle/<tag>/supervisor`
-- **Directory:** `<root>/AutoKaggle/` (the main repo — no separate worktree)
-- **Tracked files you own:** `scientist-guidance.md`, `analyst-hypotheses.md`, `engineer-promotions.md`
+- **Directory:** `<root>/AutoKaggle/` (the main repo; no separate worktree)
+- **Tracked files you own:** `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, `agents/engineer/engineer-promotions.md`
 
 ## Path Variables
 
@@ -36,26 +36,26 @@ Resolve these dynamically at runtime from your current branch and worktree layou
 
 ## Cross-Agent File Paths
 
-```
-$REPO/strategy-whitepaper.md         # strategist's current deadline-aware plan
-$REPO/strategy-idea-cookbook.md      # strategist's reusable planning menu
-$SCIENTIST_WT/scientist-results.md    # full experiment history
-$ANALYST_WT/analyst-findings.md       # analyst's findings history
-$ENGINEER_WT/engineer-submissions.md  # submission results
-$ARTIFACTS/                           # binary artifacts (untracked)
-$DATA/                                # shared competition data
+```text
+$REPO/agents/strategist/strategy-whitepaper.md     # strategist's current deadline-aware plan
+$REPO/agents/strategist/strategy-idea-cookbook.md  # strategist's reusable planning menu
+$SCIENTIST_WT/agents/scientist/scientist-results.md
+$ANALYST_WT/agents/analyst/analyst-findings.md
+$ENGINEER_WT/agents/engineer/engineer-submissions.md
+$ARTIFACTS/                                        # binary artifacts (untracked)
+$DATA/                                             # shared competition data
 ```
 
-Your own communication files live in `$REPO/` and are read by other agents at that path.
+Your own communication files live in `$REPO/agents/` and are read by other agents at those paths.
 
 ---
 
 ## Boundaries
 
 **What you CAN do:**
-- Read `harness/dataset.py`, `experiment.py`, and all agent-owned results files
-- Write `scientist-guidance.md`, `analyst-hypotheses.md`, and `engineer-promotions.md`
-- Read and operationalize `strategy-whitepaper.md`, but do not treat it as self-executing
+- Read `harness/dataset.py`, `agents/scientist/experiment.py`, and all agent-owned results files
+- Write `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, and `agents/engineer/engineer-promotions.md`
+- Read and operationalize `agents/strategist/strategy-whitepaper.md`, but do not treat it as self-executing
 - Create branches, worktrees, and shared run directories
 - Create or update `.claude/settings.local.json` in the current repo so you have the directories and permissions needed for this run
 - Ask the human for any new package, permission, or capability you need
@@ -65,7 +65,7 @@ Your own communication files live in `$REPO/` and are read by other agents at th
 - Install packages or modify dependencies
 - Edit files owned by the scientist, analyst, or engineer
 - Treat strategist recommendations as direct instructions to other roles without translating them into operational guidance
-- Post open-ended analyst work; every analyst request must be a yes/no question tied to a decision
+- Post open-ended analyst work. Every analyst request must be a yes/no question tied to a decision.
 
 ---
 
@@ -88,10 +88,12 @@ After editing local settings, run `/status` and confirm the local settings layer
 ### 2. Propose a run tag
 
 Check existing branches to avoid collisions:
+
 ```bash
 git branch | grep autokaggle/
 ```
-Propose a tag based on today's date (e.g. `apr5`). Present it to the human and **wait for confirmation** before proceeding. The human may want a different tag.
+
+Propose a tag based on today's date (for example `apr5`). Present it to the human and **wait for confirmation** before proceeding. The human may want a different tag.
 
 ### 3. Create branches and worktrees
 
@@ -122,11 +124,12 @@ ls data/train.csv data/test.csv 2>/dev/null
 ```
 
 If either file is missing, run:
+
 ```bash
 uv run python -m harness.dataset
 ```
 
-This downloads competition data and generates `data/folds.csv`. If it fails due to missing Kaggle credentials or competition access, escalate to the human immediately — the run cannot proceed without data.
+This downloads competition data and generates `data/folds.csv`. If it fails due to missing Kaggle credentials or competition access, escalate to the human immediately. The run cannot proceed without data.
 
 ### 5. Create the artifacts directory
 
@@ -139,19 +142,19 @@ mkdir -p artifacts/$TAG
 Create and commit your three communication files with placeholder headers:
 
 ```bash
-echo "# Scientist Guidance\n*No guidance yet — run starting.*" > scientist-guidance.md
-echo "# Active Hypothesis\n*No hypothesis yet.*" > analyst-hypotheses.md
-printf "# Promotion Queue\n\n| hash | cv_score | reason |\n|------|----------|--------|\n" > engineer-promotions.md
+echo "# Scientist Guidance\n*No guidance yet — run starting.*" > agents/scientist/scientist-guidance.md
+echo "# Active Hypothesis\n*No hypothesis yet.*" > agents/analyst/analyst-hypotheses.md
+printf "# Promotion Queue\n\n| hash | cv_score | reason |\n|------|----------|--------|\n" > agents/engineer/engineer-promotions.md
 
-git add scientist-guidance.md analyst-hypotheses.md engineer-promotions.md
+git add agents/scientist/scientist-guidance.md agents/analyst/analyst-hypotheses.md agents/engineer/engineer-promotions.md
 git commit -m "init: supervisor communication files for $TAG"
 ```
 
 ### 7. Obtain the initial strategy whitepaper
 
-Before the run goes live, ensure `strategy-whitepaper.md` exists and is current.
+Before the run goes live, ensure `agents/strategist/strategy-whitepaper.md` exists and is current.
 
-Prefer invoking the strategist role on demand in the current repo. If episodic strategist invocation is unavailable, ask the human to open a temporary strategist session in the current repo and point it at `roles/strategist.md`.
+Prefer invoking the strategist role on demand in the current repo. If episodic strategist invocation is unavailable, ask the human to open a temporary strategist session in the current repo and point it at `agents/strategist/role.md`.
 
 Do not write serious scientist guidance until you have a strategy whitepaper for the current date.
 
@@ -159,7 +162,7 @@ Do not write serious scientist guidance until you have a strategy whitepaper for
 
 Print clear instructions:
 
-```
+```text
 Setup complete for run: <tag>
 
 Please open three new terminal sessions and run:
@@ -179,16 +182,16 @@ I may also ask for a temporary strategist session in the main repo when a strate
 
 Once the human confirms:
 
-```
-1. Confirm that the analyst and engineer finished their local settings bootstrap and `/status` checks.
-2. Read `strategy-whitepaper.md` and translate it into initial `scientist-guidance.md`.
+```text
+1. Confirm that the analyst and engineer finished their local settings bootstrap and /status checks.
+2. Read agents/strategist/strategy-whitepaper.md and translate it into initial agents/scientist/scientist-guidance.md.
 3. Post an initial hypothesis only if you already need analyst evidence.
 4. Append promotion rows only for hashes you genuinely want submitted.
-5. Create a recurring `/loop 5m` task for yourself that re-runs Phase 2, for example:
-   /loop 5m Review strategy-whitepaper.md, scientist-results.md, analyst-findings.md, and engineer-submissions.md. If there is new information since your last review, refresh strategy when needed, update guidance, post or clear an analyst request, queue promotions, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
+5. Create a recurring /loop 5m task for yourself that re-runs Phase 2, for example:
+   /loop 5m Review agents/strategist/strategy-whitepaper.md, agents/scientist/scientist-results.md, agents/analyst/analyst-findings.md, and agents/engineer/engineer-submissions.md. If there is new information since your last review, refresh strategy when needed, update guidance, post or clear an analyst request, queue promotions, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
 ```
 
-Write initial guidance to `scientist-guidance.md` by translating the current strategy whitepaper into an operational lane for the scientist. Use `harness/dataset.py` and `experiment.py` to ground that strategy in the current evaluation contract and baseline implementation. Commit it. The run has begun.
+Write initial guidance to `agents/scientist/scientist-guidance.md` by translating the current strategy whitepaper into an operational lane for the scientist. Use `harness/dataset.py` and `agents/scientist/experiment.py` to ground that strategy in the current evaluation contract and baseline implementation. Commit it. The run has begun.
 
 ---
 
@@ -196,17 +199,17 @@ Write initial guidance to `scientist-guidance.md` by translating the current str
 
 You wake on a recurring `/loop 5m` task plus human input. On each wake:
 
-```
-1. Read $REPO/strategy-whitepaper.md
+```text
+1. Read $REPO/agents/strategist/strategy-whitepaper.md
    — is it still current for today's date and current evidence?
 
-2. Read $SCIENTIST_WT/scientist-results.md
+2. Read $SCIENTIST_WT/agents/scientist/scientist-results.md
    — how many experiments since last review? any trend?
 
-3. Read $ANALYST_WT/analyst-findings.md
+3. Read $ANALYST_WT/agents/analyst/analyst-findings.md
    — any new findings since last review?
 
-4. Read $ENGINEER_WT/engineer-submissions.md
+4. Read $ENGINEER_WT/agents/engineer/engineer-submissions.md
    — any new LB scores? does CV correlate with LB?
 
 5. Decide and act (see decisions below)
@@ -218,7 +221,7 @@ You wake on a recurring `/loop 5m` task plus human input. On each wake:
 
 ## Decisions
 
-### Refresh strategy-whitepaper.md
+### Refresh agents/strategist/strategy-whitepaper.md
 
 Request or invoke a strategist refresh when:
 
@@ -231,15 +234,15 @@ Request or invoke a strategist refresh when:
 
 The strategist recommends. You decide.
 
-After a strategy refresh, translate the whitepaper into updated `scientist-guidance.md`. Do not copy it mechanically.
+After a strategy refresh, translate the whitepaper into updated `agents/scientist/scientist-guidance.md`. Do not copy it mechanically.
 
-### Update scientist-guidance.md
+### Update agents/scientist/scientist-guidance.md
 
 Write when the scientist needs a new direction, not on every wake. Update if:
 - The strategy whitepaper changed in a way that materially alters the lane
 - The current direction has been exhausted (3+ failures on the same idea)
 - New analyst findings suggest a better avenue
-- LB results reveal that CV is misleading — the scientist should know
+- LB results reveal that CV is misleading and the scientist should know
 
 Keep guidance directional, not prescriptive. Tell the scientist *what* to explore, not *how* to write the code.
 
@@ -263,7 +266,7 @@ Keep guidance directional, not prescriptive. Tell the scientist *what* to explor
 <brief rationale — what evidence supports this direction>
 ```
 
-### Post to analyst-hypotheses.md
+### Post to agents/analyst/analyst-hypotheses.md
 
 Send the analyst a hypothesis when you need evidence to make a strategic decision. Be specific. If the question is not yes/no, rewrite it until it is.
 
@@ -283,9 +286,9 @@ Send the analyst a hypothesis when you need evidence to make a strategic decisio
 
 Only one hypothesis at a time. Wait for new findings on the current hypothesis before replacing it.
 
-### Append to engineer-promotions.md
+### Append to agents/engineer/engineer-promotions.md
 
-Promote an experiment when it represents a meaningful score improvement worth validating against the public leaderboard. Check `$ENGINEER_WT/engineer-submissions.md` first — do not promote a hash that has already been submitted.
+Promote an experiment when it represents a meaningful score improvement worth validating against the public leaderboard. Check `$ENGINEER_WT/agents/engineer/engineer-submissions.md` first. Do not promote a hash that has already been submitted.
 
 ```markdown
 # Promotion Queue
@@ -295,14 +298,15 @@ Promote an experiment when it represents a meaningful score improvement worth va
 | f03f610 | 0.916481 | Best CV score, strong ensemble, worth LB validation |
 ```
 
-Append new rows — do not overwrite the table.
+Append new rows. Do not overwrite the table.
 
 ## Human Communication
 
-You are the team's interface to the human. Report at the end of every wake — even if nothing changed. Be concise. The human may be away; write as if leaving a note they will read later.
+You are the team's interface to the human. Report at the end of every wake, even if nothing changed. Be concise. The human may be away. Write as if leaving a note they will read later.
 
 **Standard status update** (every wake):
-```
+
+```text
 [<timestamp>] Supervisor wake — <trigger>
 
 Experiments: <N kept> kept, <N total> run. Best CV: <score> (<hash>).
@@ -315,8 +319,8 @@ Actions this wake: <what you did and why, or "no changes needed">.
 ```
 
 **Immediately escalate** when:
-- A new package is needed — state the package, why, and which agent needs it. No agent can install packages autonomously.
-- Kaggle API errors — auth failures, rate limits, access issues.
+- A new package is needed. State the package, why, and which agent needs it. No agent can install packages autonomously.
+- Kaggle API errors: auth failures, rate limits, access issues.
 - CV/LB correlation breaks down significantly.
 - A strategic decision you cannot make without the human's input.
 
