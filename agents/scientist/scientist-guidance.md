@@ -72,7 +72,7 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 
 ## Priority Ideas
 
-**Current status:** `ensemble_lgbm_cb_xgb_fixed` (7b386f5) done — CV=0.916540, equal-weight LGBM+CB+XGB, proper fit/predict confirmed (208s training). This is submittable but not best — OOF grid showed CB=0.5/XGB=0.5/LGBM=0.0 is better. `BEST_SUBMITTABLE_CV = 0.916540`. Proceed to Step 1 now.
+**Current status:** `ensemble_lgbm_cb_xgb_fixed` (7b386f5) submitted — CV=0.916540, LB=0.91396 (new best). `ensemble_cb_xgb_fixed` (3963ca3, CB=0.5/XGB=0.5) scored CV=0.916381 — worse. OOF-grid weights don't transfer to real training; equal 3-way wins. `BEST_LB = 0.91396`. March 28 slots exhausted. Proceed to Step 1 now (March 29 work).
 
 ### Step 1: OOF weight grid search (CB + XGB + MLP)
 
@@ -93,7 +93,7 @@ Implement `ensemble_cb_xgb_mlp_fixed` using the `MultiModelEnsemble` template be
 Implement `ensemble_cb_xgb_fixed` (CB=0.5, XGB=0.5) using the `MultiModelEnsemble` template. This is the corrected version of c4ea0d1. Verify training time >8 minutes.
 
 **If neither beats 0.916540:**
-`ensemble_lgbm_cb_xgb_fixed` (7b386f5) is already the best submittable result. Report and await supervisor decision on submission.
+`ensemble_lgbm_cb_xgb_fixed` (7b386f5) is the anchor. Try adding LGBM to the MLP grid: grid-search all 4-component weights (LGBM+CB+XGB+MLP) in steps of 0.1. If still no improvement, report and await supervisor direction.
 
 ### MultiModelEnsemble template (extend as needed)
 
