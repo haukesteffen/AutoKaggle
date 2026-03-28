@@ -50,6 +50,13 @@ For each play, state:
 - Try it if: analysis shows categorical structure is central or native-cat trials have promise
 - Deprioritize if: repeated evidence shows native categorical handling is worse on this competition
 
+### CatBoost tuned for divergence (not just strength)
+
+- When to use it: when CatBoost default is already in the shortlist but ensemble gain is small because it is too correlated with LGBM
+- Why it might help: CatBoost at default settings often follows similar gradient contours to LGBM. Lower learning rate (0.03), more iterations (1500–2000), higher depth (8–10), and feature subsampling (rsm=0.7) can push CatBoost into different feature interactions, making it a more useful ensemble partner
+- Try it if: LGBM+CatBoost ensemble adds less than +0.001 LB over LGBM alone — this is a sign of correlation, not complementarity
+- Deprioritize if: tuned CatBoost still tracks LGBM closely in CV (difference < 0.0003 in ensemble gain)
+
 ### Reweighted or calibrated variants
 
 - When to use it: when imbalance, calibration drift, or threshold behavior may matter
@@ -65,6 +72,14 @@ For each play, state:
 - Why it might help: different model families can add ensemble value even when their standalone CV is slightly worse
 - Try it if: the strategy objective includes future ensembling or the current best family appears exhausted
 - Deprioritize if: time is short and there is no realistic path to using the diversity
+
+### ExtraTrees / Random Forest as bagging-family diversity component
+
+- When to use it: when LGBM and CatBoost are both in the shortlist but ensemble gain is small due to high correlation between two boosting-family models
+- Why it might help: bagging models (ExtraTrees, RandomForest) have structurally different error patterns from boosting models. They reduce variance through averaging independently-grown trees rather than through sequential correction of residuals. This makes them naturally more orthogonal to LGBM/CatBoost even when their standalone CV is somewhat lower
+- Try it if: LGBM+CatBoost correlation is high (ensemble gain < +0.001 LB) and there is still time for a diversity experiment
+- Deprioritize if: ensemble gain from adding the bagging component is still negligible after tuning, or if the standalone CV is more than 0.003 below the best boosting model (the diversity gain rarely overcomes that gap)
+- Suggested starting point: ExtraTreesClassifier n_estimators=500, max_features="sqrt", min_samples_leaf=5; or RandomForestClassifier with similar settings
 
 ### Feature-space diversification
 
@@ -201,6 +216,22 @@ For each play, state:
 - Why it might help: in constrained time, a simple average of the best linear model and the best tree model is often more reliable than chasing a third family or complex stacking; it avoids late-phase validation debt
 - Try it if: two distinct model families have been evaluated and both have validated CV scores
 - Deprioritize if: one model family is clearly dominant and there is no complementary diversity to gain
+
+## Tuning Failure Patterns
+
+### Hyperparameter tuning often stalls near the tree model ceiling
+
+- When to recognize it: when num_leaves, n_estimators, learning_rate, and min_child_samples all return to approximately the same CV score
+- Why it happens: on Playground Series datasets, the tree model ceiling on the given feature set is often hit quickly with conservative defaults. The signal that tuning has stalled is when 3+ tuning variants all land within ±0.0001 CV of the baseline
+- What to do instead: pivot to feature engineering or model-family diversity rather than continuing to tune the same model family
+- Evidence from mar28: LGBM num_leaves=63, deeper LGBM (1000 iterations lr=0.03), target encoding, and count features all failed to beat LGBM baseline CV 0.915855; all variants were within 0.0001 of baseline
+
+### Target encoding rarely helps tree models as a solo feature
+
+- When to recognize it: when TargetEncoder applied to high-variation categorical columns produces no CV gain on LGBM or CatBoost
+- Why it happens: gradient boosted trees already learn effective splits on categorical features (especially CatBoost with native categories). Target encoding pre-computes an average that the tree can already discover internally
+- What might still be useful: target-encoded features may add diversity when used in a different model family (e.g. as extra inputs to a logistic regression stack member), but this is speculative
+- Evidence from mar28: TargetEncoder on 13 high-variation columns: CV 0.915805 vs baseline 0.915855, discarded
 
 ## ROC-AUC / Binary Classification Notes
 
