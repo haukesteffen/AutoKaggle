@@ -19,23 +19,68 @@ uv run python -m harness.experiment_runner \
   --artifact-dir /Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/<hash>
 ```
 
-## ⚠️ CRITICAL BUG — FIX BEFORE ANY SUBMISSION
+## ⚠️ CRITICAL BUG — AFFECTS ALL "PRECOMPUTED ENSEMBLE" EXPERIMENTS
 
-The `ensemble_lgbm_cb_xgb_avg` experiment (393f8aa) scored LB 0.504 despite CV 0.916592. The bug: the experiment loads pre-computed OOF preds for CV scoring (correct), but `build_model` must return an actual sklearn-compatible estimator that trains all component models from scratch on whatever `X_train` / `y` it receives, and predicts on `X_test` via `predict_proba`. The harness calls `model.fit(X_full, y)` then `predict_positive_scores(model, X_test)` for artifact generation — if this path doesn't work correctly, test predictions will be garbage.
+`ensemble_lgbm_cb_xgb_avg` (393f8aa, LB=0.504) and `ensemble_3way_weighted_opt` (c4ea0d1, CV=0.916667) both have this bug:
 
-**Fix:** In `build_model`, return a custom class (or Pipeline subclass) that, on `.fit(X, y)`, trains all three models (LGBM, CatBoost, XGBoost) and, on `.predict_proba(X)`, averages their probability outputs. Do NOT load OOF arrays in `build_model`. The OOF-loading trick only works for CV scoring, not artifact generation.
+The `PrecomputedEnsemble.predict_proba` uses `len(X) < self._n_train` to detect whether X is a CV fold (→ use OOF preds) vs test data (→ use pre-computed test preds). **This condition is wrong.** The test set has 254,655 rows < 594,194 training rows, so test data falls into the OOF branch and indexes OOF preds with test-set row indices. The test predictions are garbage.
 
-Alternatively, run three separate single-model experiments and average their `test-preds.npy` files manually in a dedicated submission script, bypassing the ensemble-as-model approach entirely.
+**c4ea0d1 (CV=0.916667) has the correct OOF-grid optimal weights (CB=0.5, XGB=0.5, LGBM=0.0) but cannot be submitted without a fix.**
+
+**Fix — implement a real fit/predict ensemble:**
+
+```python
+from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
+from xgboost import XGBClassifier
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.preprocessing import OrdinalEncoder
+import numpy as np
+
+class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
+    def __init__(self, w_cb=0.5, w_xgb=0.5):
+        self.w_cb = w_cb
+        self.w_xgb = w_xgb
+        self.cb_ = None
+        self.xgb_ = None
+        self.enc_ = None
+
+    def fit(self, X, y):
+        cat_cols = X.select_dtypes(include="object").columns.tolist()
+        self.enc_ = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
+        X_enc = X.copy()
+        X_enc[cat_cols] = self.enc_.fit_transform(X[cat_cols])
+        self.cb_ = CatBoostClassifier(iterations=1000, depth=7, random_state=42, verbose=0)
+        self.cb_.fit(X_enc, y)
+        self.xgb_ = XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6,
+                                   subsample=0.8, colsample_bytree=0.8, random_state=42,
+                                   eval_metric="auc", verbosity=0)
+        self.xgb_.fit(X_enc, y)
+        self.cat_cols_ = cat_cols
+        return self
+
+    def predict_proba(self, X):
+        X_enc = X.copy()
+        X_enc[self.cat_cols_] = self.enc_.transform(X[self.cat_cols_])
+        cb_p = self.cb_.predict_proba(X_enc)[:, 1]
+        xgb_p = self.xgb_.predict_proba(X_enc)[:, 1]
+        preds = self.w_cb * cb_p + self.w_xgb * xgb_p
+        return np.column_stack([1 - preds, preds])
+```
+
+`EXPERIMENT_NAME = "ensemble_cb_xgb_fixed"`. Training time should be 8–15 minutes — confirm this before recording results.
 
 ## Priority Ideas
 
-1. **Fix and rerun the 3-way ensemble** — Reimplement so `build_model` returns a proper fit/predict estimator (not an OOF-loader). `EXPERIMENT_NAME = "ensemble_lgbm_cb_xgb_fixed"`. Do not submit until you verify the training time is >5 minutes (confirming all three models actually train).
+**Current status:** MLP experiment (442ff2a) is running now. Wait for it to finish.
 
-2. **OOF weight grid search (3-way)** — Using the same three OOF preds, grid-search weights in steps of 0.1 (w_lgbm + w_cb + w_xgb = 1.0, all ≥ 0.0). Find the weight combination with highest OOF CV, then run through harness with that weighting. `EXPERIMENT_NAME = "ensemble_3way_weighted_opt"`. If CV improves above 0.916592, keep it.
+1. **After MLP finishes — report CV score and OOF correlation check.** The supervisor will post an analyst hypothesis for MLP OOF correlation vs LGBM. Do NOT implement a new experiment until the analyst clears it.
 
-3. **Fast MLP probe** — A single `MLPClassifier(hidden_layer_sizes=(256, 256), activation='relu', solver='adam', early_stopping=True, max_iter=200, random_state=42)` in a Pipeline with the same preprocessor as LGBM. `EXPERIMENT_NAME = "mlp_baseline"`. Goal is not to beat GBDT solo — it's to check if OOF is genuinely more orthogonal (r < 0.990 with LGBM). If the supervisor confirms orthogonality, they'll try adding it to the ensemble.
+2. **Implement `ensemble_cb_xgb_fixed`** — Use the `MultiModelEnsemble` class above (CB=0.5, XGB=0.5). This is the corrected version of c4ea0d1 (CV=0.916667, best OOF grid result). Verify training time >8 minutes. This is the most important submission candidate.
 
-4. **LR as small-weight ensemble component** — The LR OOF preds already exist from experiment `4bc520f`. Try averaging LGBM + CatBoost + XGBoost + LR with LR weight 0.05–0.10. Compute OOF CV offline first; only run through harness if it improves above 0.916592.
+3. **If MLP passes orthogonality (analyst confirms r < 0.990 with LGBM)** — add MLP as a 3rd component: `ensemble_cb_xgb_mlp`. Weights TBD from OOF grid over CB/XGB/MLP preds. Implement as a proper `MultiModelEnsemble` extension.
+
+4. **LR as small-weight ensemble component** — The LR OOF preds already exist from experiment `4bc520f`. Try averaging CB + XGB + LR with LR weight 0.05–0.10. Compute OOF CV offline first; only run through harness if it improves above 0.916667.
 
 ## Avoid Entirely
 
