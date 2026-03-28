@@ -17,15 +17,12 @@ The repository has two layers:
 - fixed harness code under [harness/](harness)
 - agent-facing prompts, inboxes, and working files under [agents/](agents)
 
-The current documented operating model on `main` uses four long-lived roles plus one on-demand planning role:
+The current documented operating model on `main` uses three long-lived roles plus one on-demand planning role:
 
 - supervisor
 - scientist
 - analyst
-- engineer
 - strategist (episodic / temporary, not a permanently running session)
-
-That topology may change in future issues, but this README describes the current behavior on `main`.
 
 ## Document Map
 
@@ -35,7 +32,7 @@ That topology may change in future issues, but this README describes the current
 - [agents/strategist/role.md](agents/strategist/role.md): strategist-only instructions
 - [agents/scientist/role.md](agents/scientist/role.md): scientist-only instructions
 - [agents/analyst/role.md](agents/analyst/role.md): analyst-only instructions
-- [agents/engineer/role.md](agents/engineer/role.md): engineer-only instructions
+- [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md): tracked submission ledger
 
 ## Prerequisites
 
@@ -65,7 +62,7 @@ You are the supervisor, start a new run.
    - create branches and worktrees
    - ensure competition data exists
    - initialize the tracked communication files under `agents/`
-   - tell you which `claude` commands to run for the other roles
+   - tell you which `claude` commands to run for the other persistent roles
 
 4. Open the additional terminals exactly as instructed by the supervisor.
 
@@ -76,7 +73,7 @@ cd <root>/AutoKaggle
 claude
 ```
 
-That strategist session is on-demand. It is not a permanent terminal like the supervisor, scientist, analyst, and engineer sessions.
+That strategist session is on-demand. It is not a permanent terminal like the supervisor, scientist, and analyst sessions.
 
 6. Once the other role sessions are open, tell the supervisor they are running so it can start the run logic.
 
@@ -95,7 +92,7 @@ Useful places to inspect:
 - [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md)
 - [agents/scientist/scientist-guidance.md](agents/scientist/scientist-guidance.md) when present
 - [agents/analyst/analyst-hypotheses.md](agents/analyst/analyst-hypotheses.md) when present
-- [agents/engineer/engineer-promotions.md](agents/engineer/engineer-promotions.md) when present
+- [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md) when present
 - `artifacts/<tag>/` for untracked run outputs
 
 ## Repository Layout
@@ -105,9 +102,10 @@ Key tracked files:
 - [agents/program.md](agents/program.md): shared agent contract
 - [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md): strategist-owned current plan
 - [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md): strategist-owned reusable playbook
+- [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md): supervisor-owned submission ledger and CV/LB notes
+- [agents/supervisor/submission.py](agents/supervisor/submission.py): supervisor submission-preparation script
 - [agents/scientist/experiment.py](agents/scientist/experiment.py): scientist-owned experiment file
 - [agents/analyst/analysis.py](agents/analyst/analysis.py): analyst working script
-- [agents/engineer/promotion.py](agents/engineer/promotion.py): engineer submission-preparation script
 - [harness/dataset.py](harness/dataset.py): data contract and CV split logic
 - [harness/experiment_runner.py](harness/experiment_runner.py): experiment execution and timeout handling
 - [harness/analysis_runner.py](harness/analysis_runner.py): analysis execution and findings append flow

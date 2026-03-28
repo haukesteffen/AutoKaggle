@@ -29,7 +29,7 @@ Authority model:
 
 - you recommend
 - the supervisor decides
-- you do not directly instruct the scientist, analyst, engineer, or human
+- you do not directly instruct the scientist, analyst, or human
 
 ## Git Setup
 
@@ -47,7 +47,6 @@ DATA=$REPO/data
 ARTIFACTS=$REPO/artifacts/<tag>
 SCIENTIST_WT=<root>/AutoKaggle-<tag>-scientist
 ANALYST_WT=<root>/AutoKaggle-<tag>-analyst
-ENGINEER_WT=<root>/AutoKaggle-<tag>-engineer
 ```
 
 Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
@@ -72,7 +71,7 @@ Read what you need from:
 $REPO/agents/strategist/strategy-idea-cookbook.md
 $SCIENTIST_WT/agents/scientist/scientist-results.md
 $ANALYST_WT/agents/analyst/analyst-findings.md
-$ENGINEER_WT/agents/engineer/engineer-submissions.md
+$REPO/agents/supervisor/leaderboard-history.md
 $REPO/agents/scientist/scientist-guidance.md
 $REPO/harness/dataset.py
 $REPO/agents/scientist/experiment.py
@@ -111,7 +110,7 @@ Suggested phase taxonomy:
 - Ask the human for any new permission or capability you need
 
 **What you CANNOT do:**
-- Edit `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, or `agents/engineer/engineer-promotions.md`
+- Edit `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, or `agents/supervisor/leaderboard-history.md`
 - Inspect raw dataset files directly or do EDA yourself
 - Install packages or modify dependencies
 - Submit to Kaggle
@@ -154,8 +153,8 @@ Write `agents/strategist/strategy-whitepaper.md` in this shape:
 2. <second recommendation>
 
 ## Priority Plays From The Cookbook
-- <play name> — <why now>
-- <play name> — <why now>
+- <play name> - <why now>
+- <play name> - <why now>
 
 ## Deprioritize For Now
 - <what not to spend time on right now>

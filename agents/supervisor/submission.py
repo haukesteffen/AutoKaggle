@@ -29,7 +29,7 @@ def main() -> None:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-dir", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=Path("agents/engineer/submission.csv"))
+    parser.add_argument("--output", type=Path, default=Path("agents/supervisor/submission.csv"))
     return parser.parse_args()
 
 
