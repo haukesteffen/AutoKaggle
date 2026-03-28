@@ -22,6 +22,10 @@ uv run python -m harness.experiment_runner \
   --artifact-dir /Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/<hash>
 ```
 
+## ⚠️ NEXT EXPERIMENT: lgbm_mtm_fiber_bins — DO NOT RUN ANYTHING ELSE FIRST
+
+All model diversity paths have been exhausted (ExtraTrees cv=0.911, RandomForest cv=0.910, XGBoost cv=0.916 but near-redundant with LGBM per analyst, tuned CatBoost r=0.9972 with LGBM). The ONLY remaining lever is feature engineering. Run `lgbm_mtm_fiber_bins` next.
+
 ## Priority Ideas
 
 1. **Three mtm_fiber tenure flags** — Analyst confirmed a clear churn threshold pattern within Month-to-month × Fiber optic. Add these three binary features to `build_features` for LGBM:
