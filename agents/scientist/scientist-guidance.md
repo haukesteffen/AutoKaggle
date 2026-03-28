@@ -24,14 +24,11 @@ uv run python -m harness.experiment_runner \
 
 ## Priority Ideas
 
-1. **ExtraTrees baseline** — `build_model` returns an `ExtraTreesClassifier(n_estimators=500, max_features="sqrt", min_samples_leaf=5, random_state=42)` in a Pipeline with the same preprocessor as the LGBM baseline. `EXPERIMENT_NAME = "extratrees_baseline"`. Report solo CV and whether it would improve the 3-way ensemble (LGBM + CatBoost + ExtraTrees simple average).
+1. **Tuned CatBoost for divergence** — ExtraTrees (solo CV 0.911) was too weak to help the ensemble. Next: try CatBoost with `iterations=1500, learning_rate=0.03, depth=9, rsm=0.7`. The goal is to make CatBoost explore different feature interactions than the default-settings version (which is near-redundant with LGBM at r=0.9953). `EXPERIMENT_NAME = "catboost_tuned_diverge"`. Report solo CV and OOF correlation with LGBM.
 
-2. **3-component ensemble (LGBM + CatBoost + ExtraTrees)** — if ExtraTrees solo CV is anywhere near 0.910+, try a simple average of all three OOF preds and report the combined CV. OOF artifact paths:
-   - LGBM: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/cbef1de9024dbd5dc70988ba46baf1633f280340/oof-preds.npy`
-   - CatBoost: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/81151d814205733001448397276318fcfe9f5759/oof-preds.npy`
-   - `EXPERIMENT_NAME = "ensemble_lgbm_catboost_extratrees_avg"`
+2. **Ensemble with tuned CatBoost** — if tuned CatBoost scores well solo (CV ≥ 0.916), try replacing the default CatBoost component in the ensemble: simple average of LGBM (cbef1de) + tuned CatBoost. OOF artifact path for LGBM: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/cbef1de9024dbd5dc70988ba46baf1633f280340/oof-preds.npy`. `EXPERIMENT_NAME = "ensemble_lgbm_catboost_tuned_avg"`.
 
-3. **Tuned CatBoost for divergence** — if ExtraTrees doesn't help, try CatBoost with `iterations=1500, learning_rate=0.03, depth=9, rsm=0.7`. This forces CatBoost to explore different feature interactions than LGBM. `EXPERIMENT_NAME = "catboost_tuned_diverge"`. Only pursue if ExtraTrees path is exhausted or clearly fails.
+3. **XGBoost baseline** — if tuned CatBoost doesn't diverge meaningfully from LGBM, try `XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6, random_state=42)`. Low expectations for diversity but worth confirming. `EXPERIMENT_NAME = "xgb_baseline"`.
 
 ## Avoid For Now
 
