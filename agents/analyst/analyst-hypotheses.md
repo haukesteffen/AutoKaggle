@@ -1,15 +1,15 @@
 # Active Hypothesis
 
-**Hypothesis:** Is the tuned CatBoost (`b822216`, depth=7, iter=1000, rsm=0.8) less correlated with LGBM baseline (`cbef1de`) than the default CatBoost (`81151d8`) was — specifically, is the Pearson OOF correlation between tuned CatBoost and LGBM below 0.990 (vs 0.9953 for default CatBoost)?
+**Hypothesis:** Is the XGBoost baseline (`16c521c`, n=500, lr=0.05, depth=6) OOF correlation with LGBM baseline (`cbef1de`) below 0.990 — i.e., meaningfully more orthogonal than default CatBoost (r=0.9953)?
 
-**Decision if supported (correlation < 0.990):** The tuned CatBoost adds meaningful diversity despite its weaker solo CV. Direct the scientist to build an ensemble of LGBM + tuned CatBoost and check if it beats the current best (CV 0.916530).
+**Decision if supported (Pearson r < 0.990):** XGBoost adds genuine ensemble diversity. Direct the scientist to try LGBM + XGBoost simple average ensemble.
 
-**Decision if rejected (correlation ≥ 0.990):** Tuned CatBoost is not meaningfully more orthogonal than default CatBoost. Skip the ensemble with tuned CatBoost and direct the scientist to the mtm_fiber interaction feature experiment instead.
+**Decision if rejected (Pearson r ≥ 0.990):** XGBoost is also near-redundant with LGBM. Skip the LGBM + XGBoost ensemble and focus entirely on the mtm_fiber interaction feature experiment to shift LGBM's prediction space.
 
-**Allowed evidence:** Pearson and Spearman OOF correlation between tuned CatBoost and LGBM. Concise text only. No plots.
+**Allowed evidence:** Pearson and Spearman OOF correlation between XGBoost and LGBM. Concise text only. No plots.
 
-**Relevant experiments:** cbef1de (lgbm_baseline), b822216 (catboost_tuned_d7)
+**Relevant experiments:** cbef1de (lgbm_baseline), 16c521c (xgb_baseline)
 
 OOF pred paths:
 - LGBM: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/cbef1de9024dbd5dc70988ba46baf1633f280340/oof-preds.npy`
-- Tuned CatBoost: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/b822216261dbc9aa0df689fe2e5fd5ab779c6261/oof-preds.npy`
+- XGBoost: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/16c521c99ec912a96ed068b0e38c70ad28bd4801/oof-preds.npy`

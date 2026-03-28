@@ -2,9 +2,11 @@
 
 ## Current Lane
 
-Current best: weighted LGBM+CatBoost ensemble (CV 0.916530). LGBM and CatBoost are near-redundant (OOF Pearson r = 0.9953) — no further blending variants of these two.
+Current best: weighted LGBM+CatBoost ensemble (CV 0.916530).
 
-**New direction from analyst:** The hardest prediction subgroup is Month-to-month × Fiber optic × short tenure (2.1x lift in model disagreement rows, 55% churn rate, 7–12 month tenure bin has 1.71x lift). A targeted interaction feature may directly improve model quality without needing a new model family.
+**STATUS:** Analyst has confirmed all CatBoost variants (default r=0.9953, tuned d7 r=0.9972) and likely XGBoost are all near-redundant with LGBM. Model diversity from same-family tuning is exhausted. **The next experiment must be `lgbm_mtm_fiber_bins` — the interaction feature.** This has been priority #1 for several wakes and has not yet been run.
+
+Do not run any more model variants or ensembles until the interaction feature result is in.
 
 ## Success Criterion
 
