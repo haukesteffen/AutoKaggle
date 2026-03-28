@@ -7,11 +7,13 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ANALYSIS_PATH = Path("agents/analyst/analysis.py")
+DEFAULT_ERRORS_FILENAME = "analysis-errors.md"
 
 
 def main() -> None:
     args = _parse_args()
     analysis_path = _normalize_repo_path(args.analysis_path)
+    errors_file = args.errors_file or args.findings_file.with_name(DEFAULT_ERRORS_FILENAME)
 
     hypothesis_text = args.hypothesis_file.read_text()
     title = _extract_title(hypothesis_text)
@@ -24,27 +26,23 @@ def main() -> None:
         text=True,
     )
 
-    args.findings_file.parent.mkdir(parents=True, exist_ok=True)
-    with args.findings_file.open("a") as f:
-        if f.tell() > 0:
-            f.write("\n\n")
-        f.write(f"## {title}\n")
-        f.write(f"*{_utc_timestamp()}*\n\n")
-        f.write("**Hypothesis:**\n")
-        f.write(f"{hypothesis_text.rstrip()}\n\n")
-        f.write("**Verdict:** *(fill in: Supported / Rejected / Inconclusive)*\n\n")
-        f.write("**Evidence:**\n")
-        f.write(f"{_format_evidence(completed.stdout, completed.stderr, completed.returncode)}\n\n")
-        f.write("**Implications:**\n")
-        f.write("*(fill in)*\n\n")
-        f.write("**Suggested next hypotheses:** *(optional)*\n")
-        f.write("*(fill in or delete)*\n")
-
     if completed.returncode != 0:
-        print(
-            f"warning: {analysis_path} exited with code {completed.returncode}; stderr was appended to the findings entry",
-            file=sys.stderr,
+        _append_failure_entry(
+            errors_file=errors_file,
+            title=title,
+            hypothesis_text=hypothesis_text,
+            analysis_path=analysis_path,
+            completed=completed,
         )
+        _report_failure(analysis_path=analysis_path, errors_file=errors_file, completed=completed)
+        raise SystemExit(completed.returncode)
+
+    _append_findings_entry(
+        findings_file=args.findings_file,
+        title=title,
+        hypothesis_text=hypothesis_text,
+        stdout=completed.stdout,
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -52,6 +50,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--analysis-path", type=Path, default=DEFAULT_ANALYSIS_PATH)
     parser.add_argument("--hypothesis-file", type=Path, required=True)
     parser.add_argument("--findings-file", type=Path, required=True)
+    parser.add_argument("--errors-file", type=Path)
     return parser.parse_args()
 
 
@@ -70,10 +69,18 @@ def _analysis_env() -> dict[str, str]:
 
 
 def _extract_title(hypothesis_text: str) -> str:
-    for line in hypothesis_text.splitlines():
+    lines = hypothesis_text.splitlines()
+    for index, line in enumerate(lines):
         stripped = line.strip()
-        if stripped.startswith("**Question:**"):
-            return stripped.removeprefix("**Question:**").strip() or "Analysis"
+        for prefix in ("**Hypothesis:**", "**Question:**"):
+            if not stripped.startswith(prefix):
+                continue
+            title = stripped.removeprefix(prefix).strip()
+            if title:
+                return title
+            fallback_title = _next_nonempty_line(lines[index + 1 :])
+            if fallback_title:
+                return fallback_title
     return "Analysis"
 
 
@@ -81,15 +88,82 @@ def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
 
 
-def _format_evidence(stdout: str, stderr: str, returncode: int) -> str:
-    sections: list[str] = []
-    if stdout.strip():
-        sections.append(stdout.rstrip())
-    if returncode != 0 and stderr.strip():
-        sections.append(f"[stderr]\n{stderr.rstrip()}")
-    if not sections:
+def _append_findings_entry(findings_file: Path, title: str, hypothesis_text: str, stdout: str) -> None:
+    findings_file.parent.mkdir(parents=True, exist_ok=True)
+    with findings_file.open("a") as f:
+        if f.tell() > 0:
+            f.write("\n\n")
+        f.write(f"## {title}\n")
+        f.write(f"*{_utc_timestamp()}*\n\n")
+        f.write("**Hypothesis:**\n")
+        f.write(f"{hypothesis_text.rstrip()}\n\n")
+        f.write("**Verdict:** *(fill in: Supported / Rejected / Inconclusive)*\n\n")
+        f.write("**Evidence:**\n")
+        f.write(f"{_format_stream(stdout)}\n\n")
+        f.write("**Implications:**\n")
+        f.write("*(fill in)*\n\n")
+        f.write("**Suggested next hypotheses:** *(optional)*\n")
+        f.write("*(fill in or delete)*\n")
+
+
+def _append_failure_entry(
+    errors_file: Path,
+    title: str,
+    hypothesis_text: str,
+    analysis_path: Path,
+    completed: subprocess.CompletedProcess[str],
+) -> None:
+    errors_file.parent.mkdir(parents=True, exist_ok=True)
+    with errors_file.open("a") as f:
+        if f.tell() > 0:
+            f.write("\n\n")
+        f.write(f"## {title}\n")
+        f.write(f"*{_utc_timestamp()}*\n\n")
+        f.write("**Hypothesis:**\n")
+        f.write(f"{hypothesis_text.rstrip()}\n\n")
+        f.write(f"**Analysis path:** `{_display_path(analysis_path)}`\n\n")
+        f.write(f"**Exit code:** `{completed.returncode}`\n\n")
+        f.write("**Stdout:**\n")
+        f.write(f"{_format_stream(completed.stdout)}\n\n")
+        f.write("**Stderr:**\n")
+        f.write(f"{_format_stream(completed.stderr)}\n")
+
+
+def _report_failure(
+    analysis_path: Path, errors_file: Path, completed: subprocess.CompletedProcess[str]
+) -> None:
+    print(
+        f"error: {_display_path(analysis_path)} exited with code {completed.returncode}; details written to {_display_path(errors_file)}",
+        file=sys.stderr,
+    )
+    if completed.stdout.strip():
+        print("\n[analysis stdout]", file=sys.stderr)
+        print(completed.stdout.rstrip(), file=sys.stderr)
+    if completed.stderr.strip():
+        print("\n[analysis stderr]", file=sys.stderr)
+        print(completed.stderr.rstrip(), file=sys.stderr)
+
+
+def _next_nonempty_line(lines: list[str]) -> str | None:
+    for line in lines:
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return None
+
+
+def _display_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def _format_stream(stream: str) -> str:
+    if not stream.strip():
         return "*(no output)*"
-    return "\n\n".join(sections)
+    return stream.rstrip()
 
 
 if __name__ == "__main__":

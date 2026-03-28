@@ -118,6 +118,7 @@ Important untracked paths:
 - `data/`
 - `artifacts/`
 - `.claude/settings.local.json`
+- `agents/analyst/analysis-errors.md`
 
 ## Notes
 
