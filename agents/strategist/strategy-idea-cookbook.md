@@ -233,6 +233,53 @@ For each play, state:
 - What might still be useful: target-encoded features may add diversity when used in a different model family (e.g. as extra inputs to a logistic regression stack member), but this is speculative
 - Evidence from mar28: TargetEncoder on 13 high-variation columns: CV 0.915805 vs baseline 0.915855, discarded
 
+### Interaction features fail when tree models already learn them
+
+- When to recognize it: when a hand-crafted interaction feature (e.g. a binary flag or binned cross of two strong predictors) produces no CV gain on LGBM
+- Why it happens: gradient boosted trees with sufficient depth already split on the same combinations internally. Providing the interaction explicitly gives the model no new information it has not already captured
+- Diagnostic: if the analyst can confirm a clear threshold effect or subgroup concentration in the data (e.g. month-to-month × fiber optic), that does NOT mean a hand-crafted feature will help — it means the tree already made that split. Analyst structural findings should direct model selection (e.g. a model that cannot find non-linear interactions), not feature engineering for LGBM
+- Evidence from mar28: mtm_fiber binary flag, three-bin mtm×fiber tenure interaction, and continuous tenure×mtm_fiber all failed on LGBM (within ±0.0001 CV of baseline)
+
+### CatBoost tuning for divergence from LGBM backfires
+
+- When to recognize it: when tuning CatBoost toward higher accuracy (lower learning rate, more iterations, deeper trees) actually increases its OOF correlation with LGBM, not decreases it
+- Why it happens: both LGBM and CatBoost converge on the same decision boundaries when optimising for the same objective on the same features. Tuning makes them both more accurate — and more similar — not more orthogonal. True diversity requires structural differences (different model class, different feature space), not hyperparameter variation within the boosting family
+- Quantified: default CatBoost vs LGBM r=0.9953; tuned CatBoost (depth=7, iter=1000) vs LGBM r=0.9972 — tuning made it MORE correlated
+- Implication: do not expect hyperparameter tuning of a GBDT model to produce ensemble diversity; if two boosting models are highly correlated, tuning one of them will not fix it
+
+### All GBDT models hit a diversity wall on the same features
+
+- When to recognize it: when CatBoost, XGBoost, and LGBM all have OOF Pearson correlations above 0.990 with each other
+- Why it happens: all GBDT algorithms are optimising the same objective on the same ordinal-encoded feature matrix. They converge on the same prediction surface regardless of implementation differences
+- The r>0.990 wall means: ensemble gain from combining any two GBDT models on the same features is bounded at approximately +0.0001–0.0003 CV; rarely worth a submission slot unless it happens to yield the current best
+- What breaks the wall: (a) different model class (bagging, linear, neural), or (b) materially different feature representation that changes the input space for one model only
+- Evidence from mar28: CatBoost default r=0.9953, CatBoost tuned r=0.9972, XGBoost r=0.9972 — all GBDT above 0.990
+
+## Ensemble Construction — Advanced
+
+### 3-way GBDT ensemble as the practical ceiling for correlated models
+
+- When to use it: once two GBDT models are both in the shortlist and their 2-way ensemble gain is small (+0.001 or less)
+- Why it might help: a third GBDT model (e.g. XGBoost added to LGBM+CatBoost) can add a marginal +0.00006–0.00008 CV even when all three are above r=0.990 correlation with each other, because the averaging reduces variance across a slightly wider set of residuals
+- Ceiling: expect no more than +0.0001–0.0002 CV above the 2-way average; this is the practical limit for correlated GBDT ensembles
+- Evidence from mar28: LGBM+CatBoost simple average CV 0.916476, LGBM+CatBoost+XGBoost simple average CV 0.916592 (+0.000116)
+- Next step after hitting this ceiling: weight optimisation via OOF grid search (near-zero cost) before adding new model families
+
+### OOF weight grid search is the cheapest ensemble improvement
+
+- When to use it: once the component shortlist is locked (2–3 models with saved OOF predictions)
+- Why it might help: simple averaging assumes equal model quality; a grid search over weights in 0.1 steps can find a blend that weights the stronger model(s) appropriately
+- Cost: near-zero — no retraining, pure OOF computation
+- Ceiling: typically +0.0001–0.0003 CV above simple average on highly correlated models; larger gains possible if components have unequal quality
+- When to do it: before adding any new model family; exhausting weight search is always cheaper than running a new experiment
+
+### Bagging models (ExtraTrees/RF) as ensemble components have a solo CV floor
+
+- When to use it: considering ExtraTrees or RandomForest to add diversity to a GBDT ensemble
+- Hard constraint: if the bagging model's solo CV is more than 0.004 below the GBDT best, it will drag the ensemble down in all tested weighting schemes; do not include it regardless of structural orthogonality
+- Evidence from mar28: ExtraTrees solo CV 0.911426, GBDT best CV 0.916530 — gap 0.005; all ensemble combinations dragged below baseline. RF solo CV 0.910269, gap 0.006 — worse still
+- Suggested threshold: only include a bagging model in the ensemble if its solo CV is within 0.003 of the GBDT best; if the gap exceeds 0.004, discard immediately
+
 ## ROC-AUC / Binary Classification Notes
 
 ### Calibration may matter less than ranking
