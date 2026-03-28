@@ -2,13 +2,11 @@
 
 ## Current Lane
 
-Day 1 is complete. Current best: ensemble LGBM+CatBoost (CV 0.916476, LB 0.91390). The problem: LGBM and CatBoost are highly correlated — ensembling only added +0.00064 LB. Day 2 goal is **ensemble diversity**: find a more orthogonal model component.
+Current best: weighted LGBM+CatBoost ensemble (CV 0.916530). **Do not try further weighting variants of LGBM and CatBoost** — the analyst confirmed these two models have OOF Pearson r = 0.9953. They are near-redundant. Weighted averaging of near-redundant models produces noise-level gains (+0.000054 from 0.3/0.7 weighting). This is not a productive direction.
 
-Two candidates, in priority order:
-1. **ExtraTrees** — bagging family vs boosting family, structurally orthogonal
-2. **Tuned CatBoost** — make it diverge from LGBM by going deeper/slower
+The only path to meaningful improvement is an **orthogonal third model**. Priority: ExtraTrees.
 
-**Hard gate:** If neither adds >=0.0003 CV to the ensemble above 0.916476 by end of day, the current best is locked as the final submission candidate.
+**Hard gate:** If ExtraTrees (or tuned CatBoost) doesn't add >=0.0003 CV to the best available ensemble above 0.916530, lock the current best as the final submission candidate.
 
 ## Success Criterion
 
