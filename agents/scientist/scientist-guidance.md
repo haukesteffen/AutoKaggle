@@ -72,7 +72,7 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 
 ## Priority Ideas
 
-**Current status:** `ensemble_lgbm_cb_xgb_fixed` (7b386f5) is running — equal-weight LGBM+CB+XGB with proper fit/predict. Wait for it to finish, record CV, then proceed to Step 1 below.
+**Current status:** `ensemble_lgbm_cb_xgb_fixed` (7b386f5) done — CV=0.916540, equal-weight LGBM+CB+XGB, proper fit/predict confirmed (208s training). This is submittable but not best — OOF grid showed CB=0.5/XGB=0.5/LGBM=0.0 is better. `BEST_SUBMITTABLE_CV = 0.916540`. Proceed to Step 1 now.
 
 ### Step 1: OOF weight grid search (CB + XGB + MLP)
 
@@ -86,13 +86,14 @@ Grid-search all (w_cb, w_xgb, w_mlp) with steps of 0.1 that sum to 1.0 (all ≥ 
 
 ### Step 2: Based on grid result
 
-Let `BEST_SO_FAR` = max(0.916667, CV of ensemble_lgbm_cb_xgb_fixed from Step 0).
+**If best CB+XGB+MLP OOF AUC > 0.916540:**
+Implement `ensemble_cb_xgb_mlp_fixed` using the `MultiModelEnsemble` template below. Add MLP as third component: `MLPClassifier(hidden_layer_sizes=(256,256), activation='relu', solver='adam', early_stopping=True, max_iter=200, random_state=42)` in a Pipeline with the same preprocessor (including StandardScaler for MLP). Use the optimal weights from Step 1. Run through harness. Verify training time >10 minutes.
 
-**If best CB+XGB+MLP OOF AUC > BEST_SO_FAR:**
-Implement `ensemble_cb_xgb_mlp_fixed` using the `MultiModelEnsemble` template below. Add MLP as third component: `MLPClassifier(hidden_layer_sizes=(256,256), activation='relu', solver='adam', early_stopping=True, max_iter=200, random_state=42)` in a Pipeline with the same preprocessor (including StandardScaler for MLP). Use the weights from Step 1. Run through harness. Verify training time >10 minutes.
+**If CB+XGB+MLP OOF AUC ≤ 0.916540 but CB+XGB (no MLP) OOF AUC > 0.916540:**
+Implement `ensemble_cb_xgb_fixed` (CB=0.5, XGB=0.5) using the `MultiModelEnsemble` template. This is the corrected version of c4ea0d1. Verify training time >8 minutes.
 
-**If CB+XGB+MLP OOF AUC ≤ BEST_SO_FAR:**
-The current best (either ensemble_lgbm_cb_xgb_fixed or c4ea0d1's weight combo) stands. Implement `ensemble_cb_xgb_fixed` (CB=0.5, XGB=0.5) using the `MultiModelEnsemble` template only if ensemble_lgbm_cb_xgb_fixed CV < 0.916667. Otherwise use ensemble_lgbm_cb_xgb_fixed as the submission candidate.
+**If neither beats 0.916540:**
+`ensemble_lgbm_cb_xgb_fixed` (7b386f5) is already the best submittable result. Report and await supervisor decision on submission.
 
 ### MultiModelEnsemble template (extend as needed)
 
