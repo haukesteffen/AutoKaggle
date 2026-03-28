@@ -2,19 +2,16 @@
 
 ## Current Lane
 
-Current best: weighted LGBM+CatBoost ensemble (CV 0.916530).
+Phase: Exploitation / Shortlist Building. Feature engineering and model diversity are closed — all paths exhausted on day 1. The remaining work is ensemble composition and one MLP probe.
 
-**STATUS:** Analyst has confirmed all CatBoost variants (default r=0.9953, tuned d7 r=0.9972) and likely XGBoost are all near-redundant with LGBM. Model diversity from same-family tuning is exhausted. **The next experiment must be `lgbm_mtm_fiber_bins` — the interaction feature.** This has been priority #1 for several wakes and has not yet been run.
+**Shortlist components:**
+- LGBM: `cbef1de9024dbd5dc70988ba46baf1633f280340` (CV 0.915855)
+- CatBoost: `81151d814205733001448397276318fcfe9f5759` (CV 0.916405)
+- XGBoost: `16c521c99ec912a96ed068b0e38c70ad28bd4801` (CV 0.916421)
 
-Do not run any more model variants or ensembles until the interaction feature result is in.
+OOF preds at: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/<hash>/oof-preds.npy`
 
-## Success Criterion
-
-CV improvement >0.001 over `cbef1de` (0.915855) for a new LGBM with interaction features, or any ensemble CV > 0.916530 when a new component is added.
-
-## Harness Path Fix — Important
-
-Always pass `--experiment-path` as an **absolute path**:
+## Harness Path Fix — Always Required
 
 ```bash
 uv run python -m harness.experiment_runner \
@@ -22,30 +19,24 @@ uv run python -m harness.experiment_runner \
   --artifact-dir /Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/<hash>
 ```
 
-## ⚠️ NEXT EXPERIMENT: lgbm_mtm_fiber_bins — DO NOT RUN ANYTHING ELSE FIRST
-
-All model diversity paths have been exhausted (ExtraTrees cv=0.911, RandomForest cv=0.910, XGBoost cv=0.916 but near-redundant with LGBM per analyst, tuned CatBoost r=0.9972 with LGBM). The ONLY remaining lever is feature engineering. Run `lgbm_mtm_fiber_bins` next.
-
 ## Priority Ideas
 
-1. **Three mtm_fiber tenure flags** — Analyst confirmed a clear churn threshold pattern within Month-to-month × Fiber optic. Add these three binary features to `build_features` for LGBM:
-   - `mtm_fiber_early`: 1 if `Contract == "Month-to-month"` AND `InternetService == "Fiber optic"` AND `tenure <= 12` (70.8% churn)
-   - `mtm_fiber_mid`: 1 if same AND `13 <= tenure <= 24` (42.3% churn)
-   - `mtm_fiber_late`: 1 if same AND `tenure > 24` (~35% churn)
-   The 12-month split has a 28.6pp churn gap — the single most informative cut in this subgroup. Keep all original features unchanged. `EXPERIMENT_NAME = "lgbm_mtm_fiber_bins"`.
+1. **3-way ensemble: LGBM + CatBoost + XGBoost simple average** — Load OOF preds from all three shortlist components, average them, and run through the harness. `EXPERIMENT_NAME = "ensemble_lgbm_catboost_xgb_avg"`. Strategist computed this as CV ~0.916592 from OOF preds — run it to confirm and generate test predictions for submission.
 
-2. **Tuned CatBoost — strict budget** — If interaction feature doesn't help, try CatBoost with exactly `iterations=1000, learning_rate=0.03, depth=7, rsm=0.8`. **Do not use iterations=1500** — depth=8/iter=1500 already timed out. `EXPERIMENT_NAME = "catboost_tuned_d7_i1000"`. If this also times out, skip CatBoost tuning.
+2. **OOF weight grid search (3-way)** — Using the same three OOF preds, grid-search weights in steps of 0.1 (w_lgbm + w_cb + w_xgb = 1.0, all ≥ 0.0). Find the weight combination with highest OOF CV, then run through harness with that weighting. `EXPERIMENT_NAME = "ensemble_3way_weighted_opt"`. If CV improves above 0.916592, keep it.
 
-3. **XGBoost baseline** — If CatBoost tuning fails, try `XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42)`. `EXPERIMENT_NAME = "xgb_baseline"`.
+3. **Fast MLP probe** — A single `MLPClassifier(hidden_layer_sizes=(256, 256), activation='relu', solver='adam', early_stopping=True, max_iter=200, random_state=42)` in a Pipeline with the same preprocessor as LGBM. `EXPERIMENT_NAME = "mlp_baseline"`. Goal is not to beat GBDT solo — it's to check if OOF is genuinely more orthogonal (r < 0.990 with LGBM). If the supervisor confirms orthogonality, they'll try adding it to the ensemble.
 
-## Avoid For Now
+4. **LR as small-weight ensemble component** — The LR OOF preds already exist from experiment `4bc520f`. Try averaging LGBM + CatBoost + XGBoost + LR with LR weight 0.05–0.10. Compute OOF CV offline first; only run through harness if it improves above 0.916592.
 
-- Further LGBM hyperparameter tuning (exhausted)
-- Target encoding on LGBM (tried, no gain)
-- Weighted blending of LGBM + CatBoost only (near-redundant)
+## Avoid Entirely
+
+- Feature engineering (target encoding, interaction features, count features — all tried, no gain)
+- ExtraTrees or RandomForest in ensembles (too weak, dragged all blends below baseline)
+- CatBoost tuning (OOM at depth 8+, tuned d7 more correlated with LGBM than default)
+- XGBoost tuning (already in shortlist; more tuning increases LGBM correlation)
 - Stacking or meta-learners
-- Neural networks
 
 ## Why
 
-Analyst confirmed the hardest 5% of rows are heavily concentrated in Month-to-month × Fiber optic, with short-tenure customers (7–12 months) at 1.71x lift. Both LGBM and CatBoost predict ~44% churn here vs 22.5% overall — genuine ambiguity both models struggle with. A cheap binary flag + tenure bins may give the model a cleaner split on this subgroup without expensive tuning.
+Strategist confirmed: all GBDT models are r>0.990 OOF correlation with LGBM. Feature engineering doesn't help because tree models already find those splits. The ceiling is ~CV 0.9166. Remaining upside: ensemble weight optimisation (+0.0001–0.0003), MLP probe (if orthogonal). Run these in order.
