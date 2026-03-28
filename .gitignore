@@ -170,5 +170,6 @@ artifacts/
 catboost_info/
 .claude/*
 !.claude/settings.json
+agents/analyst/analysis-errors.md
 
 .DS_Store

@@ -18,6 +18,7 @@ Answer hypotheses posed by the supervisor with rigorous evidence. Surface patter
 - **Branch:** `autokaggle/<tag>/analyst`
 - **Worktree:** `<root>/AutoKaggle-<tag>-analyst/`
 - **Tracked files you own:** `agents/analyst/analysis.py`, `agents/analyst/analyst-findings.md`
+- **Local debug log:** `agents/analyst/analysis-errors.md` (ignored; do not commit)
 
 Refer to `program.md` for the definition of `<root>` and for how to initialise your branch and worktree.
 
@@ -106,14 +107,15 @@ ON EACH /loop WAKE:
    uv run python -m harness.analysis_runner \
      --hypothesis-file $REPO/agents/analyst/analyst-hypotheses.md \
      --findings-file agents/analyst/analyst-findings.md
-7. Review the appended entry in agents/analyst/analyst-findings.md
-8. Fill in Verdict, Implications, and any Suggested next hypotheses
-9. Commit agents/analyst/analysis.py and agents/analyst/analyst-findings.md
+7. If the harness succeeds, review the appended entry in agents/analyst/analyst-findings.md.
+8. If the harness fails, inspect agents/analyst/analysis-errors.md, fix agents/analyst/analysis.py, and rerun before editing findings.
+9. Fill in Verdict, Implications, and any Suggested next hypotheses only after a successful append.
+10. Commit agents/analyst/analysis.py and agents/analyst/analyst-findings.md. Do not commit analysis-errors.md.
 ```
 
 ## Writing agents/analyst/analysis.py
 
-`agents/analyst/analysis.py` is your working script for each investigation. The analysis runner executes it by explicit path and captures its stdout to append into `agents/analyst/analyst-findings.md`. Structure your script to print clearly labelled findings. Output tables and metrics, not plots:
+`agents/analyst/analysis.py` is your working script for each investigation. The analysis runner executes it by explicit path. On success it captures stdout and appends it into `agents/analyst/analyst-findings.md`. On failure it writes stdout and stderr to `agents/analyst/analysis-errors.md` instead of polluting the durable findings history. Structure your script to print clearly labelled findings. Output tables and metrics, not plots:
 
 ```python
 import pickle
@@ -138,7 +140,7 @@ Use `sklearn`, `numpy`, `pandas`, and `shap` freely. Do not call `.fit()`. Do no
 
 ## Output Format
 
-The analysis runner appends one entry per run to `agents/analyst/analyst-findings.md`:
+Successful analysis runs append one entry to `agents/analyst/analyst-findings.md`:
 
 ```markdown
 ## <short title>
@@ -157,7 +159,9 @@ The analysis runner appends one entry per run to `agents/analyst/analyst-finding
 - <specific, falsifiable question>
 ```
 
-After the runner writes the entry, fill in **Verdict**, **Implications**, and any **Suggested next hypotheses** by editing the file directly before committing.
+Failed analysis runs do not append a normal findings entry. They write a separate debugging record to `agents/analyst/analysis-errors.md` with the hypothesis, exit code, stdout, and stderr.
+
+After a successful append, fill in **Verdict**, **Implications**, and any **Suggested next hypotheses** by editing the findings file directly before committing.
 
 Append only. Do not overwrite previous entries. The supervisor reads the full history.
 
