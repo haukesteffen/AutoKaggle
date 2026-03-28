@@ -72,15 +72,19 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 
 ## Priority Ideas
 
-**Current status:** MLP experiment (442ff2a) is running now. Wait for it to finish.
+**Current status:** MLP finished (442ff2a, CV=0.911625, OOF r=0.9847 vs LGBM). Analyst hypothesis posted for formal correlation verification. Awaiting analyst confirmation before submitting or including MLP in an ensemble.
 
-1. **After MLP finishes — report CV score and OOF correlation check.** The supervisor will post an analyst hypothesis for MLP OOF correlation vs LGBM. Do NOT implement a new experiment until the analyst clears it.
+**Do NOT start a new experiment yet. Wait for the analyst to respond to the active hypothesis in `agents/analyst/analyst-hypotheses.md`.**
 
-2. **Implement `ensemble_cb_xgb_fixed`** — Use the `MultiModelEnsemble` class above (CB=0.5, XGB=0.5). This is the corrected version of c4ea0d1 (CV=0.916667, best OOF grid result). Verify training time >8 minutes. This is the most important submission candidate.
+Once analyst clears MLP orthogonality:
 
-3. **If MLP passes orthogonality (analyst confirms r < 0.990 with LGBM)** — add MLP as a 3rd component: `ensemble_cb_xgb_mlp`. Weights TBD from OOF grid over CB/XGB/MLP preds. Implement as a proper `MultiModelEnsemble` extension.
+1. **OOF weight grid search over CB + XGB + MLP** — Load OOF preds from CatBoost (81151d8), XGBoost (16c521c), MLP (442ff2a). Grid-search w_cb + w_xgb + w_mlp = 1.0, steps of 0.1. Report the best weight combination and its OOF CV. Do this in a standalone script — do NOT run through harness yet.
 
-4. **LR as small-weight ensemble component** — The LR OOF preds already exist from experiment `4bc520f`. Try averaging CB + XGB + LR with LR weight 0.05–0.10. Compute OOF CV offline first; only run through harness if it improves above 0.916667.
+2. **If best 3-way (CB+XGB+MLP) OOF CV > 0.916667** — implement `ensemble_cb_xgb_mlp_fixed` as a proper MultiModelEnsemble (see template above, add MLP as third model). Run through harness. Verify training time >10 min.
+
+3. **If CB+XGB+MLP does not beat 0.916667** — implement `ensemble_cb_xgb_fixed` (CB=0.5, XGB=0.5, LGBM=0.0) using the MultiModelEnsemble template. This is the corrected version of c4ea0d1 (CV=0.916667).
+
+4. **LR as small-weight ensemble component** — only explore after #2 or #3 is done and submitted.
 
 ## Avoid Entirely
 
