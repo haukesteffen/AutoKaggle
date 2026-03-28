@@ -118,6 +118,26 @@ Important untracked paths:
 - `.claude/settings.local.json`
 - `agents/analyst/analysis-errors.md`
 
+## Submission Harness
+
+Supervisor submissions should go through [harness/promotion_runner.py](harness/promotion_runner.py), not raw Kaggle CLI calls. The harness:
+
+- validates the artifact directory against the target hash
+- generates `submission.csv` if needed
+- submits to Kaggle
+- polls until the submission is scored, errors, or times out
+- prints deterministic JSON for leaderboard-history updates
+
+Example invocation:
+
+```bash
+uv run python -m harness.promotion_runner \
+  --hash <hash> \
+  --tag <tag> \
+  --artifact-dir artifacts/<tag>/experiments/<hash> \
+  --cv-score <cv_score>
+```
+
 ## Notes
 
 - The committed [`.claude/settings.json`](.claude/settings.json) is project-wide and path-free.

@@ -327,28 +327,21 @@ Rules:
 
 Submit only when the candidate is worth spending one of the 5 daily submission slots. A meaningful score jump or a materially different model family are the default reasons.
 
-Current implementation note:
-
-- `harness/promotion_runner.py` currently owns the initial submit step only.
-- Full submission lifecycle polling is planned separately in issue `#5`.
-- Until that lands, keep the prompt-level polling logic minimal and make `agents/supervisor/leaderboard-history.md` the single source of truth.
+The harness now owns the full submission lifecycle. Do not call raw `kaggle competitions submit` or `kaggle competitions submissions` directly for normal supervisor work.
 
 Workflow:
 
 ```text
 1. Verify the hash is not already present in agents/supervisor/leaderboard-history.md.
 2. Verify the daily submission budget still allows a new submission.
-3. Run agents/supervisor/submission.py to produce agents/supervisor/submission.csv:
-   uv run python agents/supervisor/submission.py \
-     --artifact-dir $ARTIFACTS/experiments/<hash> \
-     --output agents/supervisor/submission.csv
-4. Run harness/promotion_runner.py:
+3. Run harness/promotion_runner.py:
    uv run python -m harness.promotion_runner \
      --hash <hash> \
      --tag <tag> \
-     --submission-file agents/supervisor/submission.csv
-5. Append or update the pending row in agents/supervisor/leaderboard-history.md and commit it.
-6. Poll the current Kaggle submissions view available in your environment until the run scores, then update the row in place with the score, rank, and any CV/LB note.
+     --artifact-dir $ARTIFACTS/experiments/<hash> \
+     --cv-score <cv_score>
+4. Consume the JSON result from the harness. It validates the artifact, generates submission.csv if needed, submits to Kaggle, polls until scored or timeout/error, and returns fields such as submitted_at, submission_id, terminal_status, lb_score, lb_rank when available, and error_category on failure.
+5. Update agents/supervisor/leaderboard-history.md deterministically from that JSON and commit it.
 ```
 
 Do not treat every keepable experiment as submit-worthy. Submission timing is strategic, not mechanical.
