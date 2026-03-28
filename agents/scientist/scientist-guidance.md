@@ -22,11 +22,11 @@ uv run python -m harness.experiment_runner \
 
 ## Priority Ideas
 
-1. **Interaction feature: `mtm_fiber` flag + tenure bins** — Add to `build_features` for LGBM:
-   - `mtm_fiber`: binary, 1 if `Contract == "Month-to-month"` AND `InternetService == "Fiber optic"`
-   - `tenure_bin`: pd.cut into 0–6, 7–12, 13–24, 25–48, 49+ month bins (treat as categorical)
-   Keep all original features. `EXPERIMENT_NAME = "lgbm_mtm_fiber_interaction"`.
-   This directly targets the 30K rows where both models disagree most (analyst-confirmed 43.7% churn vs 21.4% overall).
+1. **Three mtm_fiber tenure flags** — Analyst confirmed a clear churn threshold pattern within Month-to-month × Fiber optic. Add these three binary features to `build_features` for LGBM:
+   - `mtm_fiber_early`: 1 if `Contract == "Month-to-month"` AND `InternetService == "Fiber optic"` AND `tenure <= 12` (70.8% churn)
+   - `mtm_fiber_mid`: 1 if same AND `13 <= tenure <= 24` (42.3% churn)
+   - `mtm_fiber_late`: 1 if same AND `tenure > 24` (~35% churn)
+   The 12-month split has a 28.6pp churn gap — the single most informative cut in this subgroup. Keep all original features unchanged. `EXPERIMENT_NAME = "lgbm_mtm_fiber_bins"`.
 
 2. **Tuned CatBoost — strict budget** — If interaction feature doesn't help, try CatBoost with exactly `iterations=1000, learning_rate=0.03, depth=7, rsm=0.8`. **Do not use iterations=1500** — depth=8/iter=1500 already timed out. `EXPERIMENT_NAME = "catboost_tuned_d7_i1000"`. If this also times out, skip CatBoost tuning.
 
