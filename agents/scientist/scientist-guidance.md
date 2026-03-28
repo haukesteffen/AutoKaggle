@@ -8,10 +8,22 @@ We are in the bootstrap/anchor-finding phase with 3 days remaining (deadline: Ma
 
 Two anchor CV scores from two different model families (logistic regression + LightGBM), recorded and comparable. After that, the best single model or a simple average of both is the target. A CV improvement of 0.002+ over the logistic regression baseline counts as meaningful progress.
 
+## Harness Path Fix — Important
+
+`experiment_runner.py` anchors relative `--experiment-path` values against the **main repo root** (`/Users/hs/dev/AutoKaggle`), not the worktree. You must always pass `--experiment-path` as an **absolute path** when running from the worktree:
+
+```bash
+uv run python -m harness.experiment_runner \
+  --experiment-path /Users/hs/dev/AutoKaggle-mar28-scientist/agents/scientist/experiment.py \
+  --artifact-dir /Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/<hash>
+```
+
+Without the absolute path, the runner silently executes the main repo's `experiment.py` instead of yours.
+
 ## Priority Ideas
 
-1. **Run the existing baseline as-is.** Do not change `experiment.py` yet. Get the logistic regression CV score and OOF predictions. This is the floor against which everything is measured.
-2. **LightGBM baseline.** After the logistic regression run completes, swap `build_model` to a `LGBMClassifier` with default or near-default settings (e.g. `n_estimators=500, learning_rate=0.05, num_leaves=31`). Keep `build_features` returning `df.copy()` unchanged — no feature engineering yet. Change `EXPERIMENT_NAME` to something like `lgbm_baseline`.
+1. **LR baseline is already done** (CV 0.907919, hash `4bc520f`, already submitted — LB 0.90504). No need to rerun it.
+2. **LightGBM baseline** — swap `build_model` to `LGBMClassifier` with near-default settings (e.g. `n_estimators=500, learning_rate=0.05, num_leaves=31`). Keep `build_features` as `df.copy()`. Set `EXPERIMENT_NAME = "lgbm_baseline"`. **Use the absolute `--experiment-path` flag above.**
 3. **If LightGBM clearly beats LR (>0.002 CV gap):** try a second LightGBM run with modest tuning (`num_leaves=63`, `min_child_samples=20`) to see if easy gains remain.
 
 ## Avoid For Now
