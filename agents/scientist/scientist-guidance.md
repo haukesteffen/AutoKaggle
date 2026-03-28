@@ -89,7 +89,11 @@ Research on recent Kaggle Playground Series winners (S3–S6) has identified 4 u
 
 `ensemble_lgbm_cb_xgb_orig` (b465548): CV=0.916341 — below 0.916540. Adding the IBM Telco original 7k rows hurt. Likely reason: synthetic training data (600k rows) has a different distribution than the 7k original; blending in the original introduces noise rather than signal. Discard.
 
-### Priority 2 (now active): Soft Pseudo-Labeling
+### ~~Priority 2: Soft Pseudo-Labeling~~ — DONE, FAILED
+
+`ensemble_lgbm_cb_xgb_pseudo` (48a125b): CV=0.916321, **LB=0.91340** — worse than 7b386f5 on both CV and LB. Pseudo-labeling confirmed to hurt; train/test come from the same synthetic generator so there's no distribution shift to correct. Discard.
+
+### Priority 3 (now active): Soft Pseudo-Labeling
 
 Train each of LGBM, CatBoost, XGBoost with **5 different random seeds** (same hyperparameters as the shortlist models). Average all 15 sets of OOF predictions and 15 sets of test predictions. Run through harness as `ensemble_seed_bag_15`.
 
