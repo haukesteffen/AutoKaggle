@@ -72,34 +72,18 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 
 ## Priority Ideas
 
-**Current status (end of March 28):**
-- Best result: `7b386f5` equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396
-- `ensemble_cb_xgb_fixed` (3963ca3, CB=0.5/XGB=0.5): CV=0.916381 — worse (OOF-grid weights don't transfer)
-- `ensemble_cb_xgb_mlp_fixed` (2c580af, CB=0.5/XGB=0.4/MLP=0.1): CV=0.916228 — worse (MLP hurts despite orthogonality; solo CV 0.911 is too low)
-- **MLP ensemble lane is CLOSED.** Adding MLP to any blend reduces CV.
-- March 28 slots exhausted. March 29: 5 fresh slots.
+**Current status (March 29 — consolidation phase):**
+- Best result: `7b386f5` equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396 — **this is the ceiling**
+- OOF weight grid (step=0.05, all-positive) completed by supervisor: best was LGBM=0.05/CB=0.50/XGB=0.45 → OOF 0.916657 vs equal-weight OOF 0.916580. Delta +0.000077 is too small to trust given OOF-grid unreliability (past experience: OOF overestimates by ~0.0002–0.0003 vs harness). **Do NOT implement.**
+- All lanes exhausted: feature engineering, GBDT tuning, weight optimization, MLP ensemble, CB+XGB only.
 
-### Step 1: OOF weight grid search (LGBM + CB + XGB, finer grain, all-positive)
+## Remaining Work (March 29–31)
 
-MLP lane is closed — do NOT include MLP in any further ensemble search.
+**Exploration phase is complete.** The only work left is:
 
-Run a standalone Python script (not through the harness). Load OOF preds from:
-- LGBM (cbef1de): `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/cbef1de9024dbd5dc70988ba46baf1633f280340/oof-preds.npy`
-- CatBoost (81151d8): `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/81151d814205733001448397276318fcfe9f5759/oof-preds.npy`
-- XGBoost (16c521c): `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/16c521c99ec912a96ed068b0e38c70ad28bd4801/oof-preds.npy`
-- Labels: use `harness.dataset.load_train()` to get `y`
+1. **If you have a genuinely new hypothesis** (not a weight variation, not MLP, not feature engineering) — implement it and report. Explicitly forbidden: MLP ensembles, CB+XGB-only, weight tweaks, feature engineering, GBDT tuning, stacking.
 
-Grid-search all (w_lgbm, w_cb, w_xgb) with steps of **0.05** that sum to 1.0, **all > 0** (no zero-weight components). Compute ROC-AUC for each blend. Report the best weight combo and OOF AUC. **Do not run through harness yet.**
-
-Note: prior coarse grid (step=0.1) found LGBM=0 as optimal but real training showed equal weights beat that. This finer search looks for any all-positive combo that beats the equal-weight OOF estimate (~0.916592).
-
-### Step 2: Based on grid result
-
-**If best all-positive OOF AUC > 0.916592:**
-Implement `ensemble_lgbm_cb_xgb_opt` with those weights using the `MultiModelEnsemble` template (add LGBM arm alongside CB and XGB). Run through harness.
-
-**If no all-positive combo beats 0.916592:**
-Report to supervisor. `7b386f5` (equal weights, CV=0.916540, LB=0.91396) is the ceiling. The team will shift to insurance submissions only.
+2. **If no new hypothesis** — write in scientist-results.md: `"Exploration complete. No further experiments. 7b386f5 is final. Awaiting supervisor."` The supervisor will handle remaining submissions.
 
 ### MultiModelEnsemble template (extend as needed)
 
