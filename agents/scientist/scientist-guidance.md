@@ -2,12 +2,17 @@
 
 ## Current Lane
 
-CatBoost baseline is done (CV 0.916405, +0.00055 over LGBM). Both model components are now available. Two tasks remain: (1) build the simple average ensemble of LGBM + CatBoost, and (2) still try target encoding on LGBM — it was skipped and remains the highest-potential feature engineering move.
+Day 1 is complete. Current best: ensemble LGBM+CatBoost (CV 0.916476, LB 0.91390). The problem: LGBM and CatBoost are highly correlated — ensembling only added +0.00064 LB. Day 2 goal is **ensemble diversity**: find a more orthogonal model component.
+
+Two candidates, in priority order:
+1. **ExtraTrees** — bagging family vs boosting family, structurally orthogonal
+2. **Tuned CatBoost** — make it diverge from LGBM by going deeper/slower
+
+**Hard gate:** If neither adds >=0.0003 CV to the ensemble above 0.916476 by end of day, the current best is locked as the final submission candidate.
 
 ## Success Criterion
 
-- Ensemble: CV clearly above 0.916405 (current CatBoost best). Even +0.001 over the better single model is a good result.
-- Target encoding: CV improvement >0.001 over `cbef1de` (0.915855).
+Any new component that, when averaged with the existing LGBM+CatBoost ensemble (or replacing CatBoost), yields CV > 0.916776 (+0.0003 over current best). Solo CV doesn't need to beat LGBM — diversity is the goal.
 
 ## Harness Path Fix — Important
 
@@ -21,22 +26,23 @@ uv run python -m harness.experiment_runner \
 
 ## Priority Ideas
 
-1. **Simple average ensemble (LGBM + CatBoost)** — Load the OOF preds from both kept experiments and average them to get a combined OOF score. If it beats 0.916405, build `experiment.py` to produce this ensemble (train both models, average `predict_proba` outputs). Artifact hashes:
-   - LGBM: `cbef1de9024dbd5dc70988ba46baf1633f280340` (CV 0.915855)
-   - CatBoost: `81151d814205733001448397276318fcfe9f5759` (CV 0.916405)
-   - OOF preds live at: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/<hash>/oof-preds.npy`
-   - `EXPERIMENT_NAME = "ensemble_lgbm_catboost_avg"`
+1. **ExtraTrees baseline** — `build_model` returns an `ExtraTreesClassifier(n_estimators=500, max_features="sqrt", min_samples_leaf=5, random_state=42)` in a Pipeline with the same preprocessor as the LGBM baseline. `EXPERIMENT_NAME = "extratrees_baseline"`. Report solo CV and whether it would improve the 3-way ensemble (LGBM + CatBoost + ExtraTrees simple average).
 
-2. **Target encoding on LGBM** — Still not tried. In `build_features`, add target-encoded versions of the 13 high-variation columns (analyst-confirmed): `Contract`, `PaymentMethod`, `InternetService`, `OnlineSecurity`, `TechSupport`, `OnlineBackup`, `DeviceProtection`, `StreamingMovies`, `StreamingTV`, `PaperlessBilling`, `Dependents`, `Partner`, `MultipleLines`. Use sklearn's `TargetEncoder` with cross-fitting. `EXPERIMENT_NAME = "lgbm_target_enc"`. If this yields a better LGBM component, re-run the ensemble with the improved LGBM.
+2. **3-component ensemble (LGBM + CatBoost + ExtraTrees)** — if ExtraTrees solo CV is anywhere near 0.910+, try a simple average of all three OOF preds and report the combined CV. OOF artifact paths:
+   - LGBM: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/cbef1de9024dbd5dc70988ba46baf1633f280340/oof-preds.npy`
+   - CatBoost: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/81151d814205733001448397276318fcfe9f5759/oof-preds.npy`
+   - `EXPERIMENT_NAME = "ensemble_lgbm_catboost_extratrees_avg"`
 
-3. **Ensemble with target-encoded LGBM** — If target encoding improves LGBM, replace the LGBM component in the ensemble and re-score. `EXPERIMENT_NAME = "ensemble_lgbm_tenc_catboost_avg"`.
+3. **Tuned CatBoost for divergence** — if ExtraTrees doesn't help, try CatBoost with `iterations=1500, learning_rate=0.03, depth=9, rsm=0.7`. This forces CatBoost to explore different feature interactions than LGBM. `EXPERIMENT_NAME = "catboost_tuned_diverge"`. Only pursue if ExtraTrees path is exhausted or clearly fails.
 
 ## Avoid For Now
 
-- Further CatBoost tuning
+- Further LGBM tuning (exhausted day 1)
+- Target encoding on LGBM (no gain day 1)
+- XGBoost (too similar to LGBM, low-priority)
 - Stacking or meta-learners
-- Any experiment that takes >20 minutes
+- Neural networks
 
 ## Why
 
-With 3 days left, the highest-value moves are: lock in the best ensemble now (the two model families are available), then see if target encoding can upgrade the LGBM component. Both tasks can be done today. The supervisor will decide whether to submit based on results.
+ExtraTrees uses bagging + random feature splits rather than gradient boosting. Its errors are correlated with LGBM/CatBoost on easy examples but differ on hard ones — exactly the diversity needed. The day-2 question is whether this structural difference translates to measurable ensemble gain on this dataset. CatBoost tuned for divergence is the backup if ExtraTrees is too weak as a solo model to contribute meaningfully.
