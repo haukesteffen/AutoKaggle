@@ -24,7 +24,7 @@ uv run python -m harness.experiment_runner \
 
 ## Priority Ideas
 
-1. **Lighter tuned CatBoost** — the depth=9/iter=1500/rsm=0.7 variant was OOM-killed. Retry with reduced settings: `iterations=1000, learning_rate=0.03, depth=7, rsm=0.8`. This is still meaningfully different from the default CatBoost (which used ~default depth=6, ~1000 iterations) while being lighter on memory. `EXPERIMENT_NAME = "catboost_tuned_d7"`. Report solo CV and OOF correlation with LGBM baseline.
+1. **Tuned CatBoost — strict budget** — depth=9 OOM-killed, depth=8/iter=1500 timed out. **Use `iterations=1000` (not 1500) and `depth=7`** — this is the exact config that fits: `iterations=1000, learning_rate=0.03, depth=7, rsm=0.8`. `EXPERIMENT_NAME = "catboost_tuned_d7_i1000"`. If this also times out, skip CatBoost tuning entirely and go straight to XGBoost (priority #3 below).
 
 2. **Ensemble with tuned CatBoost** — if `catboost_tuned_d7` scores well (CV ≥ 0.916), try simple average of LGBM (cbef1de) + tuned CatBoost. LGBM OOF: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/cbef1de9024dbd5dc70988ba46baf1633f280340/oof-preds.npy`. `EXPERIMENT_NAME = "ensemble_lgbm_catboost_tuned_avg"`.
 
