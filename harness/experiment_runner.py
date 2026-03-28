@@ -1,4 +1,5 @@
 import argparse
+import importlib.util
 import multiprocessing as mp
 import os
 import queue
@@ -12,12 +13,17 @@ os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(os.cpu_count() or 1))
 
 from harness.dataset import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_EXPERIMENT_PATH = Path("agents/scientist/experiment.py")
+
 
 def main() -> None:
     args = _parse_args()
+    experiment_path = _normalize_repo_path(args.experiment_path)
+    editable_path = _normalize_repo_path(args.editable_path or args.experiment_path)
 
     try:
-        _enforce_edit_boundary()
+        _enforce_edit_boundary(editable_path)
     except RuntimeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
@@ -27,7 +33,7 @@ def main() -> None:
 
     ctx = mp.get_context("spawn")
     messages: mp.Queue = ctx.Queue()
-    process = ctx.Process(target=_run_evaluation, args=(messages,))
+    process = ctx.Process(target=_run_evaluation, args=(messages, experiment_path))
     process.start()
 
     experiment_name = "unnamed"
@@ -105,16 +111,16 @@ def main() -> None:
             print("artifact generation failed: worker did not return out-of-fold predictions", file=sys.stderr)
             raise SystemExit(1)
         try:
-            _generate_artifacts(args.artifact_dir, oof_preds)
+            _generate_artifacts(args.artifact_dir, oof_preds, experiment_path)
         except BaseException as exc:
             print(f"artifact generation failed: {exc}", file=sys.stderr)
             raise SystemExit(1) from exc
 
 
-def _run_evaluation(messages: mp.Queue) -> None:
+def _run_evaluation(messages: mp.Queue, experiment_path: Path) -> None:
     experiment_name = "unnamed"
     try:
-        import experiment
+        experiment = _load_module_from_path(experiment_path, "autokaggle_experiment_worker")
 
         experiment_name = getattr(experiment, "EXPERIMENT_NAME", experiment_name)
         messages.put({"type": "start", "experiment_name": experiment_name})
@@ -145,10 +151,11 @@ def _run_evaluation(messages: mp.Queue) -> None:
         )
 
 
-def _enforce_edit_boundary() -> None:
+def _enforce_edit_boundary(editable_path: Path) -> None:
     if os.environ.get("AUTOKAGGLE_STRICT_EDIT_GUARD") != "1":
         return
 
+    allowed_path = _to_repo_relative_path(editable_path)
     changed_paths: set[str] = set()
     commands = (
         ["git", "diff", "--name-only"],
@@ -156,17 +163,21 @@ def _enforce_edit_boundary() -> None:
     )
     for command in commands:
         completed = subprocess.run(command, check=True, capture_output=True, text=True)
-        changed_paths.update(line.strip() for line in completed.stdout.splitlines() if line.strip())
+        changed_paths.update(Path(line.strip()).as_posix() for line in completed.stdout.splitlines() if line.strip())
 
-    disallowed = sorted(path for path in changed_paths if path != "experiment.py")
+    disallowed = sorted(path for path in changed_paths if path != allowed_path)
     if disallowed:
         joined = ", ".join(disallowed)
-        raise RuntimeError(f"tracked edits outside experiment.py are not allowed during experiment runs: {joined}")
+        raise RuntimeError(
+            f"tracked edits outside {allowed_path} are not allowed during experiment runs: {joined}"
+        )
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-dir", type=Path)
+    parser.add_argument("--experiment-path", type=Path, default=DEFAULT_EXPERIMENT_PATH)
+    parser.add_argument("--editable-path", type=Path)
     return parser.parse_args()
 
 
@@ -179,13 +190,13 @@ def _terminate_process(process: mp.Process) -> None:
         process.join(timeout=1)
 
 
-def _generate_artifacts(artifact_dir: Path, oof_preds) -> None:
+def _generate_artifacts(artifact_dir: Path, oof_preds, experiment_path: Path) -> None:
     import pickle
 
     import numpy as np
     import pandas as pd
 
-    import experiment
+    experiment = _load_module_from_path(experiment_path, "autokaggle_experiment_artifacts")
     from harness.dataset import ID_COLUMN, TEST_PATH, load_train_with_folds, predict_positive_scores, split_xy
 
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -214,6 +225,39 @@ def _generate_artifacts(artifact_dir: Path, oof_preds) -> None:
     np.save(artifact_dir / "test-preds.npy", test_preds)
 
     print(f"artifacts written to {artifact_dir}")
+
+
+def _normalize_repo_path(path: Path) -> Path:
+    if path.is_absolute():
+        return path.resolve()
+    return (REPO_ROOT / path).resolve()
+
+
+def _to_repo_relative_path(path: Path) -> str:
+    resolved = _normalize_repo_path(path)
+    try:
+        return resolved.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return resolved.as_posix()
+
+
+def _load_module_from_path(module_path: Path, module_name: str):
+    _ensure_repo_root_on_syspath()
+    resolved_path = _normalize_repo_path(module_path)
+    spec = importlib.util.spec_from_file_location(module_name, resolved_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"could not load module from {resolved_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _ensure_repo_root_on_syspath() -> None:
+    repo_root = str(REPO_ROOT)
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
 
 
 def _print_success_summary(experiment_name: str, result: EvaluationResult, total_seconds: float) -> None:
