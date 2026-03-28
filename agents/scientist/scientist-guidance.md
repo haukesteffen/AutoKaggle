@@ -72,19 +72,29 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 
 ## Priority Ideas
 
-**Current status:** MLP finished (442ff2a, CV=0.911625, OOF r=0.9847 vs LGBM). Analyst hypothesis posted for formal correlation verification. Awaiting analyst confirmation before submitting or including MLP in an ensemble.
+**Current status:** MLP orthogonality CONFIRMED by analyst. MLP vs LGBM r=0.9847, MLP vs CatBoost r=0.9807, MLP vs XGBoost r=0.9834 — all below 0.990. Proceed immediately.
 
-**Do NOT start a new experiment yet. Wait for the analyst to respond to the active hypothesis in `agents/analyst/analyst-hypotheses.md`.**
+**⚠️ PROCEED NOW — analyst clearance received.**
 
-Once analyst clears MLP orthogonality:
+### Step 1: OOF weight grid search (CB + XGB + MLP)
 
-1. **OOF weight grid search over CB + XGB + MLP** — Load OOF preds from CatBoost (81151d8), XGBoost (16c521c), MLP (442ff2a). Grid-search w_cb + w_xgb + w_mlp = 1.0, steps of 0.1. Report the best weight combination and its OOF CV. Do this in a standalone script — do NOT run through harness yet.
+Run a standalone Python script (not through the harness). Load OOF preds from:
+- CatBoost (81151d8): `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/81151d814205733001448397276318fcfe9f5759/oof-preds.npy`
+- XGBoost (16c521c): `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/16c521c99ec912a96ed068b0e38c70ad28bd4801/oof-preds.npy`
+- MLP (442ff2a): `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/442ff2aa236ea8a9d1552a406d77d16a3bb38f9f/oof-preds.npy`
+- Labels: use `harness.dataset.load_train()` to get `y`
 
-2. **If best 3-way (CB+XGB+MLP) OOF CV > 0.916667** — implement `ensemble_cb_xgb_mlp_fixed` as a proper MultiModelEnsemble (see template above, add MLP as third model). Run through harness. Verify training time >10 min.
+Grid-search all (w_cb, w_xgb, w_mlp) with steps of 0.1 that sum to 1.0 (all ≥ 0.0). Compute ROC-AUC for each blend vs `y`. Report the best weight combo and OOF AUC. **Do not run through harness yet.**
 
-3. **If CB+XGB+MLP does not beat 0.916667** — implement `ensemble_cb_xgb_fixed` (CB=0.5, XGB=0.5, LGBM=0.0) using the MultiModelEnsemble template. This is the corrected version of c4ea0d1 (CV=0.916667).
+### Step 2: Based on grid result
 
-4. **LR as small-weight ensemble component** — only explore after #2 or #3 is done and submitted.
+**If best CB+XGB+MLP OOF AUC > 0.916667:**
+Implement `ensemble_cb_xgb_mlp_fixed` using the `MultiModelEnsemble` template below (add MLP as third model with `MLPClassifier(hidden_layer_sizes=(256,256), activation='relu', solver='adam', early_stopping=True, max_iter=200, random_state=42)` in the pipeline). Use the weights from Step 1. Run through harness. Verify training time >10 minutes.
+
+**If CB+XGB+MLP OOF AUC ≤ 0.916667:**
+Implement `ensemble_cb_xgb_fixed` (CB=0.5, XGB=0.5) using the `MultiModelEnsemble` template. This is the corrected version of c4ea0d1 (CV=0.916667). Run through harness. Verify training time >8 minutes.
+
+### MultiModelEnsemble template (extend as needed)
 
 ## Avoid Entirely
 
