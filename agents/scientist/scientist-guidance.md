@@ -136,7 +136,20 @@ Steps:
 5. Run as `ensemble_lgbm_cb_xgb_pseudo` using the same equal-weight architecture
 6. **CV will be similar to baseline** (pseudo rows not in val) — the only true test is LB. Report CV anyway.
 
-### Priority 4: Two-Feature-Set Blend *(~3h)*
+### Priority 4 (speculative): Two-Stage Residual Model *(~2h, low confidence)*
+
+**Hypothesis:** The synthetic training data was generated from the IBM Telco original (~7k rows). If the synthesis process is roughly additive, we can decompose the signal into an "original signal" component and a "synthetic residual" component:
+
+1. Train Model A on the original 7k IBM Telco rows
+2. Apply Model A to the 600k synthetic training rows → compute residuals `y_train - Model_A.predict_proba(X_train)[:, 1]`
+3. Train Model B on 600k synthetic rows to predict those residuals
+4. Test prediction = `clip(Model_A.predict_proba(X_test)[:, 1] + Model_B.predict_proba(X_test)[:, 1], 0, 1)`
+
+**Why this is probably wrong (supervisor notes):** We already established that adding original 7k rows *hurt* CV (0.916341 < 0.916540), implying distribution mismatch between original and synthetic data. Model A trained on 7k rows will generalize poorly to 600k out-of-distribution synthetic rows, making the "residual" mostly noise rather than learnable signal. The synthesis process is likely not additive in probability space.
+
+**Run it anyway** to confirm. `EXPERIMENT_NAME = "ensemble_two_stage_residual"`. If CV is below 0.916540, discard immediately.
+
+### Priority 5: Two-Feature-Set Blend *(~3h)*
 
 Even if individual features didn't help CV, a second feature branch may *decorrelate* predictions enough to boost the blend. Train the 3-way GBDT ensemble on two feature views and average:
 - Branch A: original features (same as 7b386f5)
