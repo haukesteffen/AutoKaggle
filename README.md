@@ -17,12 +17,13 @@ The repository has two layers:
 - fixed harness code under [harness/](harness)
 - agent-edited task files such as [experiment.py](experiment.py) and [promotion.py](promotion.py)
 
-The current documented operating model on `main` uses four long-lived roles:
+The current documented operating model on `main` uses four long-lived roles plus one on-demand planning role:
 
 - supervisor
 - scientist
 - analyst
 - engineer
+- strategist (episodic / temporary, not a permanently running session)
 
 That topology may change in future issues, but this README describes the current behavior on `main`.
 
@@ -31,6 +32,7 @@ That topology may change in future issues, but this README describes the current
 - [README.md](README.md): human/operator guide
 - [program.md](program.md): shared agent-facing context
 - [roles/supervisor.md](roles/supervisor.md): supervisor-only instructions
+- [roles/strategist.md](roles/strategist.md): strategist-only instructions
 - [roles/scientist.md](roles/scientist.md): scientist-only instructions
 - [roles/analyst.md](roles/analyst.md): analyst-only instructions
 - [roles/engineer.md](roles/engineer.md): engineer-only instructions
@@ -63,11 +65,20 @@ You are the supervisor, start a new run.
    - create branches and worktrees
    - ensure competition data exists
    - initialize the tracked communication files
-   - tell you which `claude` commands to run for the other roles
+    - tell you which `claude` commands to run for the other roles
 
 4. Open the additional terminals exactly as instructed by the supervisor.
 
-5. Once the other role sessions are open, tell the supervisor they are running so it can start the run logic.
+5. The supervisor may also ask you to open a temporary strategist session in the main repo:
+
+```bash
+cd <root>/AutoKaggle
+claude
+```
+
+That strategist session is on-demand. It is not a permanent terminal like the supervisor / scientist / analyst / engineer sessions.
+
+6. Once the other role sessions are open, tell the supervisor they are running so it can start the run logic.
 
 ## During A Run
 
@@ -80,6 +91,8 @@ The human is expected to:
 
 Useful places to inspect:
 
+- [strategy-whitepaper.md](strategy-whitepaper.md) when present
+- [strategy-idea-cookbook.md](strategy-idea-cookbook.md)
 - [scientist-guidance.md](scientist-guidance.md) when present
 - [analyst-hypotheses.md](analyst-hypotheses.md) when present
 - [engineer-promotions.md](engineer-promotions.md) when present
@@ -90,6 +103,8 @@ Useful places to inspect:
 Key tracked files:
 
 - [program.md](program.md): shared agent contract
+- [strategy-whitepaper.md](strategy-whitepaper.md): strategist-owned current plan
+- [strategy-idea-cookbook.md](strategy-idea-cookbook.md): strategist-owned reusable playbook
 - [experiment.py](experiment.py): scientist-owned experiment file
 - [analysis.py](analysis.py): analyst working script
 - [promotion.py](promotion.py): engineer submission-preparation script

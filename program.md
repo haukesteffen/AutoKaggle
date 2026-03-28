@@ -20,18 +20,23 @@ Leaderboard scores are calculated with approximately 20% of the test data. The f
 
 ## The Team
 
-Four roles, each running as an independent Claude Code session:
+Persistent roles:
 
-- **Supervisor** — strategic orchestrator and human interface. Synthesises signals from all other agents, sets direction, commissions analysis, and promotes experiments to the leaderboard. Runs the setup phase before the main loop begins.
+- **Supervisor** — strategic orchestrator and human interface. Synthesises signals from all other agents, consumes strategist recommendations, sets direction, commissions analysis, and promotes experiments to the leaderboard. Runs the setup phase before the main loop begins.
 - **Scientist** — experiment engine. Iterates on `experiment.py` within the fixed evaluation harness to advance the supervisor's current lane of work.
 - **Analyst** — signal quality expert. Inspects model artifacts and data to answer targeted yes/no hypotheses and surfaces patterns the scientist's loop cannot see.
 - **Engineer** — submission pipeline. Turns promoted experiment artifacts into Kaggle submissions and tracks CV/LB correlation.
+
+Episodic role:
+
+- **Strategist** — long-horizon planning role. Produces a deadline-aware `strategy-whitepaper.md` and maintains `strategy-idea-cookbook.md`. The strategist recommends; the supervisor decides.
 
 ---
 
 ## Operating Rules
 
 - The supervisor coordinates strategy. It does not inspect raw dataset files itself. If it needs dataset evidence, it asks the analyst.
+- The strategist recommends the high-level plan. The supervisor translates that plan into operational guidance for the scientist and the rest of the team.
 - The analyst answers one active, falsifiable hypothesis at a time. Hypotheses should be yes/no questions tied to a concrete decision.
 - The analyst presents evidence in code, tables, counts, and metrics. Do not use plots unless the human explicitly asks.
 - The scientist follows the supervisor's current lane. CV is the default local scorekeeper, not the sole objective.
@@ -43,6 +48,7 @@ Four roles, each running as an independent Claude Code session:
 ## Shared Runtime Assumptions
 
 - The human starts the supervisor first. The supervisor provisions the run tag, branches, worktrees, and initial tracked communication files before the rest of the team begins normal work.
+- The strategist is on-demand, not permanently polling. It is consulted at startup and whenever strategic replanning is needed.
 - Per-agent Claude settings belong in untracked `.claude/settings.local.json` files inside the current repo or worktree.
 - The committed [`.claude/settings.json`](.claude/settings.json) is shared and must stay path-free.
 - Coordination in this repository is polling-based. Do not rely on file hooks or sentinel writes as part of the documented control flow.
@@ -84,6 +90,8 @@ All inter-agent coordination flows through files committed on each agent's branc
 
 | File | Owned by | Read by | Lives in |
 |------|----------|---------|----------|
+| `strategy-whitepaper.md` | Strategist | Supervisor | `AutoKaggle/` |
+| `strategy-idea-cookbook.md` | Strategist | Strategist, Supervisor | `AutoKaggle/` |
 | `scientist-guidance.md` | Supervisor | Scientist | `AutoKaggle/` |
 | `analyst-hypotheses.md` | Supervisor | Analyst | `AutoKaggle/` |
 | `engineer-promotions.md` | Supervisor | Engineer | `AutoKaggle/` |
@@ -102,6 +110,8 @@ Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never comm
 5-fold cross-validation with a fixed random seed, defined in `harness/dataset.py`. Fold assignments must not change mid-run — this would invalidate cross-experiment comparisons.
 
 CV score is the default local optimisation metric, but it is not the sole objective. The supervisor may deliberately direct work toward simpler models, a stronger linear component, or a complementary model family for later ensembling. The engineer tracks whether CV gains translate to LB gains. If they stop correlating, the supervisor treats this as a priority signal over chasing further CV improvement.
+
+The strategist decides the current phase using the current date, the competition deadline assumption, and the evidence accumulated so far. The whitepaper should explicitly state the current date, the deadline assumption, and the number of calendar days remaining using absolute dates.
 
 ### Experimentation
 
