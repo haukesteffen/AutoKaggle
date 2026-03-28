@@ -23,7 +23,7 @@ Leaderboard scores are calculated with approximately 20% of the test data. The f
 Persistent roles:
 
 - **Supervisor** — strategic orchestrator and human interface. Synthesises signals from all other agents, consumes strategist recommendations, sets direction, commissions analysis, and promotes experiments to the leaderboard. Runs the setup phase before the main loop begins.
-- **Scientist** — experiment engine. Iterates on `agents/scientist/experiment.py` within the fixed evaluation harness to advance the supervisor's current lane of work.
+- **Scientist** — experiment engine. Re-enters on `/loop` wakes, iterates on `agents/scientist/experiment.py`, and advances the supervisor's current lane of work within the fixed evaluation harness.
 - **Analyst** — signal quality expert. Inspects model artifacts and data to answer targeted yes/no hypotheses and surfaces patterns the scientist's loop cannot see.
 - **Engineer** — submission pipeline. Turns promoted experiment artifacts into Kaggle submissions and tracks CV/LB correlation.
 
@@ -86,8 +86,9 @@ Episodic role:
     harness/                         # shared harness code
     data/                            # competition data (untracked, shared)
     artifacts/<tag>/                 # run artifacts (untracked, shared)
-      run.log
       experiments/<hash>/
+        run.log
+        exit-code.txt
         oof-preds.npy
         model.pkl
         test-preds.npy
@@ -116,7 +117,7 @@ All inter-agent coordination flows through files committed on each agent's branc
 | `agents/analyst/analyst-findings.md` | Analyst | Supervisor | `AutoKaggle-<tag>-analyst/` |
 | `agents/engineer/engineer-submissions.md` | Engineer | Supervisor | `AutoKaggle-<tag>-engineer/` |
 
-Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never committed. They live in `AutoKaggle/artifacts/<tag>/experiments/<hash>/` and are accessed by all agents via absolute path.
+Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never committed. They live in `AutoKaggle/artifacts/<tag>/experiments/<hash>/` and are accessed by all agents via absolute path. Per-run logs and exit-code files may live beside them as untracked local runtime state.
 
 ---
 
@@ -132,7 +133,7 @@ The strategist decides the current phase using the current date, the competition
 
 ### Experimentation
 
-The scientist runs a tight loop: one idea, one commit, one 20-minute run, keep or discard. Direction comes from the supervisor's guidance. The analyst informs strategy indirectly. Findings go to the supervisor, which distils them into guidance for the scientist. Analyst work should resolve concrete yes/no questions and report evidence in tables and metrics, not plots.
+The scientist runs a `/loop`-driven state machine: start one experiment, let it run, poll it on later wakes, then keep or discard exactly one completed run before starting the next. Direction comes from the supervisor's guidance. The analyst informs strategy indirectly. Findings go to the supervisor, which distils them into guidance for the scientist. Analyst work should resolve concrete yes/no questions and report evidence in tables and metrics, not plots.
 
 ### Promotion
 
