@@ -81,7 +81,11 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 
 Research on recent Kaggle Playground Series winners (S3–S6) has identified 4 untried techniques. Current best: `7b386f5` CV=0.916540, LB=0.91396. These are ordered by confidence — run them in sequence, stopping if time runs out.
 
-### Priority 1: Seed Diversity Bagging *(~1h, most likely gain)*
+### ~~Priority 1: Seed Diversity Bagging~~ — DONE, FAILED
+
+`ensemble_seed_bag_15` (3eaeb6c): CV=0.916382 — below 0.916540. 15-model seed average is worse than equal single-seed 3-way. Discard. Pattern holds: any deviation from equal LGBM+CB+XGB hurts harness CV.
+
+### Priority 1 (now active): Original Telco Dataset Blend
 
 Train each of LGBM, CatBoost, XGBoost with **5 different random seeds** (same hyperparameters as the shortlist models). Average all 15 sets of OOF predictions and 15 sets of test predictions. Run through harness as `ensemble_seed_bag_15`.
 
