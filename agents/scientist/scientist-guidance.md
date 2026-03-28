@@ -6,7 +6,7 @@ Current best: weighted LGBM+CatBoost ensemble (CV 0.916530). **Do not try furthe
 
 The only path to meaningful improvement is an **orthogonal third model**. Priority: ExtraTrees.
 
-**Hard gate:** If ExtraTrees (or tuned CatBoost) doesn't add >=0.0003 CV to the best available ensemble above 0.916530, lock the current best as the final submission candidate.
+If ExtraTrees doesn't improve the ensemble, move to tuned CatBoost divergence, then consult the supervisor for next direction — do not stop experimenting.
 
 ## Success Criterion
 
