@@ -2,15 +2,13 @@
 
 ## Current Lane
 
-Current best: weighted LGBM+CatBoost ensemble (CV 0.916530). **Do not try further weighting variants of LGBM and CatBoost** — the analyst confirmed these two models have OOF Pearson r = 0.9953. They are near-redundant. Weighted averaging of near-redundant models produces noise-level gains (+0.000054 from 0.3/0.7 weighting). This is not a productive direction.
+Current best: weighted LGBM+CatBoost ensemble (CV 0.916530). LGBM and CatBoost are near-redundant (OOF Pearson r = 0.9953) — no further blending variants of these two.
 
-The only path to meaningful improvement is an **orthogonal third model**. Priority: ExtraTrees.
-
-If ExtraTrees doesn't improve the ensemble, move to tuned CatBoost divergence, then consult the supervisor for next direction — do not stop experimenting.
+**New direction from analyst:** The hardest prediction subgroup is Month-to-month × Fiber optic × short tenure (2.1x lift in model disagreement rows, 55% churn rate, 7–12 month tenure bin has 1.71x lift). A targeted interaction feature may directly improve model quality without needing a new model family.
 
 ## Success Criterion
 
-Any new component that, when averaged with the existing LGBM+CatBoost ensemble (or replacing CatBoost), yields CV > 0.916776 (+0.0003 over current best). Solo CV doesn't need to beat LGBM — diversity is the goal.
+CV improvement >0.001 over `cbef1de` (0.915855) for a new LGBM with interaction features, or any ensemble CV > 0.916530 when a new component is added.
 
 ## Harness Path Fix — Important
 
@@ -24,20 +22,24 @@ uv run python -m harness.experiment_runner \
 
 ## Priority Ideas
 
-1. **Tuned CatBoost — strict budget** — depth=9 OOM-killed, depth=8/iter=1500 timed out. **Use `iterations=1000` (not 1500) and `depth=7`** — this is the exact config that fits: `iterations=1000, learning_rate=0.03, depth=7, rsm=0.8`. `EXPERIMENT_NAME = "catboost_tuned_d7_i1000"`. If this also times out, skip CatBoost tuning entirely and go straight to XGBoost (priority #3 below).
+1. **Interaction feature: `mtm_fiber` flag + tenure bins** — Add to `build_features` for LGBM:
+   - `mtm_fiber`: binary, 1 if `Contract == "Month-to-month"` AND `InternetService == "Fiber optic"`
+   - `tenure_bin`: pd.cut into 0–6, 7–12, 13–24, 25–48, 49+ month bins (treat as categorical)
+   Keep all original features. `EXPERIMENT_NAME = "lgbm_mtm_fiber_interaction"`.
+   This directly targets the 30K rows where both models disagree most (analyst-confirmed 43.7% churn vs 21.4% overall).
 
-2. **Ensemble with tuned CatBoost** — if `catboost_tuned_d7` scores well (CV ≥ 0.916), try simple average of LGBM (cbef1de) + tuned CatBoost. LGBM OOF: `/Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/cbef1de9024dbd5dc70988ba46baf1633f280340/oof-preds.npy`. `EXPERIMENT_NAME = "ensemble_lgbm_catboost_tuned_avg"`.
+2. **Tuned CatBoost — strict budget** — If interaction feature doesn't help, try CatBoost with exactly `iterations=1000, learning_rate=0.03, depth=7, rsm=0.8`. **Do not use iterations=1500** — depth=8/iter=1500 already timed out. `EXPERIMENT_NAME = "catboost_tuned_d7_i1000"`. If this also times out, skip CatBoost tuning.
 
-3. **XGBoost baseline** — if CatBoost tuning still doesn't yield a useful diverse component, try `XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42)`. `EXPERIMENT_NAME = "xgb_baseline"`.
+3. **XGBoost baseline** — If CatBoost tuning fails, try `XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42)`. `EXPERIMENT_NAME = "xgb_baseline"`.
 
 ## Avoid For Now
 
-- Further LGBM tuning (exhausted day 1)
-- Target encoding on LGBM (no gain day 1)
-- XGBoost (too similar to LGBM, low-priority)
+- Further LGBM hyperparameter tuning (exhausted)
+- Target encoding on LGBM (tried, no gain)
+- Weighted blending of LGBM + CatBoost only (near-redundant)
 - Stacking or meta-learners
 - Neural networks
 
 ## Why
 
-ExtraTrees uses bagging + random feature splits rather than gradient boosting. Its errors are correlated with LGBM/CatBoost on easy examples but differ on hard ones — exactly the diversity needed. The day-2 question is whether this structural difference translates to measurable ensemble gain on this dataset. CatBoost tuned for divergence is the backup if ExtraTrees is too weak as a solo model to contribute meaningfully.
+Analyst confirmed the hardest 5% of rows are heavily concentrated in Month-to-month × Fiber optic, with short-tenure customers (7–12 months) at 1.71x lift. Both LGBM and CatBoost predict ~44% churn here vs 22.5% overall — genuine ambiguity both models struggle with. A cheap binary flag + tenure bins may give the model a cleaner split on this subgroup without expensive tuning.
