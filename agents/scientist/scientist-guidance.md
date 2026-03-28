@@ -19,9 +19,17 @@ uv run python -m harness.experiment_runner \
   --artifact-dir /Users/hs/dev/AutoKaggle/artifacts/mar28/experiments/<hash>
 ```
 
+## ⚠️ CRITICAL BUG — FIX BEFORE ANY SUBMISSION
+
+The `ensemble_lgbm_cb_xgb_avg` experiment (393f8aa) scored LB 0.504 despite CV 0.916592. The bug: the experiment loads pre-computed OOF preds for CV scoring (correct), but `build_model` must return an actual sklearn-compatible estimator that trains all component models from scratch on whatever `X_train` / `y` it receives, and predicts on `X_test` via `predict_proba`. The harness calls `model.fit(X_full, y)` then `predict_positive_scores(model, X_test)` for artifact generation — if this path doesn't work correctly, test predictions will be garbage.
+
+**Fix:** In `build_model`, return a custom class (or Pipeline subclass) that, on `.fit(X, y)`, trains all three models (LGBM, CatBoost, XGBoost) and, on `.predict_proba(X)`, averages their probability outputs. Do NOT load OOF arrays in `build_model`. The OOF-loading trick only works for CV scoring, not artifact generation.
+
+Alternatively, run three separate single-model experiments and average their `test-preds.npy` files manually in a dedicated submission script, bypassing the ensemble-as-model approach entirely.
+
 ## Priority Ideas
 
-1. **3-way ensemble: LGBM + CatBoost + XGBoost simple average** — Load OOF preds from all three shortlist components, average them, and run through the harness. `EXPERIMENT_NAME = "ensemble_lgbm_catboost_xgb_avg"`. Strategist computed this as CV ~0.916592 from OOF preds — run it to confirm and generate test predictions for submission.
+1. **Fix and rerun the 3-way ensemble** — Reimplement so `build_model` returns a proper fit/predict estimator (not an OOF-loader). `EXPERIMENT_NAME = "ensemble_lgbm_cb_xgb_fixed"`. Do not submit until you verify the training time is >5 minutes (confirming all three models actually train).
 
 2. **OOF weight grid search (3-way)** — Using the same three OOF preds, grid-search weights in steps of 0.1 (w_lgbm + w_cb + w_xgb = 1.0, all ≥ 0.0). Find the weight combination with highest OOF CV, then run through harness with that weighting. `EXPERIMENT_NAME = "ensemble_3way_weighted_opt"`. If CV improves above 0.916592, keep it.
 
