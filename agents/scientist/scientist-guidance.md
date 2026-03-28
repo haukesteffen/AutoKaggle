@@ -140,7 +140,11 @@ Steps:
 5. Run as `ensemble_lgbm_cb_xgb_pseudo` using the same equal-weight architecture
 6. **CV will be similar to baseline** (pseudo rows not in val) — the only true test is LB. Report CV anyway.
 
-### Priority 4 (speculative): Two-Stage Residual Model *(~2h, low confidence)*
+### ~~Priority 4: Two-Stage Residual Model~~ — DONE, CONFIRMED FAILURE
+
+`ensemble_two_stage_residual` (12b5ae5): CV=**0.909887** — worst result of the entire run. Model A trained on 7k original rows generalizes catastrophically to 600k synthetic rows; residuals are pure noise. Prediction confirmed. Discard.
+
+### Priority 4 (was 5, now active): Two-Feature-Set Blend *(low confidence, last lane)*
 
 **Hypothesis:** The synthetic training data was generated from the IBM Telco original (~7k rows). If the synthesis process is roughly additive, we can decompose the signal into an "original signal" component and a "synthetic residual" component:
 
@@ -153,7 +157,7 @@ Steps:
 
 **Run it anyway** to confirm. `EXPERIMENT_NAME = "ensemble_two_stage_residual"`. If CV is below 0.916540, discard immediately.
 
-### Priority 5: Two-Feature-Set Blend *(~3h)*
+### Two-Feature-Set Blend *(~3h)*
 
 Even if individual features didn't help CV, a second feature branch may *decorrelate* predictions enough to boost the blend. Train the 3-way GBDT ensemble on two feature views and average:
 - Branch A: original features (same as 7b386f5)
