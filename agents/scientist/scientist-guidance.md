@@ -77,13 +77,66 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 - OOF weight grid (step=0.05, all-positive) completed by supervisor: best was LGBM=0.05/CB=0.50/XGB=0.45 → OOF 0.916657 vs equal-weight OOF 0.916580. Delta +0.000077 is too small to trust given OOF-grid unreliability (past experience: OOF overestimates by ~0.0002–0.0003 vs harness). **Do NOT implement.**
 - All lanes exhausted: feature engineering, GBDT tuning, weight optimization, MLP ensemble, CB+XGB only.
 
-## Status: Exploration Complete
+## Status: NEW LANES OPENED — Resume Exploration
 
-**Your work is done.** All lanes have been exhausted. The supervisor has confirmed the ceiling is `7b386f5` (CV=0.916540, LB=0.91396). No further experiments are needed or expected.
+Research on recent Kaggle Playground Series winners (S3–S6) has identified 4 untried techniques. Current best: `7b386f5` CV=0.916540, LB=0.91396. These are ordered by confidence — run them in sequence, stopping if time runs out.
 
-The supervisor will handle all remaining insurance submissions directly from `7b386f5`'s artifacts.
+### Priority 1: Seed Diversity Bagging *(~1h, most likely gain)*
 
-**You may rest until explicitly asked for a new experiment.** If a genuinely novel idea occurs to you (a model family never tried, a structural change not yet explored), write it as a hypothesis in scientist-results.md and the supervisor will evaluate it. Otherwise, no action required.
+Train each of LGBM, CatBoost, XGBoost with **5 different random seeds** (same hyperparameters as the shortlist models). Average all 15 sets of OOF predictions and 15 sets of test predictions. Run through harness as `ensemble_seed_bag_15`.
+
+```python
+SEEDS = [42, 123, 456, 789, 1234]
+
+# For each seed, train LGBM/CatBoost/XGBoost with that seed
+# Collect 15 OOF arrays and 15 test prediction arrays
+# Final OOF = mean of all 15; Final test = mean of all 15
+```
+
+Use the same preprocessor (OrdinalEncoder) and same hyperparameters as the shortlist models:
+- LGBM: n_estimators=500, lr=0.05, num_leaves=31
+- CatBoost: default settings (no cat_features — use OrdinalEncoder)
+- XGBoost: n_estimators=500, lr=0.05, depth=6, subsample=0.8, colsample=0.8
+
+This creates a proper `MultiSeedEnsemble` class with `fit` (trains 15 models) and `predict_proba` (averages 15 predictions). Verify training time >15 minutes. Do NOT use pre-computed OOF arrays — all models must train from scratch.
+
+**If CV > 0.916540: keep and the supervisor will submit.**
+
+### Priority 2: Blend Original Telecom Dataset *(~2h)*
+
+S6E3 is based on a real public telecom churn dataset. The original is likely the **IBM Telco Customer Churn** dataset (`blastchar/telco-customer-churn` on Kaggle datasets, ~7k rows). Adding original rows to training gives a consistent boost in Playground Series competitions because synthetic generation introduces distribution artifacts.
+
+Steps:
+1. Download the original dataset: check if it exists at `/Users/hs/dev/AutoKaggle/data/` or search Kaggle datasets for `blastchar/telco-customer-churn`
+2. Align column names/types to match the competition schema (same feature names and dtypes as `data/train.csv`)
+3. Add `target` column encoded as 0/1
+4. Concatenate with training data: `train_aug = pd.concat([train, original_data])`
+5. Run `ensemble_lgbm_cb_xgb_orig` through harness using the equal-weight 3-way ensemble architecture from `7b386f5` but trained on `train_aug`
+6. Compare CV to 0.916540. If better, keep.
+
+**Important:** Use the same 5-fold structure. Original rows should be included in every training fold but excluded from validation folds (assign them `fold=-1` or include in all training splits).
+
+### Priority 3: Soft Pseudo-Labeling *(~3h, highest ceiling, CV uninformative)*
+
+Use the test predictions from `7b386f5` as soft labels for the test set. Retrain the 3-way ensemble on the combined dataset.
+
+Steps:
+1. Load test predictions: `test_pseudo = np.load('artifacts/mar28/experiments/7b386f5.../test-preds.npy')`
+2. Load test features: `X_test` from `harness.dataset`
+3. Concatenate: `X_aug = pd.concat([X_train, X_test])`, `y_aug = np.concatenate([y_train, test_pseudo])`
+4. For 5-fold CV: assign all pseudo-labeled rows to `fold=-1` (training only, never validation)
+5. Run as `ensemble_lgbm_cb_xgb_pseudo` using the same equal-weight architecture
+6. **CV will be similar to baseline** (pseudo rows not in val) — the only true test is LB. Report CV anyway.
+
+### Priority 4: Two-Feature-Set Blend *(~3h)*
+
+Even if individual features didn't help CV, a second feature branch may *decorrelate* predictions enough to boost the blend. Train the 3-way GBDT ensemble on two feature views and average:
+- Branch A: original features (same as 7b386f5)
+- Branch B: add frequency encoding (`.value_counts()` per categorical column), log(tenure+1), and ratio of MonthlyCharges/TotalCharges
+
+Compute OOF correlation between Branch A and Branch B predictions. If r < 0.97, run both through harness and average their test predictions as `ensemble_two_branch`.
+
+**Run Branch B OOF offline first** — only proceed to harness if OOF correlation with Branch A is < 0.97.
 
 ### MultiModelEnsemble template (extend as needed)
 
