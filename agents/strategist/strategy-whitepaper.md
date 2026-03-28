@@ -1,57 +1,87 @@
 # Strategy Whitepaper
 
 ## Current Date
-March 29, 2026
+March 28–29, 2026 transition
 
 ## Deadline
 March 31, 2026
 
 ## Days Remaining
-3 (March 29, March 30, March 31) — 15 slots total (5+5+5)
+3 (March 29, March 30, March 31) — 10 slots remaining
 
 ## Current Phase
-**Final consolidation — exploration complete, all lanes exhausted**
+**Reopened exploration — 4 untried lanes identified; attempt sequentially March 29–31**
 
 ## Status Summary
 
-Every major strategy lane has been fully explored and closed:
+All previously known lanes are exhausted. However, research into Kaggle Playground Series S3–S6 winning solutions surfaced 4 genuinely untried techniques. These are not retreads of prior work; they operate at a different level (training data diversity, seed diversity, and test-set information reuse) rather than model architecture or ensemble weighting.
 
-- **Feature engineering** — three families tried; none improved CV; closed.
-- **GBDT solo tuning** — all variants within ±0.0001 CV of baseline; closed.
-- **Bagging models (ExtraTrees, RandomForest)** — solo CV 0.910–0.911; too weak; closed.
-- **MLP ensemble** — r=0.985 OOF correlation vs LGBM confirmed orthogonality, but solo CV of 0.911 is 0.005 below the GBDT ceiling. Full harness test showed adding MLP at 10% weight reduced CV by 0.0003 vs equal 3-way GBDT. Closed.
-- **OOF-tuned CB+XGB (no LGBM)** — CB=0.5/XGB=0.5 gave CV=0.916381, worse than equal 3-way. Closed.
-- **OOF weight grid (LGBM+CB+XGB, step=0.05)** — best combo LGBM=0.05/CB=0.50/XGB=0.45 gives OOF 0.916657 vs equal-weight OOF 0.916580 (+0.000077). Delta is smaller than OOF estimation noise; OOF-to-harness transfer has failed twice. Not worth implementing.
-- **LR as ensemble component** — weaker solo than MLP; no orthogonality advantage; closed.
+**Current best: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396 (scored March 28, 23:25)**
 
-**The ceiling is definitively CV=0.916540, LB=0.91396 (commit 7b386f5, equal-weight LGBM+CB+XGB).**
+**Confirmed non-starters (do not retry):**
+- RidgeCV meta-learner: OOF delta = +0.000077 — same noise-floor result as prior grid search. Closed.
+- All lanes in the "Closed Lanes" section below.
 
-## Consolidation Posture
+## Slot Budget
 
-7b386f5 is the final candidate. No further exploration is planned.
+| Date | Slots | Plan |
+|------|-------|------|
+| March 29 | 5 available | Up to 3 experiments (seed bagging, original dataset, pseudo-labeling if time allows) |
+| March 30 | 5 available | Continue sequence; pseudo-labeling and/or two-feature-set; insurance re-submit 7b386f5 |
+| March 31 | 5 available | Final submission; 1–2 insurance slots held |
+| Reserve | — | 4–5 slots held across March 29–31 for insurance and final entry |
 
-**Planned use of remaining slots:**
+Plan to use ~5–6 slots for experiments. Keep rest as insurance and for confirming 7b386f5 holds.
 
-| Date | Slots | Action |
-|------|-------|--------|
-| March 29 | 5 available | Hold; no experiment warrants a submission today |
-| March 30 | 5 available | 1 insurance re-submission of 7b386f5 (confirms the score holds) |
-| March 31 | 5 available | 1 final submission of 7b386f5 as the official entry |
-| Reserve | — | 1–2 slots held across March 29–31 in case a genuinely new lane appears |
+## New Lanes — Priority Order for March 29–31
 
-Realistically expect to use 2–3 of the 15 remaining slots.
+### 1. Seed diversity bagging (Priority 1 — March 29)
+Train each of LGBM, CatBoost, XGBoost across 5 random seeds (15 models total), then average all predictions.
+- **Expected gain:** +0.0005–0.002 LB
+- **Effort:** ~1h, 1 LB slot
+- **Evidence:** Used by S4E8 1st-place winner (72 OOF models), NVIDIA Grandmaster Playbook
+- **Risk:** Low. Pure averaging; cannot hurt unless seed variance is unusually high.
+- **Go condition:** Offline harness CV clearly above 0.9166 before submitting.
+
+### 2. Original Telco dataset blend (Priority 2 — March 29/30)
+Augment training data with ~7k rows from the IBM Telco Customer Churn dataset (the original source for this Playground series).
+- **Expected gain:** +0.0003–0.002 LB
+- **Effort:** ~2h, 1 LB slot
+- **Evidence:** Standard top-5 technique across multiple Playground seasons.
+- **Risk:** Low-medium. Extra rows with slightly different distribution may hurt CV but help LB.
+- **Go condition:** LB slot justified even if CV is flat; pattern is well-established.
+
+### 3. Soft pseudo-labeling on test set (Priority 3 — March 30)
+Use 7b386f5 test predictions as soft labels; retrain ensemble on combined train + soft-labeled test set.
+- **Expected gain:** +0.001–0.004 LB
+- **Effort:** ~3h, 1 LB slot
+- **Evidence:** High-ceiling technique in multiple Playground top solutions.
+- **Risk:** High uncertainty — CV is **uninformative** here (model has seen test labels during training). Only LB tells the truth.
+- **Go condition:** Always spend the slot if capacity allows; CV cannot be used as a gate.
+
+### 4. Two-feature-set blending (Priority 4 — March 30/31)
+Train the GBDT trio on two distinct feature representations; blend the resulting ensembles.
+- **Expected gain:** +0.001–0.003 LB
+- **Effort:** ~3h, 1 LB slot
+- **Evidence:** Useful when Branch B OOF correlation with Branch A is <0.97, even if solo CV does not improve.
+- **Risk:** Medium. Correlation check must be done offline before spending a slot.
+- **Go condition:** Run correlation check first; only submit if cross-branch OOF correlation <0.97.
 
 ## Guidance For The Supervisor
 
-1. **7b386f5 is the anchor and the final answer.** Equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396.
+1. **7b386f5 remains the anchor.** Every experiment is measured against CV=0.916540 / LB=0.91396.
 
-2. **No new experiments unless a genuinely novel model family appears.** The known families (GBDT, bagging, MLP, LR) are all exhausted. If the scientist brings a credible new idea (e.g. a model family not yet tried) the team can still act on it — but the bar is high: offline harness CV must clearly exceed 0.9168 before spending an LB slot.
+2. **Run lanes in priority order.** Do not skip to pseudo-labeling before attempting seed bagging; early wins compound. Do not run more than one experiment simultaneously.
 
-3. **OOF estimates are not sufficient to trigger a submission.** OOF-to-harness transfer has failed twice. Any candidate must be validated with the full harness CV first.
+3. **OOF estimates are not sufficient for lanes 1 and 2.** Full harness CV must be run. For pseudo-labeling (lane 3), skip the CV gate entirely — LB is the only truth.
 
-4. **Do not invent experiments to fill slots.** The remaining budget exists as insurance, not as an invitation to explore.
+4. **No hard gates between lanes.** A lane that fails does not close the next one. Keep running the sequence unless genuinely blocked.
 
-5. **CV/LB gap is stable at ~0.0026** across all scored submissions. CV remains a reliable proxy for LB.
+5. **These are the last remaining lanes.** There is no fifth idea in reserve. If all four fail, 7b386f5 is the final submission and no further exploration is warranted.
+
+6. **CV/LB gap is stable at ~0.0026** across all scored submissions. CV remains a reliable proxy except for pseudo-labeling.
+
+7. **Insurance:** Reserve at least 1 slot on March 31 to re-submit 7b386f5 if any experiment degrades the active submission.
 
 ## Closed Lanes (Do Not Revisit)
 
@@ -60,21 +90,17 @@ Realistically expect to use 2–3 of the 15 remaining slots.
 - OOF-tuned weight optimisation (LGBM+CB+XGB or any subset)
 - OOF-tuned CB+XGB without LGBM
 - ExtraTrees / RandomForest
-- CatBoost depth tuning (OOM above depth 7; closed)
+- CatBoost depth tuning (OOM above depth 7)
 - LGBM hyperparameter tuning
 - Feature engineering (any family)
 - XGBoost solo tuning
-- Stacked meta-learners
+- Stacked meta-learners (including RidgeCV — confirmed noise-floor delta)
 
 ## Pivot Conditions
 
-- **No hard gates.** If the scientist surfaces a genuinely new model family or a structural insight not yet tested, the team may act — but offline harness CV must clearly beat 0.9168 before any LB slot is used.
+- **No hard gates between lanes.** Failure in one lane does not prevent the next.
 - If any LB submission returns below 0.9135: flag CV/LB gap widening to analyst before spending further slots.
-- If 7b386f5 re-submission on March 30 scores materially different from 0.91396: investigate before submitting on March 31.
-
-## Why This Is The Final State
-
-30+ experiments and 5+ LB submissions have been run. The GBDT diversity wall is confirmed (all three boosting families r > 0.990 OOF correlation). The equal-weight LGBM+CB+XGB ensemble has beaten every alternative attempted, including OOF-optimised variants. The OOF weight grid confirmed that no weight vector within the GBDT shortlist meaningfully improves over equal weighting once harness noise is accounted for. There is no remaining lever with a credible expected gain above the noise floor. LB=0.91396 is the team's best achievable result on this feature set.
+- If all 4 new lanes fail to beat 0.91396 on LB: accept 7b386f5 as the final answer and use March 31 slot for a clean final submission.
 
 ---
-*Refreshed: March 29, 2026. Final consolidation. 30+ experiments, 5+ LB submissions. All lanes exhausted. Current best: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396.*
+*Refreshed: March 28–29, 2026 transition. Exploration reopened: 4 untried lanes from S3–S6 research. 10 slots remaining. Current best: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396.*
