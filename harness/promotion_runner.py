@@ -62,7 +62,6 @@ T = TypeVar("T")
 @dataclass
 class PromotionResult:
     hash: str
-    tag: str
     competition: str
     artifact_dir: str
     submission_file: str
@@ -98,11 +97,10 @@ def main() -> None:
 
 
 def _run_promotion(args: argparse.Namespace) -> PromotionResult:
-    artifact_dir = _normalize_repo_path(args.artifact_dir or _default_artifact_dir(args.tag, args.hash))
+    artifact_dir = _normalize_repo_path(args.artifact_dir or _default_artifact_dir(args.hash))
     submission_file = _normalize_repo_path(args.submission_file or artifact_dir / DEFAULT_SUBMISSION_FILENAME)
     result = PromotionResult(
         hash=args.hash,
-        tag=args.tag,
         competition=COMPETITION,
         artifact_dir=str(artifact_dir),
         submission_file=str(submission_file),
@@ -220,7 +218,6 @@ def _run_promotion(args: argparse.Namespace) -> PromotionResult:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hash", required=True)
-    parser.add_argument("--tag", required=True)
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--submission-file", type=Path)
     parser.add_argument("--cv-score", type=float)
@@ -473,8 +470,8 @@ def _is_transient_kaggle_error(exc: Exception) -> bool:
     return any(token in message for token in TRANSIENT_KAGGLE_TOKENS)
 
 
-def _default_artifact_dir(tag: str, hash_value: str) -> Path:
-    return DEFAULT_ARTIFACTS_ROOT / tag / "experiments" / hash_value
+def _default_artifact_dir(hash_value: str) -> Path:
+    return DEFAULT_ARTIFACTS_ROOT / "experiments" / hash_value
 
 
 def _normalize_repo_path(path: Path) -> Path:

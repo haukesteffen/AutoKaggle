@@ -4,7 +4,6 @@ import importlib.util
 import multiprocessing as mp
 import os
 import queue
-import subprocess
 import sys
 import time
 import traceback
@@ -22,13 +21,6 @@ INVALID_EXIT_CODE = 2
 def main() -> None:
     args = _parse_args()
     experiment_path = _normalize_repo_path(args.experiment_path)
-    editable_path = _normalize_repo_path(args.editable_path or args.experiment_path)
-
-    try:
-        _enforce_edit_boundary(editable_path)
-    except RuntimeError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
 
     total_start = time.perf_counter()
     deadline = time.monotonic() + TIME_BUDGET_SECONDS
@@ -166,33 +158,10 @@ def _run_evaluation(messages: mp.Queue, experiment_path: Path) -> None:
         )
 
 
-def _enforce_edit_boundary(editable_path: Path) -> None:
-    if os.environ.get("AUTOKAGGLE_STRICT_EDIT_GUARD") != "1":
-        return
-
-    allowed_path = _to_repo_relative_path(editable_path)
-    changed_paths: set[str] = set()
-    commands = (
-        ["git", "diff", "--name-only"],
-        ["git", "diff", "--cached", "--name-only"],
-    )
-    for command in commands:
-        completed = subprocess.run(command, check=True, capture_output=True, text=True)
-        changed_paths.update(Path(line.strip()).as_posix() for line in completed.stdout.splitlines() if line.strip())
-
-    disallowed = sorted(path for path in changed_paths if path != allowed_path)
-    if disallowed:
-        joined = ", ".join(disallowed)
-        raise RuntimeError(
-            f"tracked edits outside {allowed_path} are not allowed during experiment runs: {joined}"
-        )
-
-
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--experiment-path", type=Path, default=DEFAULT_EXPERIMENT_PATH)
-    parser.add_argument("--editable-path", type=Path)
     return parser.parse_args()
 
 
@@ -261,14 +230,6 @@ def _normalize_repo_path(path: Path) -> Path:
     if path.is_absolute():
         return path.resolve()
     return (REPO_ROOT / path).resolve()
-
-
-def _to_repo_relative_path(path: Path) -> str:
-    resolved = _normalize_repo_path(path)
-    try:
-        return resolved.relative_to(REPO_ROOT).as_posix()
-    except ValueError:
-        return resolved.as_posix()
 
 
 def _load_module_from_path(module_path: Path, module_name: str):

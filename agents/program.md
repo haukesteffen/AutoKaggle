@@ -45,6 +45,9 @@ Episodic roles:
 - The scientist reads one active task at a time, executes one experiment cycle, and records only terminal evaluated runs in `agents/scientist/scientist-results.md`.
 - Invalid scientist launches are repaired inside the same invocation and do not count as completed experiment results.
 - The scientist follows the supervisor's current lane. CV is the default local scorekeeper, not the sole objective.
+- The supervisor is the only agent that commits tracked changes.
+- The supervisor commits only at quiescent points, after all active strategist, analyst, and scientist work has finished.
+- `agents/scientist/scientist-task.md` and `agents/analyst/analyst-hypothesis.md` are tracked live-control files, but they should normally be cleared back to `status: none` before the supervisor commits a checkpoint.
 - No agent installs packages, modifies dependencies, or changes the environment on its own.
 - If an agent needs a new package, new permission, or any capability it does not already have, it asks the human.
 
@@ -52,9 +55,9 @@ Episodic roles:
 
 ## Shared Runtime Assumptions
 
-- The human starts the supervisor first. The supervisor provisions the run tag, branches, worktrees, and initial tracked communication files before the rest of the team begins normal work.
+- The human starts the supervisor first. The supervisor creates or updates the long-lived `run` branch, ensures the initial tracked communication files exist, and then manages all later commits.
 - The strategist, analyst, and scientist are on-demand, not permanently polling. They are invoked in the current repo only when needed.
-- Per-agent Claude settings belong in untracked `.claude/settings.local.json` files inside the current repo or worktree.
+- Per-agent Claude settings belong in untracked `.claude/settings.local.json` files inside the current repo.
 - The committed [`.claude/settings.json`](../.claude/settings.json) is shared and must stay path-free.
 - Coordination in this repository is polling-based. Do not rely on file hooks or sentinel writes as part of the documented control flow.
 
@@ -62,7 +65,7 @@ Episodic roles:
 
 ## Directory Layout
 
-`<root>` is the parent directory where the repository lives (for example `~/dev`). All worktrees share the same `.git` object store.
+`<root>` is the parent directory where the repository lives (for example `~/dev`).
 
 ```text
 <root>/
@@ -91,7 +94,7 @@ Episodic roles:
         scientist-knowledge.md       # concise durable scientist memory
     harness/                         # shared harness code
     data/                            # competition data (untracked, shared)
-    artifacts/<tag>/                 # run artifacts (untracked, shared)
+    artifacts/                       # untracked runtime artifacts
       experiments/<hash>/
         run.log
         exit-code.txt
@@ -104,7 +107,7 @@ Episodic roles:
 
 ## Communication Files
 
-All inter-agent coordination flows through tracked files committed in the appropriate repo or worktree location, read by others through paths resolved dynamically at runtime from the repo and worktree layout.
+All inter-agent coordination flows through tracked files in the repository, read by others through paths resolved dynamically at runtime from the current checkout.
 
 | File | Owned by | Read by | Lives in |
 |------|----------|---------|----------|
@@ -118,7 +121,7 @@ All inter-agent coordination flows through tracked files committed in the approp
 | `agents/scientist/scientist-results.md` | Scientist | Supervisor, Analyst, Strategist | `AutoKaggle/` |
 | `agents/scientist/scientist-knowledge.md` | Scientist | Scientist, Supervisor | `AutoKaggle/` |
 
-Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never committed. They live in `AutoKaggle/artifacts/<tag>/experiments/<hash>/` and are accessed by all agents via absolute path. Per-run logs and exit-code files may live beside them as untracked local runtime state.
+Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never committed. They live in `AutoKaggle/artifacts/experiments/<hash>/` and are accessed by all agents via absolute path. Per-run logs and exit-code files may live beside them as untracked local runtime state.
 
 ---
 
@@ -150,7 +153,7 @@ When `stop` is given, every agent should:
 2. Cancel any active `/loop` scheduled task it started.
 3. Do not create any new scheduled tasks.
 4. Finish only the current atomic checkpoint.
-5. Commit its owned status files if needed.
+5. Only the supervisor may commit tracked checkpoint files if needed.
 6. Report a final status note, then go idle or exit.
 
 There is no automatic stopping condition besides an explicit human stop.

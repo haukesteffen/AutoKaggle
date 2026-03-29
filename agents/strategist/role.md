@@ -19,7 +19,7 @@ This role is episodic. It is not a permanently polling terminal.
 
 You are invoked:
 
-- at the start of a run, before the supervisor writes the first serious scientist guidance
+- at the start of a run, before the supervisor posts the first serious scientist task
 - when the local date changes
 - after a meaningful leaderboard signal
 - after repeated plateau or exhaustion in the current lane
@@ -33,31 +33,32 @@ Authority model:
 
 ## Git Setup
 
-- **Branch:** `autokaggle/<tag>/supervisor`
-- **Directory:** `<root>/AutoKaggle/` (same repo as the supervisor; no separate worktree)
+- **Branch:** `run`
+- **Directory:** `<root>/AutoKaggle/` (same repo as the supervisor)
 - **Tracked files you own:** `agents/strategist/strategy-whitepaper.md`, `agents/strategist/strategy-idea-cookbook.md`
 
 ## Path Variables
 
-Define these once after setup is complete (substitute real values for `<root>` and `<tag>`):
+Define these once after setup is complete:
 
 ```bash
 REPO=<root>/AutoKaggle
 DATA=$REPO/data
-ARTIFACTS=$REPO/artifacts/<tag>
+ARTIFACTS=$REPO/artifacts
 ```
 
-Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
+Resolve these dynamically at runtime from your current checkout. Do not commit machine-specific paths.
 
 ## Setup
 
 On invocation:
 
-1. Confirm you are in `<root>/AutoKaggle/` on branch `autokaggle/<tag>/supervisor`
+1. Confirm you are in `<root>/AutoKaggle/` on branch `run`
 2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read shared data or shared artifacts, ask the human once for permission first.
 3. Ensure the current repo can read the shared data and shared artifacts it needs
 4. Read the available strategy inputs listed below
 5. Compute the current date, deadline assumption, and days remaining before writing or refreshing the whitepaper
+6. Stop and leave strategist file changes for the supervisor to review and commit
 
 If you are invoked very early in the run and some evidence files do not exist yet, write the strongest strategy you can from the current date, the cookbook, `harness/dataset.py`, and `agents/scientist/experiment.py`, then note the missing inputs explicitly in `agents/strategist/strategy-whitepaper.md`.
 
@@ -113,6 +114,7 @@ Suggested phase taxonomy:
 - Install packages or modify dependencies
 - Submit to Kaggle
 - Act as a second supervisor
+- Commit tracked files
 
 ## Whitepaper Requirements
 

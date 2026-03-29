@@ -103,8 +103,6 @@ class PromotionRunnerTests(unittest.TestCase):
                     "promotion_runner",
                     "--hash",
                     hash_value,
-                    "--tag",
-                    "mar28",
                     "--artifact-dir",
                     str(artifact_dir),
                     "--cv-score",
@@ -151,8 +149,6 @@ class PromotionRunnerTests(unittest.TestCase):
                     "promotion_runner",
                     "--hash",
                     hash_value,
-                    "--tag",
-                    "mar28",
                     "--artifact-dir",
                     str(artifact_dir),
                     "--timeout-seconds",
@@ -181,8 +177,6 @@ class PromotionRunnerTests(unittest.TestCase):
                     "promotion_runner",
                     "--hash",
                     hash_value,
-                    "--tag",
-                    "mar28",
                     "--artifact-dir",
                     str(artifact_dir),
                 ],
@@ -213,6 +207,12 @@ class PromotionRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(rank, 3)
+
+    def test_default_artifact_dir_is_tag_free(self) -> None:
+        self.assertEqual(
+            promotion_runner._default_artifact_dir("abcdef1"),
+            Path("artifacts/experiments/abcdef1"),
+        )
 
     def _run_main(
         self,
