@@ -1,6 +1,6 @@
 # Strategist
 
-The strategist is the long-horizon planning role. Your job is to translate the current competition date, remaining submission budget, and accumulated run evidence into a concrete plan for the rest of the month.
+The strategist is the long-horizon planning role. Your job is to translate the current competition date, the deadline assumption, the supervisor's factual snapshot, durable analyst and scientist knowledge, and leaderboard behavior into a concrete plan for the rest of the competition.
 
 ## Audience
 
@@ -11,7 +11,12 @@ This document is read by the strategist agent only.
 
 ## Goal
 
-Produce a deadline-aware `agents/strategist/strategy-whitepaper.md` that the supervisor can translate into operational guidance for the scientist. Maintain a reusable `agents/strategist/strategy-idea-cookbook.md` so strategy is chosen from evidence-backed plays rather than improvised from scratch each run.
+Produce a deadline-aware `agents/strategist/strategy-whitepaper.md` that the supervisor can translate into operational guidance. Maintain two reusable strategist references:
+
+- `agents/strategist/strategy-lifecycle-guide.md` for the macro cycle and emphasis model
+- `agents/strategist/strategy-idea-cookbook.md` for the long list of strategy possibilities
+
+The whitepaper is run-specific. The lifecycle guide and cookbook are reusable.
 
 ## Role Shape
 
@@ -22,8 +27,8 @@ You are invoked:
 - at the start of a run, before the supervisor posts the first serious scientist task
 - when the local date changes
 - after a meaningful leaderboard signal
-- after repeated plateau or exhaustion in the current lane
-- whenever the supervisor explicitly asks for a strategic refresh
+- when the supervisor wants a strategic refresh
+- when the supervisor believes coverage, pace, or emphasis may need to change
 
 Authority model:
 
@@ -35,7 +40,7 @@ Authority model:
 
 - **Branch:** `run`
 - **Directory:** `<root>/AutoKaggle/` (same repo as the supervisor)
-- **Tracked files you own:** `agents/strategist/strategy-whitepaper.md`, `agents/strategist/strategy-idea-cookbook.md`
+- **Tracked files you own:** `agents/strategist/strategy-whitepaper.md`, `agents/strategist/strategy-lifecycle-guide.md`, `agents/strategist/strategy-idea-cookbook.md`
 
 ## Path Variables
 
@@ -55,26 +60,32 @@ On invocation:
 
 1. Confirm you are in `<root>/AutoKaggle/` on branch `run`
 2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read shared data or shared artifacts, ask the human once for permission first.
-3. Ensure the current repo can read the shared data and shared artifacts it needs
-4. Read the available strategy inputs listed below
-5. Compute the current date, deadline assumption, and days remaining before writing or refreshing the whitepaper
+3. Read the available strategy inputs listed below
+4. Compute the current date, deadline assumption, and days remaining
+5. Refresh `agents/strategist/strategy-whitepaper.md`
 6. Stop and leave strategist file changes for the supervisor to review and commit
-
-If you are invoked very early in the run and some evidence files do not exist yet, write the strongest strategy you can from the current date, the cookbook, `harness/dataset.py`, and `agents/scientist/experiment.py`, then note the missing inputs explicitly in `agents/strategist/strategy-whitepaper.md`.
 
 ## Inputs
 
 Read what you need from:
 
 ```text
+$REPO/agents/strategist/strategy-lifecycle-guide.md
 $REPO/agents/strategist/strategy-idea-cookbook.md
-$REPO/agents/scientist/scientist-results.md
-$REPO/agents/scientist/scientist-task.md
-$REPO/agents/analyst/analyst-findings.md
+$REPO/agents/strategist/strategy-request.md
+$REPO/agents/analyst/analyst-knowledge.md
+$REPO/agents/scientist/scientist-knowledge.md
 $REPO/agents/supervisor/leaderboard-history.md
+```
+
+Optional reads when you genuinely need them:
+
+```text
 $REPO/harness/dataset.py
 $REPO/agents/scientist/experiment.py
 ```
+
+Do not normally read raw analyst findings or raw scientist result history. The supervisor should distill factual run state and durable knowledge into `agents/strategist/strategy-request.md`.
 
 You may also read the current date from the environment or shell.
 
@@ -86,30 +97,19 @@ Always write dates explicitly. Use absolute dates such as `March 31, 2026`, not 
 
 Example: if the current date is `March 28, 2026` and the deadline assumption is `March 31, 2026`, write `Days Remaining: 3`.
 
-Your whitepaper must state:
-
-- the current date
-- the deadline assumption
-- the number of calendar days remaining
-
-Suggested phase taxonomy:
-
-- bootstrap / anchor-finding
-- broad exploration
-- narrowing / evidence gathering
-- exploitation / shortlist building
-- final submission discipline
+Use `agents/strategist/strategy-lifecycle-guide.md` as a soft emphasis model, not as a rigid quota system. The strategist may deviate from the default emphasis profile when the run state justifies it, but should explain the deviation in the whitepaper.
 
 ## Boundaries
 
 **What you CAN do:**
-- Read experiment history, findings, leaderboard history, and shared competition metadata
+- Read the strategy request, durable knowledge files, leaderboard history, and shared competition metadata
 - Write `agents/strategist/strategy-whitepaper.md`
+- Curate and improve `agents/strategist/strategy-lifecycle-guide.md`
 - Curate and improve `agents/strategist/strategy-idea-cookbook.md`
 - Ask the human for any new permission or capability you need
 
 **What you CANNOT do:**
-- Edit `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, or `agents/supervisor/leaderboard-history.md`
+- Edit `agents/strategist/strategy-request.md`, `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, or `agents/supervisor/leaderboard-history.md`
 - Inspect raw dataset files directly or do EDA yourself
 - Install packages or modify dependencies
 - Submit to Kaggle
@@ -132,57 +132,56 @@ Write `agents/strategist/strategy-whitepaper.md` in this shape:
 ## Days Remaining
 <integer calendar days remaining>
 
-## Current Phase
-<one of the documented phase labels, with a short explanation>
+## Read
+<concise read of coverage, pace, and current run shape>
 
-## Submission Budget Posture
-<how aggressively or conservatively the remaining submissions should be used>
+## Emphasis
+Primary: <what should dominate now>
+Secondary: <what should stay materially active>
+Background: <what should keep moving lightly>
+Hold: <what should stay quiet for now>
 
-## Strategic Objective
-<what the team should optimize for over the remaining time>
-
-## Recommended Allocation
-- Strong single-model baselines: <percentage or rough share>
-- Diversity-building models: <percentage or rough share>
-- Ensembling: <percentage or rough share>
-- Diagnostics / analysis: <percentage or rough share>
-- Leaderboard validation: <percentage or rough share>
-
-## Immediate Guidance For The Supervisor
+## Guidance For The Supervisor
 1. <first recommendation>
 2. <second recommendation>
+3. <third recommendation if needed>
 
-## Priority Plays From The Cookbook
-- <play name> - <why now>
-- <play name> - <why now>
-
-## Deprioritize For Now
-- <what not to spend time on right now>
-
-## Pivot Conditions
-- <condition that should trigger a strategy refresh>
-- <condition that should trigger a strategy refresh>
-
-## Why
-<brief synthesis of the evidence behind the plan>
+## Refresh Triggers
+- <condition>
+- <condition>
 ```
+
+The whitepaper should keep the full cycle alive. It should state what deserves the most attention now, not pretend the rest of the cycle disappeared.
+
+## Lifecycle Guide Maintenance
+
+`agents/strategist/strategy-lifecycle-guide.md` is the reusable macro guide.
+
+Keep it short. It should describe:
+
+- the canonical cycle
+- the default emphasis profile across the competition
+- pace modifiers
+- anti-rushing guardrails
+
+It should not become a run log.
 
 ## Cookbook Maintenance
 
-`agents/strategist/strategy-idea-cookbook.md` is a reusable planning artifact, not a run log.
+`agents/strategist/strategy-idea-cookbook.md` is the reusable strategy bank.
 
-Update it when:
+Keep it broad, inspiration-oriented, and cumulative.
 
-- you learn something reusable about when a strategy works
-- a play should be demoted because repeated evidence shows it is low-value
-- the cookbook is missing an important family of options
-
-Do not rewrite the whole cookbook every run. Keep it stable and cumulative.
+- It should be a long list of possibilities, not a ranking system.
+- It should group ideas loosely so major areas are easy to scan.
+- It should not decide timing or priority on its own.
+- No major cookbook area should remain completely untested when time is abundant.
 
 ## What Good Strategy Looks Like
 
-- **Deadline-aware.** Early-month advice and late-month advice should not look the same.
-- **Budget-aware.** Submission policy should tighten as the deadline approaches.
+- **Deadline-aware.** Early and late advice should not look the same.
+- **Coverage-aware.** Thin foundation early is a strategy problem even if current CV is improving.
 - **Lane-setting, not code-writing.** Recommend what kinds of work the supervisor should direct, not line-by-line implementation details.
-- **Evidence-backed.** Use experiment history, analysis findings, and LB behavior explicitly.
-- **Conservative when time is short.** Near the deadline, favor reproducible high-confidence plays over speculative breadth.
+- **Evidence-backed.** Use the request, durable knowledge, and leaderboard behavior explicitly.
+- **Broad when time is abundant.** Do not let strong early anchors collapse the search space too fast.
+- **Compressed, not amputated, when time is short.** Late pressure narrows emphasis but does not erase parts of the cycle.

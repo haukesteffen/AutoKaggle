@@ -17,7 +17,7 @@ Make the right calls at the right time: consume the strategist's long-horizon pl
 
 - **Branch:** `run`
 - **Directory:** `<root>/AutoKaggle/` (the shared repo checkout)
-- **Tracked files you own:** `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, `agents/supervisor/leaderboard-history.md`, `agents/supervisor/submission.py`
+- **Tracked files you own:** `agents/strategist/strategy-request.md`, `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, `agents/supervisor/leaderboard-history.md`, `agents/supervisor/submission.py`
 
 ## Path Variables
 
@@ -34,6 +34,8 @@ Resolve these dynamically at runtime from your current checkout. Do not commit m
 ## Cross-Agent File Paths
 
 ```text
+$REPO/agents/strategist/strategy-request.md        # factual strategist input owned by supervisor
+$REPO/agents/strategist/strategy-lifecycle-guide.md # strategist's reusable macro guide
 $REPO/agents/strategist/strategy-whitepaper.md      # strategist's current deadline-aware plan
 $REPO/agents/strategist/strategy-idea-cookbook.md   # strategist's reusable planning menu
 $REPO/agents/scientist/scientist-task.md            # active scientist task
@@ -54,7 +56,7 @@ Your own communication files live in `$REPO/agents/` and are read by the other a
 
 **What you CAN do:**
 - Read `harness/dataset.py`, `agents/scientist/experiment.py`, and all agent-owned results files
-- Write `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, and `agents/supervisor/leaderboard-history.md`
+- Write `agents/strategist/strategy-request.md`, `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, and `agents/supervisor/leaderboard-history.md`
 - Edit `agents/supervisor/submission.py` if the submission-preparation helper needs adjustment
 - Read and operationalize `agents/strategist/strategy-whitepaper.md`, but do not treat it as self-executing
 - Create or update the long-lived `run` branch and shared runtime directories
@@ -76,7 +78,7 @@ Your own communication files live in `$REPO/agents/` and are read by the other a
 - Never commit while strategist, analyst, or scientist work is still in flight.
 - Prefer not to edit tracked files yourself while a subagent is running.
 - Before each commit, validate the tracked diff against role ownership. If a subagent touched files outside its allowed set, do not commit; send it back to fix the checkpoint first.
-- `agents/scientist/scientist-task.md` and `agents/analyst/analyst-hypothesis.md` are tracked live-control files. Do not commit them in an active state unless you are intentionally checkpointing a paused run. Normally clear them back to `status: none` before you commit.
+- `agents/strategist/strategy-request.md`, `agents/scientist/scientist-task.md`, and `agents/analyst/analyst-hypothesis.md` are tracked live-control files. Do not commit them in an active state unless you are intentionally checkpointing a paused run. Normally clear them back to `status: none` before you commit.
 
 ---
 
@@ -146,6 +148,21 @@ status: none
 EOF
 test -f agents/analyst/analyst-findings.md || echo "# Analyst Findings" > agents/analyst/analyst-findings.md
 test -f agents/analyst/analyst-knowledge.md || echo "# Analyst Knowledge" > agents/analyst/analyst-knowledge.md
+test -f agents/strategist/strategy-request.md || cat > agents/strategist/strategy-request.md <<'EOF'
+# Strategy Request
+status: none
+id:
+at:
+trigger:
+
+## Volume
+
+## Coverage
+
+## Current
+
+## Knowledge
+EOF
 test -f agents/supervisor/leaderboard-history.md || cat > agents/supervisor/leaderboard-history.md <<'EOF'
 # Leaderboard History
 
@@ -159,13 +176,13 @@ test -f agents/supervisor/leaderboard-history.md || cat > agents/supervisor/lead
 *No submissions yet.*
 EOF
 
-git add agents/scientist/scientist-task.md agents/scientist/scientist-results.md agents/scientist/scientist-knowledge.md agents/analyst/analyst-hypothesis.md agents/analyst/analyst-findings.md agents/analyst/analyst-knowledge.md agents/supervisor/leaderboard-history.md
+git add agents/strategist/strategy-request.md agents/scientist/scientist-task.md agents/scientist/scientist-results.md agents/scientist/scientist-knowledge.md agents/analyst/analyst-hypothesis.md agents/analyst/analyst-findings.md agents/analyst/analyst-knowledge.md agents/supervisor/leaderboard-history.md
 git diff --cached --quiet || git commit -m "init: run branch coordination files"
 ```
 
 ### 6. Obtain the initial strategy whitepaper
 
-Before the run goes live, ensure `agents/strategist/strategy-whitepaper.md` exists and is current.
+Before the run goes live, ensure `agents/strategist/strategy-request.md` is current and `agents/strategist/strategy-whitepaper.md` exists for today's date.
 
 Prefer invoking the strategist role on demand in the current repo. If episodic strategist invocation is unavailable, ask the human to open a temporary strategist session in the current repo and point it at `agents/strategist/role.md`.
 
@@ -183,12 +200,12 @@ If direct episodic invocation is unavailable, I may ask you to open a temporary 
 ```
 
 ```text
-1. Read agents/strategist/strategy-whitepaper.md, agents/scientist/scientist-knowledge.md, and agents/analyst/analyst-knowledge.md.
+1. Refresh agents/strategist/strategy-request.md from factual run state and durable knowledge, then obtain agents/strategist/strategy-whitepaper.md.
 2. Write an initial scientist task only if experiment work should begin immediately, then invoke the scientist.
 3. Post an initial analyst hypothesis only if you already need analyst evidence, then invoke the analyst.
 4. Review agents/supervisor/leaderboard-history.md before spending any submission budget.
 5. Create a recurring /loop 5m task for yourself, for example:
-   /loop 5m Review agents/strategist/strategy-whitepaper.md and agents/supervisor/leaderboard-history.md. If scientist work completed since your last review, also read agents/scientist/scientist-results.md and agents/scientist/scientist-knowledge.md. If analyst work completed since your last review, also read agents/analyst/analyst-findings.md and agents/analyst/analyst-knowledge.md. If there is new information since your last review, refresh strategy when needed, post or clear scientist and analyst requests, invoke episodic work when warranted, submit when warranted, commit only if no subagent is active, and leave the human a concise status note. Otherwise report that no changes were needed.
+   /loop 5m Review agents/strategist/strategy-whitepaper.md and agents/supervisor/leaderboard-history.md. If scientist work completed since your last review, also read agents/scientist/scientist-results.md and agents/scientist/scientist-knowledge.md. If analyst work completed since your last review, also read agents/analyst/analyst-findings.md and agents/analyst/analyst-knowledge.md. If there is new information since your last review, refresh agents/strategist/strategy-request.md when needed, invoke strategist refresh when needed, post or clear scientist and analyst requests, invoke episodic work when warranted, submit when warranted, commit only if no subagent is active, and leave the human a concise status note. Otherwise report that no changes were needed.
 ```
 
 Write the initial `agents/scientist/scientist-task.md` only when there is concrete experiment work to run. Use `harness/dataset.py` and `agents/scientist/experiment.py` to ground the task in the current evaluation contract and baseline implementation. Do not commit an active task file. The run has begun.
@@ -235,6 +252,45 @@ Request or invoke a strategist refresh when:
 - CV/LB behavior broke from expectations
 - the current scientist lane has plateaued or been exhausted
 - the remaining submission budget posture should change
+
+Before invoking the strategist, rewrite `agents/strategist/strategy-request.md` from factual run state and durable knowledge. Keep it factual. Do not pre-label the phase there.
+
+Use this shape:
+
+```markdown
+# Strategy Request
+status: active
+id: T-004
+at: 2026-03-04T09:20Z
+trigger: refresh
+
+## Volume
+- scientist_runs_total: <count>
+- scientist_runs_last_72h: <count>
+- analyst_sessions_total: <count>
+- analyst_sessions_last_72h: <count>
+- submissions_total: <count>
+- submissions_scored: <count>
+- submissions_pending: <count>
+
+## Coverage
+- analyst_topics: <comma-separated topics>
+- preprocess: <comma-separated ideas>
+- features: <comma-separated ideas>
+- models: <family(count), family(count)>
+- ensembles: <simple(count), weighted(count), stack(count)>
+- moonshots: <count or short note>
+
+## Current
+- best_cv: <score and hash>
+- best_lb: <score and hash or none>
+- active_scientist_lane: <short phrase>
+- active_analyst_topic: <short phrase or none>
+
+## Knowledge
+- AK-...: <fact>
+- SK-...: <fact>
+```
 
 The strategist recommends. You decide.
 
@@ -303,7 +359,7 @@ Before committing:
 
 1. Run `git diff --name-only` and verify the tracked changes match role ownership.
 2. If a subagent changed tracked files outside its allowed set, do not commit. Send it back to fix the checkpoint first.
-3. Clear `agents/scientist/scientist-task.md` and `agents/analyst/analyst-hypothesis.md` back to `status: none` unless you are intentionally recording a paused active state.
+3. Clear `agents/strategist/strategy-request.md`, `agents/scientist/scientist-task.md`, and `agents/analyst/analyst-hypothesis.md` back to `status: none` unless you are intentionally recording a paused active state.
 4. Commit the completed checkpoint with a message that describes the completed work, not the temporary control-file state.
 
 ### Update agents/supervisor/leaderboard-history.md
@@ -386,6 +442,7 @@ When escalating: state what is blocked, what you need, and what the team will do
 
 - **Strategy translation, not blind delegation.** Read the strategist's whitepaper, but convert it into operational guidance that fits the current run state.
 - **Evidence-based decisions.** Do not change direction without a reason. Cite results, findings, or LB signals explicitly. Treat unsupported empirical claims as hypotheses until they are verified.
+- **Do not abandon lanes too fast.** If time and budget are abundant, do not drop a strategy after one failed experiment. Prefer at least one nearby follow-up before parking it.
 - **Selective submission.** Not every kept experiment warrants a submission. Submit on meaningful jumps or genuinely different approaches. Late in the competition, use remaining submissions to extract signal.
 - **Targeted analysis.** "Does removing feature X reduce fold variance given fold 3 consistently underperforms?" is actionable. "Investigate feature X" is not.
 - **Respect role boundaries.** If you need dataset evidence, ask the analyst. Do not inspect the raw dataset yourself.
