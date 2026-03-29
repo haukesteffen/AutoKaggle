@@ -50,6 +50,13 @@ For each play, state:
 - Try it if: analysis shows categorical structure is central or native-cat trials have promise
 - Deprioritize if: repeated evidence shows native categorical handling is worse on this competition
 
+### CatBoost tuned for divergence (not just strength)
+
+- When to use it: when CatBoost default is already in the shortlist but ensemble gain is small because it is too correlated with LGBM
+- Why it might help: CatBoost at default settings often follows similar gradient contours to LGBM. Lower learning rate (0.03), more iterations (1500–2000), higher depth (8–10), and feature subsampling (rsm=0.7) can push CatBoost into different feature interactions, making it a more useful ensemble partner
+- Try it if: LGBM+CatBoost ensemble adds less than +0.001 LB over LGBM alone — this is a sign of correlation, not complementarity
+- Deprioritize if: tuned CatBoost still tracks LGBM closely in CV (difference < 0.0003 in ensemble gain)
+
 ### Reweighted or calibrated variants
 
 - When to use it: when imbalance, calibration drift, or threshold behavior may matter
@@ -65,6 +72,14 @@ For each play, state:
 - Why it might help: different model families can add ensemble value even when their standalone CV is slightly worse
 - Try it if: the strategy objective includes future ensembling or the current best family appears exhausted
 - Deprioritize if: time is short and there is no realistic path to using the diversity
+
+### ExtraTrees / Random Forest as bagging-family diversity component
+
+- When to use it: when LGBM and CatBoost are both in the shortlist but ensemble gain is small due to high correlation between two boosting-family models
+- Why it might help: bagging models (ExtraTrees, RandomForest) have structurally different error patterns from boosting models. They reduce variance through averaging independently-grown trees rather than through sequential correction of residuals. This makes them naturally more orthogonal to LGBM/CatBoost even when their standalone CV is somewhat lower
+- Try it if: LGBM+CatBoost correlation is high (ensemble gain < +0.001 LB) and there is still time for a diversity experiment
+- Deprioritize if: ensemble gain from adding the bagging component is still negligible after tuning, or if the standalone CV is more than 0.003 below the best boosting model (the diversity gain rarely overcomes that gap)
+- Suggested starting point: ExtraTreesClassifier n_estimators=500, max_features="sqrt", min_samples_leaf=5; or RandomForestClassifier with similar settings
 
 ### Feature-space diversification
 
@@ -178,3 +193,105 @@ For each play, state:
 - Why it might help: leaderboard slots become information resources that must be spent deliberately
 - Try it if: the team needs to distinguish between a small set of serious candidates
 - Deprioritize if: the run is still so early that broad anchoring is more valuable
+
+## Cold-Start / Late-Entry Plays
+
+### Front-load model-family comparison when time is short
+
+- When to use it: when the run starts with 3 or fewer days remaining and no experiments have been run
+- Why it might help: the most information-dense question in tabular Playground competitions is whether tree models are dominant over linear ones; answering it on day one determines the allocation for all remaining work
+- Try it if: the run is in bootstrap phase with no LB history
+- Deprioritize if: model-family comparison is already settled from prior experiment history
+
+### Linear anchor before tree exploration
+
+- When to use it: always, at the very start of a cold run
+- Why it might help: provides a reproducible reference point; reveals if the feature space is already well-conditioned; identifies whether leakage or fold issues exist before committing tree-model iterations
+- Try it if: `experiment.py` contains a usable baseline that has not yet been evaluated
+- Deprioritize if: a strong, validated anchor already exists from a prior run or prior day
+
+### Compress to two-model ensemble when deadline is within 3 days
+
+- When to use it: when fewer than 4 days remain and no shortlist exists
+- Why it might help: in constrained time, a simple average of the best linear model and the best tree model is often more reliable than chasing a third family or complex stacking; it avoids late-phase validation debt
+- Try it if: two distinct model families have been evaluated and both have validated CV scores
+- Deprioritize if: one model family is clearly dominant and there is no complementary diversity to gain
+
+## Tuning Failure Patterns
+
+### Hyperparameter tuning often stalls near the tree model ceiling
+
+- When to recognize it: when num_leaves, n_estimators, learning_rate, and min_child_samples all return to approximately the same CV score
+- Why it happens: on Playground Series datasets, the tree model ceiling on the given feature set is often hit quickly with conservative defaults. The signal that tuning has stalled is when 3+ tuning variants all land within ±0.0001 CV of the baseline
+- What to do instead: pivot to feature engineering or model-family diversity rather than continuing to tune the same model family
+- Evidence from mar28: LGBM num_leaves=63, deeper LGBM (1000 iterations lr=0.03), target encoding, and count features all failed to beat LGBM baseline CV 0.915855; all variants were within 0.0001 of baseline
+
+### Target encoding rarely helps tree models as a solo feature
+
+- When to recognize it: when TargetEncoder applied to high-variation categorical columns produces no CV gain on LGBM or CatBoost
+- Why it happens: gradient boosted trees already learn effective splits on categorical features (especially CatBoost with native categories). Target encoding pre-computes an average that the tree can already discover internally
+- What might still be useful: target-encoded features may add diversity when used in a different model family (e.g. as extra inputs to a logistic regression stack member), but this is speculative
+- Evidence from mar28: TargetEncoder on 13 high-variation columns: CV 0.915805 vs baseline 0.915855, discarded
+
+### Interaction features fail when tree models already learn them
+
+- When to recognize it: when a hand-crafted interaction feature (e.g. a binary flag or binned cross of two strong predictors) produces no CV gain on LGBM
+- Why it happens: gradient boosted trees with sufficient depth already split on the same combinations internally. Providing the interaction explicitly gives the model no new information it has not already captured
+- Diagnostic: if the analyst can confirm a clear threshold effect or subgroup concentration in the data (e.g. month-to-month × fiber optic), that does NOT mean a hand-crafted feature will help — it means the tree already made that split. Analyst structural findings should direct model selection (e.g. a model that cannot find non-linear interactions), not feature engineering for LGBM
+- Evidence from mar28: mtm_fiber binary flag, three-bin mtm×fiber tenure interaction, and continuous tenure×mtm_fiber all failed on LGBM (within ±0.0001 CV of baseline)
+
+### CatBoost tuning for divergence from LGBM backfires
+
+- When to recognize it: when tuning CatBoost toward higher accuracy (lower learning rate, more iterations, deeper trees) actually increases its OOF correlation with LGBM, not decreases it
+- Why it happens: both LGBM and CatBoost converge on the same decision boundaries when optimising for the same objective on the same features. Tuning makes them both more accurate — and more similar — not more orthogonal. True diversity requires structural differences (different model class, different feature space), not hyperparameter variation within the boosting family
+- Quantified: default CatBoost vs LGBM r=0.9953; tuned CatBoost (depth=7, iter=1000) vs LGBM r=0.9972 — tuning made it MORE correlated
+- Implication: do not expect hyperparameter tuning of a GBDT model to produce ensemble diversity; if two boosting models are highly correlated, tuning one of them will not fix it
+
+### All GBDT models hit a diversity wall on the same features
+
+- When to recognize it: when CatBoost, XGBoost, and LGBM all have OOF Pearson correlations above 0.990 with each other
+- Why it happens: all GBDT algorithms are optimising the same objective on the same ordinal-encoded feature matrix. They converge on the same prediction surface regardless of implementation differences
+- The r>0.990 wall means: ensemble gain from combining any two GBDT models on the same features is bounded at approximately +0.0001–0.0003 CV; rarely worth a submission slot unless it happens to yield the current best
+- What breaks the wall: (a) different model class (bagging, linear, neural), or (b) materially different feature representation that changes the input space for one model only
+- Evidence from mar28: CatBoost default r=0.9953, CatBoost tuned r=0.9972, XGBoost r=0.9972 — all GBDT above 0.990
+
+## Ensemble Construction — Advanced
+
+### 3-way GBDT ensemble as the practical ceiling for correlated models
+
+- When to use it: once two GBDT models are both in the shortlist and their 2-way ensemble gain is small (+0.001 or less)
+- Why it might help: a third GBDT model (e.g. XGBoost added to LGBM+CatBoost) can add a marginal +0.00006–0.00008 CV even when all three are above r=0.990 correlation with each other, because the averaging reduces variance across a slightly wider set of residuals
+- Ceiling: expect no more than +0.0001–0.0002 CV above the 2-way average; this is the practical limit for correlated GBDT ensembles
+- Evidence from mar28: LGBM+CatBoost simple average CV 0.916476, LGBM+CatBoost+XGBoost simple average CV 0.916592 (+0.000116)
+- Next step after hitting this ceiling: weight optimisation via OOF grid search (near-zero cost) before adding new model families
+
+### OOF weight grid search is the cheapest ensemble improvement
+
+- When to use it: once the component shortlist is locked (2–3 models with saved OOF predictions)
+- Why it might help: simple averaging assumes equal model quality; a grid search over weights in 0.1 steps can find a blend that weights the stronger model(s) appropriately
+- Cost: near-zero — no retraining, pure OOF computation
+- Ceiling: typically +0.0001–0.0003 CV above simple average on highly correlated models; larger gains possible if components have unequal quality
+- When to do it: before adding any new model family; exhausting weight search is always cheaper than running a new experiment
+
+### Bagging models (ExtraTrees/RF) as ensemble components have a solo CV floor
+
+- When to use it: considering ExtraTrees or RandomForest to add diversity to a GBDT ensemble
+- Hard constraint: if the bagging model's solo CV is more than 0.004 below the GBDT best, it will drag the ensemble down in all tested weighting schemes; do not include it regardless of structural orthogonality
+- Evidence from mar28: ExtraTrees solo CV 0.911426, GBDT best CV 0.916530 — gap 0.005; all ensemble combinations dragged below baseline. RF solo CV 0.910269, gap 0.006 — worse still
+- Suggested threshold: only include a bagging model in the ensemble if its solo CV is within 0.003 of the GBDT best; if the gap exceeds 0.004, discard immediately
+
+## ROC-AUC / Binary Classification Notes
+
+### Calibration may matter less than ranking
+
+- When to use it: as a reminder when tuning probability outputs
+- Why it might help: ROC-AUC is rank-based; well-calibrated probabilities are not required for the metric, so calibration fixes are low-priority unless ensemble weighting relies on them
+- Try it if: an analyst finding suggests calibration drift is affecting ensemble blending
+- Deprioritize if: the team is still in the anchoring phase
+
+### Class imbalance treatment requires analyst confirmation
+
+- When to use it: before applying class weights, oversampling, or threshold adjustments
+- Why it might help: treating a balanced dataset as imbalanced can hurt ROC-AUC; analyst should confirm the actual class distribution before the scientist applies imbalance corrections
+- Try it if: the churn rate appears low or the scientist proposes imbalance-specific changes
+- Deprioritize if: the analyst has already confirmed balanced class distribution

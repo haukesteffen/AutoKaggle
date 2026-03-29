@@ -1,4 +1,5 @@
 import io
+import os
 import subprocess
 import sys
 import tempfile
@@ -96,6 +97,87 @@ class AnalysisRunnerTests(unittest.TestCase):
             "Does feature hashing help?",
         )
         self.assertEqual(analysis_runner._extract_title("**Question:** Legacy title"), "Legacy title")
+
+    def test_success_normalizes_relative_repo_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as otherdir:
+            root = Path(tmpdir)
+            hypothesis_file = root / "agents/analyst/hypothesis.md"
+            findings_file = root / "agents/analyst/findings.md"
+            hypothesis_file.parent.mkdir(parents=True)
+            hypothesis_file.write_text("# Active Hypothesis\n\n**Hypothesis:** Does feature hashing help?\n")
+
+            completed = subprocess.CompletedProcess(
+                args=["python", "analysis.py"],
+                returncode=0,
+                stdout="Finding: yes\n",
+                stderr="",
+            )
+
+            original_cwd = os.getcwd()
+            os.chdir(otherdir)
+            try:
+                with mock.patch.object(
+                    analysis_runner,
+                    "REPO_ROOT",
+                    root,
+                ), mock.patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "analysis_runner",
+                        "--hypothesis-file",
+                        "agents/analyst/hypothesis.md",
+                        "--findings-file",
+                        "agents/analyst/findings.md",
+                    ],
+                ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed):
+                    analysis_runner.main()
+            finally:
+                os.chdir(original_cwd)
+
+            findings = findings_file.read_text()
+            self.assertIn("## Does feature hashing help?", findings)
+
+    def test_failure_normalizes_default_error_log_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as otherdir:
+            root = Path(tmpdir)
+            hypothesis_file = root / "agents/analyst/hypothesis.md"
+            findings_file = root / "agents/analyst/findings.md"
+            hypothesis_file.parent.mkdir(parents=True)
+            hypothesis_file.write_text("# Active Hypothesis\n\n**Hypothesis:** Does feature hashing help?\n")
+
+            completed = subprocess.CompletedProcess(
+                args=["python", "analysis.py"],
+                returncode=2,
+                stdout="partial output\n",
+                stderr="Traceback: boom\n",
+            )
+
+            original_cwd = os.getcwd()
+            os.chdir(otherdir)
+            try:
+                with mock.patch.object(
+                    analysis_runner,
+                    "REPO_ROOT",
+                    root,
+                ), mock.patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "analysis_runner",
+                        "--hypothesis-file",
+                        "agents/analyst/hypothesis.md",
+                        "--findings-file",
+                        "agents/analyst/findings.md",
+                    ],
+                ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed):
+                    with self.assertRaises(SystemExit):
+                        analysis_runner.main()
+            finally:
+                os.chdir(original_cwd)
+
+            errors = (root / "agents/analyst/analysis-errors.md").read_text()
+            self.assertIn("## Does feature hashing help?", errors)
 
 
 if __name__ == "__main__":
