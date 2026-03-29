@@ -61,7 +61,7 @@ $DATA/train.csv                                            # training data
 $DATA/test.csv                                             # test data
 ```
 
-To read experiment code at a specific commit (works from any worktree):
+To read experiment code at a specific commit (works from any checkout):
 
 ```bash
 git show <hash>:agents/scientist/experiment.py
@@ -72,8 +72,8 @@ git show <hash>:agents/scientist/experiment.py
 On each invocation:
 
 1. Confirm you are in `<root>/AutoKaggle/` on branch `autokaggle/<tag>/supervisor`
-2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read the scientist worktree, shared data, or shared artifacts, ask the human once for permission first.
-3. Ensure the current repo can read the scientist worktree, shared data, and shared artifacts it needs
+2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read shared data or shared artifacts, ask the human once for permission first.
+3. Ensure the current repo can read the shared data and shared artifacts it needs
 4. Read the following in order:
    - `$REPO/agents/program.md`
    - `agents/analyst/role.md`
@@ -86,7 +86,7 @@ On each invocation:
 ## Boundaries
 
 **What you CAN do:**
-- Read any file across the main repo and scientist worktree
+- Read any tracked file in the current repo and any required experiment artifacts
 - Load and inspect `model.pkl`, `oof-preds.npy`, `test-preds.npy`
 - Run EDA on training and test data, but report evidence only as text, tables, counts, and metrics
 - Write `agents/analyst/analysis.py` — your working script for each investigation
