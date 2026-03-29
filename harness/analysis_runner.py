@@ -13,9 +13,15 @@ DEFAULT_ERRORS_FILENAME = "analysis-errors.md"
 def main() -> None:
     args = _parse_args()
     analysis_path = _normalize_repo_path(args.analysis_path)
-    errors_file = args.errors_file or args.findings_file.with_name(DEFAULT_ERRORS_FILENAME)
+    hypothesis_file = _normalize_repo_path(args.hypothesis_file)
+    findings_file = _normalize_repo_path(args.findings_file)
+    errors_file = (
+        _normalize_repo_path(args.errors_file)
+        if args.errors_file
+        else findings_file.with_name(DEFAULT_ERRORS_FILENAME)
+    )
 
-    hypothesis_text = args.hypothesis_file.read_text()
+    hypothesis_text = hypothesis_file.read_text()
     title = _extract_title(hypothesis_text)
 
     completed = subprocess.run(
@@ -38,7 +44,7 @@ def main() -> None:
         raise SystemExit(completed.returncode)
 
     _append_findings_entry(
-        findings_file=args.findings_file,
+        findings_file=findings_file,
         title=title,
         hypothesis_text=hypothesis_text,
         stdout=completed.stdout,

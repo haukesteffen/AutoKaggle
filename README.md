@@ -17,12 +17,12 @@ The repository has two layers:
 - fixed harness code under [harness/](harness)
 - agent-facing prompts, inboxes, and working files under [agents/](agents)
 
-The current documented operating model on `main` uses three long-lived roles plus one on-demand planning role:
+The current documented operating model on `main` uses two long-lived roles plus two on-demand roles:
 
 - supervisor
 - scientist
-- analyst
 - strategist (episodic / temporary, not a permanently running session)
+- analyst (episodic / temporary, invoked only for concrete yes/no investigations)
 
 ## Document Map
 
@@ -62,9 +62,9 @@ You are the supervisor, start a new run.
    - create branches and worktrees
    - ensure competition data exists
    - initialize the tracked communication files under `agents/`
-   - tell you which `claude` commands to run for the other persistent roles
+   - tell you which `claude` commands to run for the remaining persistent role
 
-4. Open the additional terminals exactly as instructed by the supervisor.
+4. Open the additional terminal exactly as instructed by the supervisor.
 
 5. The supervisor may also ask you to open a temporary strategist session in the main repo:
 
@@ -73,9 +73,11 @@ cd <root>/AutoKaggle
 claude
 ```
 
-That strategist session is on-demand. It is not a permanent terminal like the supervisor, scientist, and analyst sessions.
+That strategist session is on-demand. It is not a permanent terminal.
 
-6. Once the other role sessions are open, tell the supervisor they are running so it can start the run logic.
+The analyst is also on-demand. The supervisor invokes analyst work only when there is a concrete yes/no hypothesis to test. This does not require a permanently running analyst terminal.
+
+6. Once the scientist session is open, tell the supervisor it is running so it can start the run logic.
 
 ## During A Run
 
@@ -91,7 +93,7 @@ Useful places to inspect:
 - [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md) when present
 - [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md)
 - [agents/scientist/scientist-guidance.md](agents/scientist/scientist-guidance.md) when present
-- [agents/analyst/analyst-hypotheses.md](agents/analyst/analyst-hypotheses.md) when present
+- [agents/analyst/analyst-findings.md](agents/analyst/analyst-findings.md) when present
 - [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md) when present
 - `artifacts/<tag>/` for untracked run outputs
 
@@ -102,6 +104,8 @@ Key tracked files:
 - [agents/program.md](agents/program.md): shared agent contract
 - [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md): strategist-owned current plan
 - [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md): strategist-owned reusable playbook
+- [agents/analyst/analyst-hypotheses.md](agents/analyst/analyst-hypotheses.md): supervisor-owned active analyst question
+- [agents/analyst/analyst-findings.md](agents/analyst/analyst-findings.md): append-only analyst findings history
 - [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md): supervisor-owned submission ledger and CV/LB notes
 - [agents/supervisor/submission.py](agents/supervisor/submission.py): supervisor submission-preparation script
 - [agents/scientist/experiment.py](agents/scientist/experiment.py): scientist-owned experiment file

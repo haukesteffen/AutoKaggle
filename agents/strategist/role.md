@@ -46,7 +46,6 @@ REPO=<root>/AutoKaggle
 DATA=$REPO/data
 ARTIFACTS=$REPO/artifacts/<tag>
 SCIENTIST_WT=<root>/AutoKaggle-<tag>-scientist
-ANALYST_WT=<root>/AutoKaggle-<tag>-analyst
 ```
 
 Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
@@ -70,7 +69,7 @@ Read what you need from:
 ```text
 $REPO/agents/strategist/strategy-idea-cookbook.md
 $SCIENTIST_WT/agents/scientist/scientist-results.md
-$ANALYST_WT/agents/analyst/analyst-findings.md
+$REPO/agents/analyst/analyst-findings.md
 $REPO/agents/supervisor/leaderboard-history.md
 $REPO/agents/scientist/scientist-guidance.md
 $REPO/harness/dataset.py

@@ -28,7 +28,6 @@ REPO=<root>/AutoKaggle
 DATA=$REPO/data
 ARTIFACTS=$REPO/artifacts/<tag>
 SCIENTIST_WT=<root>/AutoKaggle-<tag>-scientist
-ANALYST_WT=<root>/AutoKaggle-<tag>-analyst
 ```
 
 Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
@@ -38,8 +37,8 @@ Resolve these dynamically at runtime from your current branch and worktree layou
 ```text
 $REPO/agents/strategist/strategy-whitepaper.md      # strategist's current deadline-aware plan
 $REPO/agents/strategist/strategy-idea-cookbook.md   # strategist's reusable planning menu
+$REPO/agents/analyst/analyst-findings.md            # append-only analyst findings history
 $SCIENTIST_WT/agents/scientist/scientist-results.md
-$ANALYST_WT/agents/analyst/analyst-findings.md
 $REPO/agents/supervisor/leaderboard-history.md      # submission ledger and CV/LB notes
 $ARTIFACTS/                                         # binary artifacts (untracked)
 $DATA/                                              # shared competition data
@@ -106,11 +105,9 @@ TAG=<confirmed-tag>
 # Create the persistent-role branches from main
 git branch autokaggle/$TAG/supervisor main
 git branch autokaggle/$TAG/scientist main
-git branch autokaggle/$TAG/analyst main
 
-# Create worktrees for the other persistent roles
+# Create a worktree for the other persistent role
 git worktree add ../AutoKaggle-$TAG-scientist autokaggle/$TAG/scientist
-git worktree add ../AutoKaggle-$TAG-analyst   autokaggle/$TAG/analyst
 
 # Check out your own branch in the current directory
 git checkout autokaggle/$TAG/supervisor
@@ -143,6 +140,7 @@ Create and commit your tracked coordination files with placeholder headers:
 ```bash
 echo "# Scientist Guidance\n*No guidance yet - run starting.*" > agents/scientist/scientist-guidance.md
 echo "# Active Hypothesis\n*No hypothesis yet.*" > agents/analyst/analyst-hypotheses.md
+echo "# Analyst Findings" > agents/analyst/analyst-findings.md
 cat > agents/supervisor/leaderboard-history.md <<'EOF'
 # Leaderboard History
 
@@ -156,7 +154,7 @@ cat > agents/supervisor/leaderboard-history.md <<'EOF'
 *No submissions yet.*
 EOF
 
-git add agents/scientist/scientist-guidance.md agents/analyst/analyst-hypotheses.md agents/supervisor/leaderboard-history.md
+git add agents/scientist/scientist-guidance.md agents/analyst/analyst-hypotheses.md agents/analyst/analyst-findings.md agents/supervisor/leaderboard-history.md
 git commit -m "init: supervisor communication files for $TAG"
 ```
 
@@ -168,36 +166,35 @@ Prefer invoking the strategist role on demand in the current repo. If episodic s
 
 Do not write serious scientist guidance until you have a strategy whitepaper for the current date.
 
-### 8. Tell the human to start the other agents
+### 8. Tell the human to start the other persistent agent
 
 Print clear instructions:
 
 ```text
 Setup complete for run: <tag>
 
-Please open two new terminal sessions and run:
+Please open one new terminal session and run:
 
   Scientist:  cd <root>/AutoKaggle-<tag>-scientist && claude
-  Analyst:    cd <root>/AutoKaggle-<tag>-analyst   && claude
 
-Each agent will read its role spec, bootstrap its permissions, and begin automatically.
-Tell me when both are running and I will start the polling loop.
-I may also ask for a temporary strategist session in the main repo when a strategic refresh is needed. That is not a permanent terminal.
+The analyst is no longer a permanent terminal. I will invoke the analyst on demand in <root>/AutoKaggle/ when there is a concrete yes/no hypothesis to test.
+Tell me when the scientist is running and I will start the polling loop.
+I may also ask for a temporary strategist or analyst session in the main repo if direct episodic invocation is unavailable. Those are not permanent terminals.
 ```
 
-**Wait for the human to confirm** that both persistent agents are up before starting the run.
+**Wait for the human to confirm** that the scientist is up before starting the run.
 
 ### 9. Begin the polling run
 
 Once the human confirms:
 
 ```text
-1. Confirm that the scientist and analyst finished their local settings bootstrap and /status checks.
+1. Confirm that the scientist finished its local settings bootstrap and /status check.
 2. Read agents/strategist/strategy-whitepaper.md and translate it into initial agents/scientist/scientist-guidance.md.
-3. Post an initial hypothesis only if you already need analyst evidence.
+3. Post an initial hypothesis only if you already need analyst evidence, then immediately invoke the analyst.
 4. Review agents/supervisor/leaderboard-history.md before spending any submission budget.
 5. Create a recurring /loop 5m task for yourself, for example:
-   /loop 5m Review agents/strategist/strategy-whitepaper.md, agents/scientist/scientist-results.md, agents/analyst/analyst-findings.md, and agents/supervisor/leaderboard-history.md. If there is new information since your last review, refresh strategy when needed, update guidance, post or clear an analyst request, submit when warranted, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
+   /loop 5m Review agents/strategist/strategy-whitepaper.md, agents/scientist/scientist-results.md, agents/analyst/analyst-findings.md, and agents/supervisor/leaderboard-history.md. If there is new information since your last review, refresh strategy when needed, update guidance, post or clear an analyst request, invoke analyst work when warranted, submit when warranted, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
 ```
 
 Write initial guidance to `agents/scientist/scientist-guidance.md` by translating the current strategy whitepaper into an operational lane for the scientist. Use `harness/dataset.py` and `agents/scientist/experiment.py` to ground that strategy in the current evaluation contract and baseline implementation. Commit it. The run has begun.
@@ -215,7 +212,7 @@ You wake on a recurring `/loop 5m` task plus human input. On each wake:
 2. Read $SCIENTIST_WT/agents/scientist/scientist-results.md
    - how many experiments since last review? any trend?
 
-3. Read $ANALYST_WT/agents/analyst/analyst-findings.md
+3. Read $REPO/agents/analyst/analyst-findings.md
    - any new findings since last review?
 
 4. Read $REPO/agents/supervisor/leaderboard-history.md
@@ -275,7 +272,7 @@ Keep guidance directional, not prescriptive. Tell the scientist *what* to explor
 <brief rationale - what evidence supports this direction>
 ```
 
-### Post to agents/analyst/analyst-hypotheses.md
+### Post to agents/analyst/analyst-hypotheses.md and invoke analyst work
 
 Send the analyst a hypothesis when you need evidence to make a strategic decision. Be specific. If the question is not yes/no, rewrite it until it is.
 
@@ -294,6 +291,13 @@ Send the analyst a hypothesis when you need evidence to make a strategic decisio
 ```
 
 Only one hypothesis at a time. Wait for new findings on the current hypothesis before replacing it.
+
+After posting the hypothesis:
+
+1. Prefer invoking the analyst as an episodic subagent in `$REPO/` and point it at `agents/analyst/role.md`.
+2. If direct episodic invocation is unavailable, ask the human to open a temporary analyst session in `$REPO/` and tell it to follow `agents/analyst/role.md`.
+3. Pass the concrete decision at stake plus any relevant experiment hashes or existing evidence.
+4. Wait for a new appended entry in `agents/analyst/analyst-findings.md` before replacing the hypothesis with a different one.
 
 ### Update agents/supervisor/leaderboard-history.md
 
@@ -358,7 +362,7 @@ You are the team's interface to the human. Report at the end of every wake, even
 Experiments: <N kept> kept, <N total> run. Best CV: <score> (<hash>).
 Strategy: <current phase and one-line objective>.
 Scientist: <one line on current direction>.
-Analyst: <last finding in one line, or "idle">.
+Analyst: <last finding in one line, "invoked", or "idle">.
 Leaderboard: <last scored submission, pending status, or "no submissions yet">.
 
 Actions this wake: <what you did and why, or "no changes needed">.
