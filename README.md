@@ -40,7 +40,7 @@ The current documented operating model on `main` uses one long-lived role plus t
 - Run `uv sync`.
 - Configure Kaggle authentication on your machine before starting a run.
 - Make sure your Kaggle account has access to the target competition and has accepted any required rules.
-- Start Claude Code from within the repository or worktree directories created for the run.
+- Start Claude Code from within the repository root.
 
 ## Starting A Run
 
@@ -58,7 +58,7 @@ You are the supervisor, start a new run.
 ```
 
 3. The supervisor will:
-   - propose a run tag
+   - create or update the long-lived `run` branch
    - prepare the run state
    - ensure competition data exists
    - initialize the tracked communication files under `agents/`
@@ -93,7 +93,7 @@ Useful places to inspect:
 - [agents/analyst/analyst-findings.md](agents/analyst/analyst-findings.md) when present
 - [agents/analyst/analyst-knowledge.md](agents/analyst/analyst-knowledge.md) when present
 - [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md) when present
-- `artifacts/<tag>/` for untracked run outputs
+- `artifacts/` for untracked run outputs
 
 ## Repository Layout
 
@@ -141,8 +141,7 @@ Example invocation:
 ```bash
 uv run python -m harness.promotion_runner \
   --hash <hash> \
-  --tag <tag> \
-  --artifact-dir artifacts/<tag>/experiments/<hash> \
+  --artifact-dir artifacts/experiments/<hash> \
   --cv-score <cv_score>
 ```
 
@@ -150,4 +149,5 @@ uv run python -m harness.promotion_runner \
 
 - The committed [`.claude/settings.json`](.claude/settings.json) is project-wide and path-free.
 - Machine-specific permissions and directories belong only in untracked local Claude settings.
+- The supervisor is the only agent that commits tracked changes.
 - Do not push local run state, local Claude state, downloaded Kaggle data, or generated artifacts.

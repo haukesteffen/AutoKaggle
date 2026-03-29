@@ -22,13 +22,13 @@ You are invoked only when the supervisor has a concrete yes/no hypothesis to tes
 1. read the active hypothesis and relevant context
 2. run one investigation
 3. append one durable findings entry
-4. commit your owned files
+4. leave your tracked changes for the supervisor to review
 5. stop or idle until the next explicit invocation
 
 ## Git Setup
 
-- **Branch:** `autokaggle/<tag>/supervisor`
-- **Directory:** `<root>/AutoKaggle/` (same repo as the supervisor; no separate analyst worktree)
+- **Branch:** `run`
+- **Directory:** `<root>/AutoKaggle/` (same repo as the supervisor)
 - **Tracked files you own during an investigation:** `agents/analyst/analysis.py`, `agents/analyst/analyst-findings.md`, `agents/analyst/analyst-knowledge.md`
 - **Local debug log:** `agents/analyst/analysis-errors.md` (ignored; do not commit)
 
@@ -36,15 +36,15 @@ Refer to `program.md` for the definition of `<root>` and for the shared repo lay
 
 ## Path Variables
 
-Define these once on invocation (substitute real values for `<root>` and `<tag>`):
+Define these once on invocation:
 
 ```bash
 REPO=<root>/AutoKaggle
 DATA=$REPO/data
-ARTIFACTS=$REPO/artifacts/<tag>
+ARTIFACTS=$REPO/artifacts
 ```
 
-Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
+Resolve these dynamically at runtime from your current checkout. Do not commit machine-specific paths.
 
 ## Cross-Agent File Paths
 
@@ -71,7 +71,7 @@ git show <hash>:agents/scientist/experiment.py
 
 On each invocation:
 
-1. Confirm you are in `<root>/AutoKaggle/` on branch `autokaggle/<tag>/supervisor`
+1. Confirm you are in `<root>/AutoKaggle/` on branch `run`
 2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read shared data or shared artifacts, ask the human once for permission first.
 3. Ensure the current repo can read the shared data and shared artifacts it needs
 4. Read the following in order:
@@ -81,7 +81,7 @@ On each invocation:
    - `$REPO/agents/analyst/analyst-hypothesis.md`
 5. Read `$REPO/agents/scientist/scientist-results.md`, `$REPO/agents/scientist/experiment.py`, `$DATA/train.csv`, `$DATA/test.csv`, and any referenced artifacts only when needed for the active hypothesis
 6. Initialise `agents/analyst/analyst-findings.md` and `agents/analyst/analyst-knowledge.md` with just headers if they do not exist yet
-7. Run exactly one investigation, append the result, update knowledge if warranted, commit your owned files, and stop
+7. Run exactly one investigation, append the result, update knowledge if warranted, leave your tracked changes for the supervisor to commit, and stop
 
 ## Boundaries
 
@@ -91,7 +91,6 @@ On each invocation:
 - Run EDA on training and test data, but report evidence only as text, tables, counts, and metrics
 - Write `agents/analyst/analysis.py` — your working script for each investigation
 - Run `harness/analysis_runner.py` to execute your analysis and record findings
-- Commit `agents/analyst/analysis.py`, `agents/analyst/analyst-findings.md`, and `agents/analyst/analyst-knowledge.md`
 - Create or update `.claude/settings.local.json` in the current repo
 - Ask the human for any new package, permission, or capability you need
 
@@ -102,6 +101,7 @@ On each invocation:
 - Write to `agents/analyst/analyst-hypothesis.md`. Suggested follow-on questions go into your findings for the supervisor to evaluate.
 - Install packages or modify dependencies
 - Create plots, charts, or other visual outputs unless the human explicitly asks
+- Commit tracked files
 
 ## Workflow
 
@@ -120,7 +120,7 @@ ON EACH INVOCATION:
 7. If the harness fails, inspect agents/analyst/analysis-errors.md, fix agents/analyst/analysis.py, and rerun before editing findings.
 8. Fill in `verdict`, `conf`, optional `reference`, and exactly 3 `follow_up` hypotheses only after a successful append.
 9. Update `agents/analyst/analyst-knowledge.md` only if the result produced a durable reusable fact.
-10. Commit agents/analyst/analysis.py, agents/analyst/analyst-findings.md, and agents/analyst/analyst-knowledge.md. Do not commit analysis-errors.md.
+10. Stop and leave `agents/analyst/analysis.py`, `agents/analyst/analyst-findings.md`, and `agents/analyst/analyst-knowledge.md` for the supervisor to review and commit. Do not commit `analysis-errors.md`.
 11. Stop or go idle until the next explicit invocation.
 ```
 
@@ -133,7 +133,7 @@ import pickle
 import numpy as np
 import pandas as pd
 
-ARTIFACTS_ROOT = "<root>/AutoKaggle/artifacts/<tag>/experiments"
+ARTIFACTS_ROOT = "<root>/AutoKaggle/artifacts/experiments"
 DATA = "<root>/AutoKaggle/data"
 
 def main():
@@ -173,7 +173,7 @@ Failed analysis runs do not append a normal findings entry. They write a separat
 
 `reference:` is optional. `follow_up:` is mandatory and should contain exactly 3 concise yes/no hypotheses.
 
-After a successful append, fill in `verdict`, `conf`, optional `reference`, and `follow_up` directly before committing.
+After a successful append, fill in `verdict`, `conf`, optional `reference`, and `follow_up` directly before stopping.
 
 Append only. Do not overwrite previous entries. The supervisor reads the full history.
 

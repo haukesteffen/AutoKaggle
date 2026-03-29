@@ -23,11 +23,12 @@ One invocation should do exactly one full scientist cycle:
 2. edit `agents/scientist/experiment.py`
 3. run the scientist harness
 4. if the run is invalid, fix the experiment and retry inside the same invocation
-5. if the run reaches a terminal outcome, record it, update scientist knowledge if warranted, commit your owned files, and stop
+5. if the run reaches a terminal outcome, record it, update scientist knowledge if warranted, leave your tracked changes for the supervisor to review, and stop
 
 ## Git Setup
 
-- **Directory:** current scientist checkout
+- **Branch:** `run`
+- **Directory:** `<root>/AutoKaggle/` (same repo as the supervisor)
 - **Tracked files you own during an investigation:** `agents/scientist/experiment.py`, `agents/scientist/scientist-results.md`, `agents/scientist/scientist-knowledge.md`
 - **Local debug log:** `agents/scientist/scientist-errors.md` (ignored; do not commit)
 
@@ -38,9 +39,9 @@ Refer to `program.md` for the shared repo layout.
 Define these once on invocation:
 
 ```bash
-REPO=<current repo root>
+REPO=<root>/AutoKaggle
 DATA=$REPO/data
-ARTIFACTS=$REPO/artifacts/<tag>
+ARTIFACTS=$REPO/artifacts
 ```
 
 Resolve these dynamically at runtime from your current checkout. Do not commit machine-specific paths.
@@ -64,7 +65,7 @@ $REPO/harness/scientist_runner.py
 
 On each invocation:
 
-1. Confirm you are in the intended scientist checkout.
+1. Confirm you are in `<root>/AutoKaggle/` on branch `run`.
 2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read shared data or artifacts, ask the human once for permission first.
 3. Read the following in order:
    - `$REPO/agents/program.md`
@@ -74,14 +75,13 @@ On each invocation:
 4. Read `$REPO/harness/dataset.py`, `$REPO/harness/experiment_runner.py`, and `$REPO/harness/scientist_runner.py` when needed for execution details.
 5. Read analyst findings, analyst knowledge, or leaderboard history only when the active task references them or when they are needed to implement the requested experiment.
 6. Initialise `agents/scientist/scientist-results.md` and `agents/scientist/scientist-knowledge.md` with just headers if they do not exist yet.
-7. Run exactly one scientist cycle, commit your owned files, and stop.
+7. Run exactly one scientist cycle, leave your tracked changes for the supervisor to commit, and stop.
 
 ## Boundaries
 
 **What you CAN do:**
 - Edit `agents/scientist/experiment.py` freely: feature engineering, preprocessing, model architecture, hyperparameters, ensembles, anything
 - Run the scientist harness
-- Commit `agents/scientist/experiment.py`, `agents/scientist/scientist-results.md`, and `agents/scientist/scientist-knowledge.md`
 - Write binary artifacts to `$ARTIFACTS/` when the runner is given an artifact root
 - Create or update `.claude/settings.local.json` in the current repo
 - Ask the human for any new package, permission, or capability you need
@@ -92,6 +92,7 @@ On each invocation:
 - Submit to Kaggle
 - Write to any other agent's files
 - Write to `agents/scientist/scientist-task.md`
+- Commit tracked files
 
 ## Active Task
 
@@ -128,7 +129,7 @@ ON EACH INVOCATION:
 5. If the runner returns `invalid`, inspect `agents/scientist/scientist-errors.md`, fix `agents/scientist/experiment.py`, and rerun inside the same invocation.
 6. If the runner returns a terminal outcome (`kept`, `discarded`, `timeout`, or `error`), review the appended row in `agents/scientist/scientist-results.md`.
 7. Update `agents/scientist/scientist-knowledge.md` only if the run produced a durable reusable fact.
-8. Commit your owned files and stop.
+8. Stop and leave `agents/scientist/experiment.py`, `agents/scientist/scientist-results.md`, and `agents/scientist/scientist-knowledge.md` for the supervisor to review and commit.
 ```
 
 Do not treat an invalid run as a completed experiment. Invalid runs do not belong in `scientist-results.md`.

@@ -15,21 +15,21 @@ Make the right calls at the right time: consume the strategist's long-horizon pl
 
 ## Git Setup
 
-- **Branch:** `autokaggle/<tag>/supervisor`
-- **Directory:** `<root>/AutoKaggle/` (the main repo; no separate worktree)
+- **Branch:** `run`
+- **Directory:** `<root>/AutoKaggle/` (the shared repo checkout)
 - **Tracked files you own:** `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, `agents/supervisor/leaderboard-history.md`, `agents/supervisor/submission.py`
 
 ## Path Variables
 
-Define these once after setup is complete (substitute real values for `<root>` and `<tag>`):
+Define these once after setup is complete:
 
 ```bash
 REPO=<root>/AutoKaggle
 DATA=$REPO/data
-ARTIFACTS=$REPO/artifacts/<tag>
+ARTIFACTS=$REPO/artifacts
 ```
 
-Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
+Resolve these dynamically at runtime from your current checkout. Do not commit machine-specific paths.
 
 ## Cross-Agent File Paths
 
@@ -57,10 +57,11 @@ Your own communication files live in `$REPO/agents/` and are read by the other a
 - Write `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, and `agents/supervisor/leaderboard-history.md`
 - Edit `agents/supervisor/submission.py` if the submission-preparation helper needs adjustment
 - Read and operationalize `agents/strategist/strategy-whitepaper.md`, but do not treat it as self-executing
-- Create branches, worktrees, and shared run directories
+- Create or update the long-lived `run` branch and shared runtime directories
 - Create or update `.claude/settings.local.json` in the current repo so you have the directories and permissions needed for this run
 - Run `harness/promotion_runner.py` to trigger submissions
 - Ask the human for any new package, permission, or capability you need
+- Commit tracked files after completed checkpoints
 
 **What you CANNOT do:**
 - Inspect raw dataset files directly or do EDA yourself
@@ -69,11 +70,19 @@ Your own communication files live in `$REPO/agents/` and are read by the other a
 - Treat strategist recommendations as direct instructions to other roles without translating them into operational guidance
 - Post open-ended analyst work. Every analyst request must be a yes/no question tied to a decision.
 
+## Commit Discipline
+
+- You are the only agent that commits tracked files.
+- Never commit while strategist, analyst, or scientist work is still in flight.
+- Prefer not to edit tracked files yourself while a subagent is running.
+- Before each commit, validate the tracked diff against role ownership. If a subagent touched files outside its allowed set, do not commit; send it back to fix the checkpoint first.
+- `agents/scientist/scientist-task.md` and `agents/analyst/analyst-hypothesis.md` are tracked live-control files. Do not commit them in an active state unless you are intentionally checkpointing a paused run. Normally clear them back to `status: none` before you commit.
+
 ---
 
 ## Phase 1: Setup
 
-This runs once, before the main loop. You start on the `main` branch in `<root>/AutoKaggle/`.
+This runs once, before the main loop. You start in `<root>/AutoKaggle/`, usually on `main`.
 
 ### 1. Bootstrap local Claude settings
 
@@ -81,37 +90,21 @@ Before any other setup work, ask the human once for permission to create or upda
 
 Use this local settings file to:
 
-- grant yourself the exact Bash permissions needed for git, worktree, data bootstrap, and submission work
-- add sibling worktrees, shared data, and shared artifacts under `permissions.additionalDirectories`
+- grant yourself the exact Bash permissions needed for git, data bootstrap, and submission work
+- add shared data and shared artifacts under `permissions.additionalDirectories`
 - keep machine-specific full filesystem paths out of committed files
 
 After editing local settings, run `/status` and confirm the local settings layer is active. If `/loop` is unavailable, scheduled tasks are disabled, or Claude Code is too old to support scheduled tasks, tell the human immediately before continuing.
 
-### 2. Propose a run tag
+### 2. Create or update the `run` branch
 
-Check existing branches to avoid collisions:
-
-```bash
-git branch | grep autokaggle/
-```
-
-Propose a tag based on today's date (for example `apr5`). Present it to the human and **wait for confirmation** before proceeding. The human may want a different tag.
-
-### 3. Create the supervisor branch
-
-Once the tag is confirmed:
+Switch to the long-lived run branch:
 
 ```bash
-TAG=<confirmed-tag>
-
-# Create the persistent-role branch from main
-git branch autokaggle/$TAG/supervisor main
-
-# Check out your own branch in the current directory
-git checkout autokaggle/$TAG/supervisor
+git checkout run || git checkout -b run
 ```
 
-### 4. Ensure data is available
+### 3. Ensure data is available
 
 ```bash
 ls data/train.csv data/test.csv 2>/dev/null
@@ -125,35 +118,35 @@ uv run python -m harness.dataset
 
 This downloads competition data and generates `data/folds.csv`. If it fails due to missing Kaggle credentials or competition access, escalate to the human immediately. The run cannot proceed without data.
 
-### 5. Create the artifacts directory
+### 4. Create the artifacts directory
 
 ```bash
-mkdir -p artifacts/$TAG
+mkdir -p artifacts/experiments
 ```
 
-### 6. Initialise communication files
+### 5. Initialise missing communication files
 
-Create and commit your tracked coordination files with placeholder headers:
+Ensure the tracked coordination files exist. Do not wipe existing histories on the `run` branch:
 
 ```bash
-cat > agents/scientist/scientist-task.md <<'EOF'
+test -f agents/scientist/scientist-task.md || cat > agents/scientist/scientist-task.md <<'EOF'
 # Active Scientist Task
 status: none
 EOF
-cat > agents/scientist/scientist-results.md <<'EOF'
+test -f agents/scientist/scientist-results.md || cat > agents/scientist/scientist-results.md <<'EOF'
 # Scientist Results
 
 | id | code | status | score | std | delta_best | desc |
 |----|------|--------|-------|-----|------------|------|
 EOF
-echo "# Scientist Knowledge" > agents/scientist/scientist-knowledge.md
-cat > agents/analyst/analyst-hypothesis.md <<'EOF'
+test -f agents/scientist/scientist-knowledge.md || echo "# Scientist Knowledge" > agents/scientist/scientist-knowledge.md
+test -f agents/analyst/analyst-hypothesis.md || cat > agents/analyst/analyst-hypothesis.md <<'EOF'
 # Active Analyst Hypothesis
 status: none
 EOF
-echo "# Analyst Findings" > agents/analyst/analyst-findings.md
-echo "# Analyst Knowledge" > agents/analyst/analyst-knowledge.md
-cat > agents/supervisor/leaderboard-history.md <<'EOF'
+test -f agents/analyst/analyst-findings.md || echo "# Analyst Findings" > agents/analyst/analyst-findings.md
+test -f agents/analyst/analyst-knowledge.md || echo "# Analyst Knowledge" > agents/analyst/analyst-knowledge.md
+test -f agents/supervisor/leaderboard-history.md || cat > agents/supervisor/leaderboard-history.md <<'EOF'
 # Leaderboard History
 
 ## Submission Ledger
@@ -167,23 +160,23 @@ cat > agents/supervisor/leaderboard-history.md <<'EOF'
 EOF
 
 git add agents/scientist/scientist-task.md agents/scientist/scientist-results.md agents/scientist/scientist-knowledge.md agents/analyst/analyst-hypothesis.md agents/analyst/analyst-findings.md agents/analyst/analyst-knowledge.md agents/supervisor/leaderboard-history.md
-git commit -m "init: supervisor communication files for $TAG"
+git diff --cached --quiet || git commit -m "init: run branch coordination files"
 ```
 
-### 7. Obtain the initial strategy whitepaper
+### 6. Obtain the initial strategy whitepaper
 
 Before the run goes live, ensure `agents/strategist/strategy-whitepaper.md` exists and is current.
 
 Prefer invoking the strategist role on demand in the current repo. If episodic strategist invocation is unavailable, ask the human to open a temporary strategist session in the current repo and point it at `agents/strategist/role.md`.
 
-Do not write serious scientist guidance until you have a strategy whitepaper for the current date.
+Do not post serious scientist tasks until you have a strategy whitepaper for the current date.
 
-### 8. Start the run
+### 7. Start the run
 
 No other persistent terminal is required.
 
 ```text
-Setup complete for run: <tag>
+Setup complete on branch: run
 
 I will invoke strategist, analyst, and scientist work on demand in <root>/AutoKaggle/ when needed.
 If direct episodic invocation is unavailable, I may ask you to open a temporary strategist, analyst, or scientist session in the main repo. Those are not permanent terminals.
@@ -195,10 +188,10 @@ If direct episodic invocation is unavailable, I may ask you to open a temporary 
 3. Post an initial analyst hypothesis only if you already need analyst evidence, then invoke the analyst.
 4. Review agents/supervisor/leaderboard-history.md before spending any submission budget.
 5. Create a recurring /loop 5m task for yourself, for example:
-   /loop 5m Review agents/strategist/strategy-whitepaper.md and agents/supervisor/leaderboard-history.md. If scientist work completed since your last review, also read agents/scientist/scientist-results.md and agents/scientist/scientist-knowledge.md. If analyst work completed since your last review, also read agents/analyst/analyst-findings.md and agents/analyst/analyst-knowledge.md. If there is new information since your last review, refresh strategy when needed, post or clear scientist and analyst requests, invoke episodic work when warranted, submit when warranted, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
+   /loop 5m Review agents/strategist/strategy-whitepaper.md and agents/supervisor/leaderboard-history.md. If scientist work completed since your last review, also read agents/scientist/scientist-results.md and agents/scientist/scientist-knowledge.md. If analyst work completed since your last review, also read agents/analyst/analyst-findings.md and agents/analyst/analyst-knowledge.md. If there is new information since your last review, refresh strategy when needed, post or clear scientist and analyst requests, invoke episodic work when warranted, submit when warranted, commit only if no subagent is active, and leave the human a concise status note. Otherwise report that no changes were needed.
 ```
 
-Write the initial `agents/scientist/scientist-task.md` only when there is concrete experiment work to run. Use `harness/dataset.py` and `agents/scientist/experiment.py` to ground the task in the current evaluation contract and baseline implementation. Commit it. The run has begun.
+Write the initial `agents/scientist/scientist-task.md` only when there is concrete experiment work to run. Use `harness/dataset.py` and `agents/scientist/experiment.py` to ground the task in the current evaluation contract and baseline implementation. Do not commit an active task file. The run has begun.
 
 ---
 
@@ -225,7 +218,7 @@ You wake on a recurring `/loop 5m` task plus human input. On each wake:
 
 5. Decide and act (see decisions below)
 
-6. Commit any files you updated.
+6. If no subagent is active, validate and commit any completed checkpoint files.
 
 7. Report to the human (see human communication below)
 ```
@@ -271,7 +264,8 @@ After posting the task:
 2. If direct episodic invocation is unavailable, ask the human to open a temporary scientist session in `$REPO/` and tell it to follow `agents/scientist/role.md`.
 3. Tell it to read `agents/program.md`, `agents/scientist/role.md`, `agents/scientist/scientist-knowledge.md`, and `agents/scientist/scientist-task.md`.
 4. Wait for a new appended entry in `agents/scientist/scientist-results.md` before replacing the task with a different one.
-5. After the experiment completes, read the new result and refreshed scientist knowledge, make the next decision, then reset `agents/scientist/scientist-task.md` to `status: none`.
+5. Do not commit while the scientist is running.
+6. After the experiment completes, read the new result and refreshed scientist knowledge, make the next decision, then reset `agents/scientist/scientist-task.md` to `status: none`.
 
 ### Post to agents/analyst/analyst-hypothesis.md and invoke analyst work
 
@@ -298,7 +292,19 @@ After posting the hypothesis:
 2. If direct episodic invocation is unavailable, ask the human to open a temporary analyst session in `$REPO/` and tell it to follow `agents/analyst/role.md`.
 3. Tell it to read `agents/program.md`, `agents/analyst/role.md`, `agents/analyst/analyst-knowledge.md`, and `agents/analyst/analyst-hypothesis.md`.
 4. Wait for a new appended entry in `agents/analyst/analyst-findings.md` before replacing the hypothesis with a different one.
-5. After the investigation completes, read the new finding and refreshed knowledge, make the blocked decision, then reset `agents/analyst/analyst-hypothesis.md` to `status: none`.
+5. Do not commit while the analyst is running.
+6. After the investigation completes, read the new finding and refreshed knowledge, make the blocked decision, then reset `agents/analyst/analyst-hypothesis.md` to `status: none`.
+
+### Commit a checkpoint
+
+Commit only when strategist, analyst, and scientist are all idle.
+
+Before committing:
+
+1. Run `git diff --name-only` and verify the tracked changes match role ownership.
+2. If a subagent changed tracked files outside its allowed set, do not commit. Send it back to fix the checkpoint first.
+3. Clear `agents/scientist/scientist-task.md` and `agents/analyst/analyst-hypothesis.md` back to `status: none` unless you are intentionally recording a paused active state.
+4. Commit the completed checkpoint with a message that describes the completed work, not the temporary control-file state.
 
 ### Update agents/supervisor/leaderboard-history.md
 
@@ -342,7 +348,6 @@ Workflow:
 3. Run harness/promotion_runner.py:
    uv run python -m harness.promotion_runner \
      --hash <hash> \
-     --tag <tag> \
      --artifact-dir $ARTIFACTS/experiments/<hash> \
      --cv-score <cv_score>
 4. Consume the JSON result from the harness. It validates the artifact, generates submission.csv if needed, submits to Kaggle, polls until scored or timeout/error, and returns fields such as submitted_at, submission_id, terminal_status, lb_score, lb_rank when available, and error_category on failure.
