@@ -23,12 +23,12 @@ Leaderboard scores are calculated with approximately 20% of the test data. The f
 Persistent roles:
 
 - **Supervisor** — strategic orchestrator and human interface. Synthesises signals from across the run, consumes strategist recommendations, sets direction, commissions analysis, decides what to submit, and maintains leaderboard history. Runs the setup phase before the main loop begins.
-- **Scientist** — experiment engine. Re-enters on `/loop` wakes, iterates on `agents/scientist/experiment.py`, and advances the supervisor's current lane of work within the fixed evaluation harness.
 
 Episodic roles:
 
 - **Strategist** — long-horizon planning role. Produces `agents/strategist/strategy-whitepaper.md` and maintains `agents/strategist/strategy-idea-cookbook.md`. The strategist recommends; the supervisor decides.
-- **Analyst** — signal quality expert. Invoked by the supervisor only when there is a concrete yes/no hypothesis to test. Inspects model artifacts and data, appends a durable findings entry, then exits or idles until the next request.
+- **Analyst** — signal quality expert. Invoked by the supervisor only when there is a concrete yes/no hypothesis to test. Inspects model artifacts and data, appends a durable findings entry, updates concise durable knowledge when warranted, then exits or idles until the next request.
+- **Scientist** — experiment engine. Invoked by the supervisor only when there is one concrete experiment task to execute. Implements one experiment, retries invalid launches locally, records one terminal result, updates concise durable knowledge when warranted, then exits.
 
 ---
 
@@ -36,10 +36,14 @@ Episodic roles:
 
 - The supervisor coordinates strategy and owns submission timing, submission notes, and leaderboard bookkeeping.
 - The supervisor does not inspect raw dataset files itself. If it needs dataset evidence, it asks the analyst.
+- The supervisor should treat unverified empirical claims as hypotheses. If a claim is decision-relevant and not already supported by experiment results, leaderboard history, or analyst output, route it to the analyst before acting on it.
 - The strategist recommends the high-level plan. The supervisor translates that plan into operational guidance for the scientist and the rest of the team.
 - The analyst is on-demand. It is invoked only for concrete decision-relevant hypotheses and does not require a standing terminal or polling loop.
 - The analyst answers one active, falsifiable hypothesis at a time. Hypotheses should be yes/no questions tied to a concrete decision.
-- The analyst presents evidence in code, tables, counts, and metrics. Do not use plots unless the human explicitly asks.
+- The analyst presents evidence in code, tables, counts, and metrics. Findings should stay neutral and factual. Do not use plots unless the human explicitly asks.
+- The scientist is on-demand. It is invoked only for one concrete experiment task and does not require a standing terminal or polling loop.
+- The scientist reads one active task at a time, executes one experiment cycle, and records only terminal evaluated runs in `agents/scientist/scientist-results.md`.
+- Invalid scientist launches are repaired inside the same invocation and do not count as completed experiment results.
 - The scientist follows the supervisor's current lane. CV is the default local scorekeeper, not the sole objective.
 - No agent installs packages, modifies dependencies, or changes the environment on its own.
 - If an agent needs a new package, new permission, or any capability it does not already have, it asks the human.
@@ -49,11 +53,10 @@ Episodic roles:
 ## Shared Runtime Assumptions
 
 - The human starts the supervisor first. The supervisor provisions the run tag, branches, worktrees, and initial tracked communication files before the rest of the team begins normal work.
-- The strategist and analyst are on-demand, not permanently polling. They are invoked in the main repo only when needed.
+- The strategist, analyst, and scientist are on-demand, not permanently polling. They are invoked in the current repo only when needed.
 - Per-agent Claude settings belong in untracked `.claude/settings.local.json` files inside the current repo or worktree.
 - The committed [`.claude/settings.json`](../.claude/settings.json) is shared and must stay path-free.
 - Coordination in this repository is polling-based. Do not rely on file hooks or sentinel writes as part of the documented control flow.
-- `/loop` scheduled tasks are session-scoped, fire only while Claude is open and idle, and expire after 3 days. If `/loop` is unavailable or scheduled tasks are disabled, the affected agent must tell the human immediately.
 
 ---
 
@@ -77,12 +80,15 @@ Episodic roles:
       analyst/
         role.md
         analysis.py
-        analyst-hypotheses.md        # supervisor-owned active request
+        analyst-hypothesis.md        # supervisor-owned active request
         analyst-findings.md          # append-only durable findings history
+        analyst-knowledge.md         # concise durable analyst memory
       scientist/
         role.md
         experiment.py
-        scientist-guidance.md        # shared inbox written by supervisor
+        scientist-task.md            # supervisor-owned active task
+        scientist-results.md         # append-only terminal run history
+        scientist-knowledge.md       # concise durable scientist memory
     harness/                         # shared harness code
     data/                            # competition data (untracked, shared)
     artifacts/<tag>/                 # run artifacts (untracked, shared)
@@ -92,11 +98,7 @@ Episodic roles:
         oof-preds.npy
         model.pkl
         test-preds.npy
-
-  AutoKaggle-<tag>-scientist/        # scientist worktree
 ```
-
-The supervisor has no separate worktree. It works from `AutoKaggle/` directly, on branch `autokaggle/<tag>/supervisor`.
 
 ---
 
@@ -108,11 +110,13 @@ All inter-agent coordination flows through tracked files committed in the approp
 |------|----------|---------|----------|
 | `agents/strategist/strategy-whitepaper.md` | Strategist | Supervisor | `AutoKaggle/` |
 | `agents/strategist/strategy-idea-cookbook.md` | Strategist | Strategist, Supervisor | `AutoKaggle/` |
-| `agents/scientist/scientist-guidance.md` | Supervisor | Scientist | `AutoKaggle/` |
-| `agents/analyst/analyst-hypotheses.md` | Supervisor | Analyst | `AutoKaggle/` |
+| `agents/scientist/scientist-task.md` | Supervisor | Scientist | `AutoKaggle/` |
+| `agents/analyst/analyst-hypothesis.md` | Supervisor | Analyst | `AutoKaggle/` |
 | `agents/analyst/analyst-findings.md` | Analyst | Supervisor, Strategist | `AutoKaggle/` |
+| `agents/analyst/analyst-knowledge.md` | Analyst | Analyst, Supervisor | `AutoKaggle/` |
 | `agents/supervisor/leaderboard-history.md` | Supervisor | Supervisor, Strategist | `AutoKaggle/` |
-| `agents/scientist/scientist-results.md` | Scientist | Supervisor, Analyst | `AutoKaggle-<tag>-scientist/` |
+| `agents/scientist/scientist-results.md` | Scientist | Supervisor, Analyst, Strategist | `AutoKaggle/` |
+| `agents/scientist/scientist-knowledge.md` | Scientist | Scientist, Supervisor | `AutoKaggle/` |
 
 Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never committed. They live in `AutoKaggle/artifacts/<tag>/experiments/<hash>/` and are accessed by all agents via absolute path. Per-run logs and exit-code files may live beside them as untracked local runtime state.
 
@@ -130,7 +134,7 @@ The strategist decides the current phase using the current date, the competition
 
 ### Experimentation
 
-The scientist runs a `/loop`-driven state machine: start one experiment, let it run, poll it on later wakes, then keep or discard exactly one completed run before starting the next. Direction comes from the supervisor's guidance. The analyst is invoked only when the supervisor has a concrete yes/no question to resolve. Findings go to the supervisor through `agents/analyst/analyst-findings.md`, which remains append-only and reviewable across invocations. Analyst work should resolve concrete hypotheses and report evidence in tables and metrics, not plots.
+The scientist is invoked only when the supervisor has one concrete experiment task to execute. Each scientist invocation should implement one experiment, retry invalid launches locally, and end only after the run reaches a terminal outcome that has been recorded in `agents/scientist/scientist-results.md`. Durable reusable scientist facts go in `agents/scientist/scientist-knowledge.md`. The analyst is invoked only when the supervisor has a concrete yes/no question to resolve. Findings go to the supervisor through `agents/analyst/analyst-findings.md`, which remains append-only and reviewable across invocations. Durable reusable analyst facts go in `agents/analyst/analyst-knowledge.md`. Analyst work should resolve concrete hypotheses and report neutral evidence in tables and metrics, not plots.
 
 ### Promotion
 

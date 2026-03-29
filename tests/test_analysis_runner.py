@@ -15,9 +15,16 @@ class AnalysisRunnerTests(unittest.TestCase):
     def test_success_appends_findings_without_stderr(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            hypothesis_file = root / "hypothesis.md"
-            findings_file = root / "findings.md"
-            hypothesis_file.write_text("# Active Hypothesis\n\n**Hypothesis:** Does feature hashing help?\n")
+            hypothesis_file = root / "analyst-hypothesis.md"
+            findings_file = root / "analyst-findings.md"
+            hypothesis_file.write_text(
+                "# Active Analyst Hypothesis\n"
+                "status: active\n"
+                "id: A-001\n"
+                "at: 2026-03-29T10:45Z\n"
+                "q: Does feature hashing help?\n"
+                "reference: experiment=abc123, knowledge=AK-001\n"
+            )
 
             completed = subprocess.CompletedProcess(
                 args=["python", "analysis.py"],
@@ -40,18 +47,29 @@ class AnalysisRunnerTests(unittest.TestCase):
                 analysis_runner.main()
 
             findings = findings_file.read_text()
-            self.assertIn("## Does feature hashing help?", findings)
-            self.assertIn("**Evidence:**\nFinding: yes", findings)
+            self.assertIn("## A-001", findings)
+            self.assertIn("q: Does feature hashing help?", findings)
+            self.assertIn("conf: *(fill in: high | medium | low)*", findings)
+            self.assertIn("reference: experiment=abc123, knowledge=AK-001", findings)
+            self.assertIn("evidence:\nFinding: yes", findings)
+            self.assertIn("follow_up:\n- *(fill in yes/no hypothesis)*", findings)
+            self.assertEqual(findings.count("- *(fill in yes/no hypothesis)*"), 3)
             self.assertNotIn("debug noise", findings)
             self.assertFalse((root / "analysis-errors.md").exists())
 
     def test_failure_skips_findings_and_writes_error_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            hypothesis_file = root / "hypothesis.md"
-            findings_file = root / "findings.md"
+            hypothesis_file = root / "analyst-hypothesis.md"
+            findings_file = root / "analyst-findings.md"
             findings_file.write_text("## Existing finding\n")
-            hypothesis_file.write_text("# Active Hypothesis\n\n**Hypothesis:** Does feature hashing help?\n")
+            hypothesis_file.write_text(
+                "# Active Analyst Hypothesis\n"
+                "status: active\n"
+                "id: A-001\n"
+                "at: 2026-03-29T10:45Z\n"
+                "q: Does feature hashing help?\n"
+            )
 
             completed = subprocess.CompletedProcess(
                 args=["python", "analysis.py"],
@@ -81,30 +99,41 @@ class AnalysisRunnerTests(unittest.TestCase):
             self.assertEqual(findings_file.read_text(), "## Existing finding\n")
 
             errors = (root / "analysis-errors.md").read_text()
-            self.assertIn("## Does feature hashing help?", errors)
-            self.assertIn("**Exit code:** `2`", errors)
-            self.assertIn("**Stdout:**\npartial output", errors)
-            self.assertIn("**Stderr:**\nTraceback: boom", errors)
+            self.assertIn("## A-001", errors)
+            self.assertIn("q: Does feature hashing help?", errors)
+            self.assertIn("exit_code: `2`", errors)
+            self.assertIn("stdout:\npartial output", errors)
+            self.assertIn("stderr:\nTraceback: boom", errors)
 
             stderr_text = stderr.getvalue()
             self.assertIn("details written to", stderr_text)
             self.assertIn("[analysis stdout]", stderr_text)
             self.assertIn("[analysis stderr]", stderr_text)
 
-    def test_extract_title_prefers_hypothesis_and_supports_multiline(self) -> None:
+    def test_extract_title_prefers_id_and_supports_legacy_formats(self) -> None:
         self.assertEqual(
-            analysis_runner._extract_title("# Active Hypothesis\n\n**Hypothesis:**\nDoes feature hashing help?\n"),
-            "Does feature hashing help?",
+            analysis_runner._extract_title(
+                "# Active Analyst Hypothesis\n"
+                "status: active\n"
+                "id: A-001\n"
+                "q: Does feature hashing help?\n"
+            ),
+            "A-001",
         )
         self.assertEqual(analysis_runner._extract_title("**Question:** Legacy title"), "Legacy title")
 
     def test_success_normalizes_relative_repo_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as otherdir:
             root = Path(tmpdir)
-            hypothesis_file = root / "agents/analyst/hypothesis.md"
-            findings_file = root / "agents/analyst/findings.md"
+            hypothesis_file = root / "agents/analyst/analyst-hypothesis.md"
+            findings_file = root / "agents/analyst/analyst-findings.md"
             hypothesis_file.parent.mkdir(parents=True)
-            hypothesis_file.write_text("# Active Hypothesis\n\n**Hypothesis:** Does feature hashing help?\n")
+            hypothesis_file.write_text(
+                "# Active Analyst Hypothesis\n"
+                "status: active\n"
+                "id: A-001\n"
+                "q: Does feature hashing help?\n"
+            )
 
             completed = subprocess.CompletedProcess(
                 args=["python", "analysis.py"],
@@ -126,9 +155,9 @@ class AnalysisRunnerTests(unittest.TestCase):
                     [
                         "analysis_runner",
                         "--hypothesis-file",
-                        "agents/analyst/hypothesis.md",
+                        "agents/analyst/analyst-hypothesis.md",
                         "--findings-file",
-                        "agents/analyst/findings.md",
+                        "agents/analyst/analyst-findings.md",
                     ],
                 ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed):
                     analysis_runner.main()
@@ -136,15 +165,20 @@ class AnalysisRunnerTests(unittest.TestCase):
                 os.chdir(original_cwd)
 
             findings = findings_file.read_text()
-            self.assertIn("## Does feature hashing help?", findings)
+            self.assertIn("## A-001", findings)
 
     def test_failure_normalizes_default_error_log_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as otherdir:
             root = Path(tmpdir)
-            hypothesis_file = root / "agents/analyst/hypothesis.md"
-            findings_file = root / "agents/analyst/findings.md"
+            hypothesis_file = root / "agents/analyst/analyst-hypothesis.md"
+            findings_file = root / "agents/analyst/analyst-findings.md"
             hypothesis_file.parent.mkdir(parents=True)
-            hypothesis_file.write_text("# Active Hypothesis\n\n**Hypothesis:** Does feature hashing help?\n")
+            hypothesis_file.write_text(
+                "# Active Analyst Hypothesis\n"
+                "status: active\n"
+                "id: A-001\n"
+                "q: Does feature hashing help?\n"
+            )
 
             completed = subprocess.CompletedProcess(
                 args=["python", "analysis.py"],
@@ -166,9 +200,9 @@ class AnalysisRunnerTests(unittest.TestCase):
                     [
                         "analysis_runner",
                         "--hypothesis-file",
-                        "agents/analyst/hypothesis.md",
+                        "agents/analyst/analyst-hypothesis.md",
                         "--findings-file",
-                        "agents/analyst/findings.md",
+                        "agents/analyst/analyst-findings.md",
                     ],
                 ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed):
                     with self.assertRaises(SystemExit):
@@ -177,7 +211,7 @@ class AnalysisRunnerTests(unittest.TestCase):
                 os.chdir(original_cwd)
 
             errors = (root / "agents/analyst/analysis-errors.md").read_text()
-            self.assertIn("## Does feature hashing help?", errors)
+            self.assertIn("## A-001", errors)
 
 
 if __name__ == "__main__":

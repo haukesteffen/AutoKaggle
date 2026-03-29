@@ -17,12 +17,12 @@ The repository has two layers:
 - fixed harness code under [harness/](harness)
 - agent-facing prompts, inboxes, and working files under [agents/](agents)
 
-The current documented operating model on `main` uses two long-lived roles plus two on-demand roles:
+The current documented operating model on `main` uses one long-lived role plus three on-demand roles:
 
 - supervisor
-- scientist
 - strategist (episodic / temporary, not a permanently running session)
 - analyst (episodic / temporary, invoked only for concrete yes/no investigations)
+- scientist (episodic / temporary, invoked only for one concrete experiment task)
 
 ## Document Map
 
@@ -59,25 +59,19 @@ You are the supervisor, start a new run.
 
 3. The supervisor will:
    - propose a run tag
-   - create branches and worktrees
+   - prepare the run state
    - ensure competition data exists
    - initialize the tracked communication files under `agents/`
-   - tell you which `claude` commands to run for the remaining persistent role
+   - begin the supervisor loop and invoke strategist, analyst, and scientist work only when needed
 
-4. Open the additional terminal exactly as instructed by the supervisor.
-
-5. The supervisor may also ask you to open a temporary strategist session in the main repo:
+4. The supervisor may ask you to open a temporary strategist, analyst, or scientist session in the main repo if direct episodic invocation is unavailable:
 
 ```bash
 cd <root>/AutoKaggle
 claude
 ```
 
-That strategist session is on-demand. It is not a permanent terminal.
-
-The analyst is also on-demand. The supervisor invokes analyst work only when there is a concrete yes/no hypothesis to test. This does not require a permanently running analyst terminal.
-
-6. Once the scientist session is open, tell the supervisor it is running so it can start the run logic.
+Those sessions are on-demand. They are not permanent terminals.
 
 ## During A Run
 
@@ -92,8 +86,12 @@ Useful places to inspect:
 
 - [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md) when present
 - [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md)
-- [agents/scientist/scientist-guidance.md](agents/scientist/scientist-guidance.md) when present
+- [agents/scientist/scientist-task.md](agents/scientist/scientist-task.md) when present
+- [agents/scientist/scientist-results.md](agents/scientist/scientist-results.md) when present
+- [agents/scientist/scientist-knowledge.md](agents/scientist/scientist-knowledge.md) when present
+- [agents/analyst/analyst-hypothesis.md](agents/analyst/analyst-hypothesis.md) when present
 - [agents/analyst/analyst-findings.md](agents/analyst/analyst-findings.md) when present
+- [agents/analyst/analyst-knowledge.md](agents/analyst/analyst-knowledge.md) when present
 - [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md) when present
 - `artifacts/<tag>/` for untracked run outputs
 
@@ -104,14 +102,19 @@ Key tracked files:
 - [agents/program.md](agents/program.md): shared agent contract
 - [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md): strategist-owned current plan
 - [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md): strategist-owned reusable playbook
-- [agents/analyst/analyst-hypotheses.md](agents/analyst/analyst-hypotheses.md): supervisor-owned active analyst question
+- [agents/scientist/scientist-task.md](agents/scientist/scientist-task.md): supervisor-owned active scientist task
+- [agents/scientist/scientist-results.md](agents/scientist/scientist-results.md): append-only scientist result history
+- [agents/scientist/scientist-knowledge.md](agents/scientist/scientist-knowledge.md): concise scientist-owned durable memory
+- [agents/analyst/analyst-hypothesis.md](agents/analyst/analyst-hypothesis.md): supervisor-owned active analyst question
 - [agents/analyst/analyst-findings.md](agents/analyst/analyst-findings.md): append-only analyst findings history
+- [agents/analyst/analyst-knowledge.md](agents/analyst/analyst-knowledge.md): concise analyst-owned durable memory
 - [agents/supervisor/leaderboard-history.md](agents/supervisor/leaderboard-history.md): supervisor-owned submission ledger and CV/LB notes
 - [agents/supervisor/submission.py](agents/supervisor/submission.py): supervisor submission-preparation script
 - [agents/scientist/experiment.py](agents/scientist/experiment.py): scientist-owned experiment file
 - [agents/analyst/analysis.py](agents/analyst/analysis.py): analyst working script
 - [harness/dataset.py](harness/dataset.py): data contract and CV split logic
 - [harness/experiment_runner.py](harness/experiment_runner.py): experiment execution and timeout handling
+- [harness/scientist_runner.py](harness/scientist_runner.py): scientist execution and result append flow
 - [harness/analysis_runner.py](harness/analysis_runner.py): analysis execution and findings append flow
 - [harness/promotion_runner.py](harness/promotion_runner.py): submission harness entrypoint
 
@@ -121,6 +124,7 @@ Important untracked paths:
 - `artifacts/`
 - `.claude/settings.local.json`
 - `agents/analyst/analysis-errors.md`
+- `agents/scientist/scientist-errors.md`
 
 ## Submission Harness
 

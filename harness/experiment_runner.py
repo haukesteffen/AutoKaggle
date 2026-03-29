@@ -1,4 +1,5 @@
 import argparse
+import builtins
 import importlib.util
 import multiprocessing as mp
 import os
@@ -15,6 +16,7 @@ from harness.dataset import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, eva
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXPERIMENT_PATH = Path("agents/scientist/experiment.py")
+INVALID_EXIT_CODE = 2
 
 
 def main() -> None:
@@ -76,9 +78,15 @@ def main() -> None:
         if message_type == "error":
             experiment_name = message["experiment_name"]
             total_seconds = time.perf_counter() - total_start
-            _print_error_summary(experiment_name, completed_folds, total_seconds)
+            classification = message.get("classification", "error")
+            if classification == "invalid":
+                _print_invalid_summary(experiment_name, completed_folds, total_seconds)
+                exit_code = INVALID_EXIT_CODE
+            else:
+                _print_error_summary(experiment_name, completed_folds, total_seconds)
+                exit_code = 1
             print(message["traceback"], file=sys.stderr, end="")
-            raise SystemExit(1)
+            raise SystemExit(exit_code)
 
         raise RuntimeError(f"unexpected worker message type: {message_type}")
 
@@ -101,11 +109,6 @@ def main() -> None:
         )
         raise SystemExit(124)
 
-    _print_success_summary(
-        experiment_name=experiment_name,
-        result=result,
-        total_seconds=total_seconds,
-    )
     if args.artifact_dir is not None:
         if oof_preds is None:
             print("artifact generation failed: worker did not return out-of-fold predictions", file=sys.stderr)
@@ -113,8 +116,19 @@ def main() -> None:
         try:
             _generate_artifacts(args.artifact_dir, oof_preds, experiment_path)
         except BaseException as exc:
-            print(f"artifact generation failed: {exc}", file=sys.stderr)
+            classification = _classify_exception(exc)
+            if classification == "invalid":
+                _print_invalid_summary(experiment_name, result.completed_folds, total_seconds)
+                print(traceback.format_exc(), file=sys.stderr, end="")
+                raise SystemExit(INVALID_EXIT_CODE) from exc
+            _print_error_summary(experiment_name, result.completed_folds, total_seconds)
+            print(traceback.format_exc(), file=sys.stderr, end="")
             raise SystemExit(1) from exc
+    _print_success_summary(
+        experiment_name=experiment_name,
+        result=result,
+        total_seconds=total_seconds,
+    )
 
 
 def _run_evaluation(messages: mp.Queue, experiment_path: Path) -> None:
@@ -141,12 +155,13 @@ def _run_evaluation(messages: mp.Queue, experiment_path: Path) -> None:
                 "oof_preds": oof_preds,
             }
         )
-    except BaseException:
+    except BaseException as exc:
         messages.put(
             {
                 "type": "error",
                 "experiment_name": experiment_name,
                 "traceback": traceback.format_exc(),
+                "classification": _classify_exception(exc),
             }
         )
 
@@ -188,6 +203,21 @@ def _terminate_process(process: mp.Process) -> None:
     if process.is_alive():
         process.kill()
         process.join(timeout=1)
+
+
+def _classify_exception(exc: BaseException) -> str:
+    invalid_types = (
+        SyntaxError,
+        ImportError,
+        ModuleNotFoundError,
+        AttributeError,
+        TypeError,
+        ValueError,
+        KeyError,
+        NameError,
+        builtins.NotImplementedError,
+    )
+    return "invalid" if isinstance(exc, invalid_types) else "error"
 
 
 def _generate_artifacts(artifact_dir: Path, oof_preds, experiment_path: Path) -> None:
@@ -290,6 +320,14 @@ def _print_error_summary(experiment_name: str, completed_folds: int, total_secon
     print("---")
     print(f"experiment_name:   {experiment_name}")
     print("status:            error")
+    print(f"completed_folds:   {completed_folds}/{N_SPLITS}")
+    print(f"total_seconds:     {total_seconds:.1f}")
+
+
+def _print_invalid_summary(experiment_name: str, completed_folds: int, total_seconds: float) -> None:
+    print("---")
+    print(f"experiment_name:   {experiment_name}")
+    print("status:            invalid")
     print(f"completed_folds:   {completed_folds}/{N_SPLITS}")
     print(f"total_seconds:     {total_seconds:.1f}")
 

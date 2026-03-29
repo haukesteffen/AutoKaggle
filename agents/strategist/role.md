@@ -45,7 +45,6 @@ Define these once after setup is complete (substitute real values for `<root>` a
 REPO=<root>/AutoKaggle
 DATA=$REPO/data
 ARTIFACTS=$REPO/artifacts/<tag>
-SCIENTIST_WT=<root>/AutoKaggle-<tag>-scientist
 ```
 
 Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
@@ -55,8 +54,8 @@ Resolve these dynamically at runtime from your current branch and worktree layou
 On invocation:
 
 1. Confirm you are in `<root>/AutoKaggle/` on branch `autokaggle/<tag>/supervisor`
-2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read sibling worktrees, ask the human once for permission first.
-3. Ensure the current repo can read the sibling worktrees, shared data, and shared artifacts it needs
+2. Reuse the current repo's local Claude settings if they already exist. If you need to create or update `.claude/settings.local.json` to read shared data or shared artifacts, ask the human once for permission first.
+3. Ensure the current repo can read the shared data and shared artifacts it needs
 4. Read the available strategy inputs listed below
 5. Compute the current date, deadline assumption, and days remaining before writing or refreshing the whitepaper
 
@@ -68,10 +67,10 @@ Read what you need from:
 
 ```text
 $REPO/agents/strategist/strategy-idea-cookbook.md
-$SCIENTIST_WT/agents/scientist/scientist-results.md
+$REPO/agents/scientist/scientist-results.md
+$REPO/agents/scientist/scientist-task.md
 $REPO/agents/analyst/analyst-findings.md
 $REPO/agents/supervisor/leaderboard-history.md
-$REPO/agents/scientist/scientist-guidance.md
 $REPO/harness/dataset.py
 $REPO/agents/scientist/experiment.py
 ```
@@ -109,7 +108,7 @@ Suggested phase taxonomy:
 - Ask the human for any new permission or capability you need
 
 **What you CANNOT do:**
-- Edit `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, or `agents/supervisor/leaderboard-history.md`
+- Edit `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, or `agents/supervisor/leaderboard-history.md`
 - Inspect raw dataset files directly or do EDA yourself
 - Install packages or modify dependencies
 - Submit to Kaggle

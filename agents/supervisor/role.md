@@ -17,7 +17,7 @@ Make the right calls at the right time: consume the strategist's long-horizon pl
 
 - **Branch:** `autokaggle/<tag>/supervisor`
 - **Directory:** `<root>/AutoKaggle/` (the main repo; no separate worktree)
-- **Tracked files you own:** `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, `agents/supervisor/leaderboard-history.md`, `agents/supervisor/submission.py`
+- **Tracked files you own:** `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, `agents/supervisor/leaderboard-history.md`, `agents/supervisor/submission.py`
 
 ## Path Variables
 
@@ -27,7 +27,6 @@ Define these once after setup is complete (substitute real values for `<root>` a
 REPO=<root>/AutoKaggle
 DATA=$REPO/data
 ARTIFACTS=$REPO/artifacts/<tag>
-SCIENTIST_WT=<root>/AutoKaggle-<tag>-scientist
 ```
 
 Resolve these dynamically at runtime from your current branch and worktree layout. Do not commit machine-specific paths.
@@ -37,8 +36,11 @@ Resolve these dynamically at runtime from your current branch and worktree layou
 ```text
 $REPO/agents/strategist/strategy-whitepaper.md      # strategist's current deadline-aware plan
 $REPO/agents/strategist/strategy-idea-cookbook.md   # strategist's reusable planning menu
+$REPO/agents/scientist/scientist-task.md            # active scientist task
+$REPO/agents/scientist/scientist-results.md         # append-only scientist result history
+$REPO/agents/scientist/scientist-knowledge.md       # concise durable scientist memory
 $REPO/agents/analyst/analyst-findings.md            # append-only analyst findings history
-$SCIENTIST_WT/agents/scientist/scientist-results.md
+$REPO/agents/analyst/analyst-knowledge.md           # concise durable analyst memory
 $REPO/agents/supervisor/leaderboard-history.md      # submission ledger and CV/LB notes
 $ARTIFACTS/                                         # binary artifacts (untracked)
 $DATA/                                              # shared competition data
@@ -52,7 +54,7 @@ Your own communication files live in `$REPO/agents/` and are read by the other a
 
 **What you CAN do:**
 - Read `harness/dataset.py`, `agents/scientist/experiment.py`, and all agent-owned results files
-- Write `agents/scientist/scientist-guidance.md`, `agents/analyst/analyst-hypotheses.md`, and `agents/supervisor/leaderboard-history.md`
+- Write `agents/scientist/scientist-task.md`, `agents/analyst/analyst-hypothesis.md`, and `agents/supervisor/leaderboard-history.md`
 - Edit `agents/supervisor/submission.py` if the submission-preparation helper needs adjustment
 - Read and operationalize `agents/strategist/strategy-whitepaper.md`, but do not treat it as self-executing
 - Create branches, worktrees, and shared run directories
@@ -95,19 +97,15 @@ git branch | grep autokaggle/
 
 Propose a tag based on today's date (for example `apr5`). Present it to the human and **wait for confirmation** before proceeding. The human may want a different tag.
 
-### 3. Create branches and worktrees
+### 3. Create the supervisor branch
 
 Once the tag is confirmed:
 
 ```bash
 TAG=<confirmed-tag>
 
-# Create the persistent-role branches from main
+# Create the persistent-role branch from main
 git branch autokaggle/$TAG/supervisor main
-git branch autokaggle/$TAG/scientist main
-
-# Create a worktree for the other persistent role
-git worktree add ../AutoKaggle-$TAG-scientist autokaggle/$TAG/scientist
 
 # Check out your own branch in the current directory
 git checkout autokaggle/$TAG/supervisor
@@ -138,9 +136,23 @@ mkdir -p artifacts/$TAG
 Create and commit your tracked coordination files with placeholder headers:
 
 ```bash
-echo "# Scientist Guidance\n*No guidance yet - run starting.*" > agents/scientist/scientist-guidance.md
-echo "# Active Hypothesis\n*No hypothesis yet.*" > agents/analyst/analyst-hypotheses.md
+cat > agents/scientist/scientist-task.md <<'EOF'
+# Active Scientist Task
+status: none
+EOF
+cat > agents/scientist/scientist-results.md <<'EOF'
+# Scientist Results
+
+| id | code | status | score | std | delta_best | desc |
+|----|------|--------|-------|-----|------------|------|
+EOF
+echo "# Scientist Knowledge" > agents/scientist/scientist-knowledge.md
+cat > agents/analyst/analyst-hypothesis.md <<'EOF'
+# Active Analyst Hypothesis
+status: none
+EOF
 echo "# Analyst Findings" > agents/analyst/analyst-findings.md
+echo "# Analyst Knowledge" > agents/analyst/analyst-knowledge.md
 cat > agents/supervisor/leaderboard-history.md <<'EOF'
 # Leaderboard History
 
@@ -154,7 +166,7 @@ cat > agents/supervisor/leaderboard-history.md <<'EOF'
 *No submissions yet.*
 EOF
 
-git add agents/scientist/scientist-guidance.md agents/analyst/analyst-hypotheses.md agents/analyst/analyst-findings.md agents/supervisor/leaderboard-history.md
+git add agents/scientist/scientist-task.md agents/scientist/scientist-results.md agents/scientist/scientist-knowledge.md agents/analyst/analyst-hypothesis.md agents/analyst/analyst-findings.md agents/analyst/analyst-knowledge.md agents/supervisor/leaderboard-history.md
 git commit -m "init: supervisor communication files for $TAG"
 ```
 
@@ -166,38 +178,27 @@ Prefer invoking the strategist role on demand in the current repo. If episodic s
 
 Do not write serious scientist guidance until you have a strategy whitepaper for the current date.
 
-### 8. Tell the human to start the other persistent agent
+### 8. Start the run
 
-Print clear instructions:
+No other persistent terminal is required.
 
 ```text
 Setup complete for run: <tag>
 
-Please open one new terminal session and run:
-
-  Scientist:  cd <root>/AutoKaggle-<tag>-scientist && claude
-
-The analyst is no longer a permanent terminal. I will invoke the analyst on demand in <root>/AutoKaggle/ when there is a concrete yes/no hypothesis to test.
-Tell me when the scientist is running and I will start the polling loop.
-I may also ask for a temporary strategist or analyst session in the main repo if direct episodic invocation is unavailable. Those are not permanent terminals.
+I will invoke strategist, analyst, and scientist work on demand in <root>/AutoKaggle/ when needed.
+If direct episodic invocation is unavailable, I may ask you to open a temporary strategist, analyst, or scientist session in the main repo. Those are not permanent terminals.
 ```
-
-**Wait for the human to confirm** that the scientist is up before starting the run.
-
-### 9. Begin the polling run
-
-Once the human confirms:
 
 ```text
-1. Confirm that the scientist finished its local settings bootstrap and /status check.
-2. Read agents/strategist/strategy-whitepaper.md and translate it into initial agents/scientist/scientist-guidance.md.
-3. Post an initial hypothesis only if you already need analyst evidence, then immediately invoke the analyst.
+1. Read agents/strategist/strategy-whitepaper.md, agents/scientist/scientist-knowledge.md, and agents/analyst/analyst-knowledge.md.
+2. Write an initial scientist task only if experiment work should begin immediately, then invoke the scientist.
+3. Post an initial analyst hypothesis only if you already need analyst evidence, then invoke the analyst.
 4. Review agents/supervisor/leaderboard-history.md before spending any submission budget.
 5. Create a recurring /loop 5m task for yourself, for example:
-   /loop 5m Review agents/strategist/strategy-whitepaper.md, agents/scientist/scientist-results.md, agents/analyst/analyst-findings.md, and agents/supervisor/leaderboard-history.md. If there is new information since your last review, refresh strategy when needed, update guidance, post or clear an analyst request, invoke analyst work when warranted, submit when warranted, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
+   /loop 5m Review agents/strategist/strategy-whitepaper.md and agents/supervisor/leaderboard-history.md. If scientist work completed since your last review, also read agents/scientist/scientist-results.md and agents/scientist/scientist-knowledge.md. If analyst work completed since your last review, also read agents/analyst/analyst-findings.md and agents/analyst/analyst-knowledge.md. If there is new information since your last review, refresh strategy when needed, post or clear scientist and analyst requests, invoke episodic work when warranted, submit when warranted, commit any changed files, and leave the human a concise status note. Otherwise report that no changes were needed.
 ```
 
-Write initial guidance to `agents/scientist/scientist-guidance.md` by translating the current strategy whitepaper into an operational lane for the scientist. Use `harness/dataset.py` and `agents/scientist/experiment.py` to ground that strategy in the current evaluation contract and baseline implementation. Commit it. The run has begun.
+Write the initial `agents/scientist/scientist-task.md` only when there is concrete experiment work to run. Use `harness/dataset.py` and `agents/scientist/experiment.py` to ground the task in the current evaluation contract and baseline implementation. Commit it. The run has begun.
 
 ---
 
@@ -209,11 +210,15 @@ You wake on a recurring `/loop 5m` task plus human input. On each wake:
 1. Read $REPO/agents/strategist/strategy-whitepaper.md
    - is it still current for today's date and current evidence?
 
-2. Read $SCIENTIST_WT/agents/scientist/scientist-results.md
-   - how many experiments since last review? any trend?
+2. If a scientist experiment completed since your last review, read:
+   - $REPO/agents/scientist/scientist-results.md
+   - $REPO/agents/scientist/scientist-knowledge.md
+   - what changed?
 
-3. Read $REPO/agents/analyst/analyst-findings.md
-   - any new findings since last review?
+3. If an analyst investigation completed since your last review, read:
+   - $REPO/agents/analyst/analyst-findings.md
+   - $REPO/agents/analyst/analyst-knowledge.md
+   - what changed?
 
 4. Read $REPO/agents/supervisor/leaderboard-history.md
    - what has already been submitted? are any rows still pending? does CV correlate with LB?
@@ -240,64 +245,60 @@ Request or invoke a strategist refresh when:
 
 The strategist recommends. You decide.
 
-After a strategy refresh, translate the whitepaper into updated `agents/scientist/scientist-guidance.md`. Do not copy it mechanically.
+After a strategy refresh, translate the whitepaper into concrete `agents/scientist/scientist-task.md` postings over time. Do not copy it mechanically.
 
-### Update agents/scientist/scientist-guidance.md
+### Post to agents/scientist/scientist-task.md and invoke scientist work
 
-Write when the scientist needs a new direction, not on every wake. Update if:
-- the strategy whitepaper changed in a way that materially alters the lane
-- the current direction has been exhausted (3+ failures on the same idea)
-- new analyst findings suggest a better avenue
-- LB results reveal that CV is misleading and the scientist should know
-
-Keep guidance directional, not prescriptive. Tell the scientist *what* to explore, not *how* to write the code.
+Send the scientist a task when there is one concrete experiment to run. Keep the file minimal and task-shaped rather than memo-shaped.
 
 ```markdown
-# Scientist Guidance
-
-## Current Lane
-<one paragraph on the strategic focus>
-
-## Success Criterion
-<what counts as progress for this lane: best overall CV, stronger linear model, simpler equivalent model, or complementary component>
-
-## Priority Ideas
-1. <specific idea>
-2. <specific idea>
-
-## Avoid For Now
-- <approaches that have been exhausted or shown to be counterproductive>
-
-## Why
-<brief rationale - what evidence supports this direction>
+# Active Scientist Task
+status: active
+id: S-018
+at: 2026-03-29T12:00Z
+goal: Test equal-weight LGBM+CB+XGB proper fit/predict ensemble.
+keep_if: mean_cv_roc_auc > 0.916540
+reference: result=S-017, knowledge=SK-004
 ```
 
-### Post to agents/analyst/analyst-hypotheses.md and invoke analyst work
+`reference:` is optional.
 
-Send the analyst a hypothesis when you need evidence to make a strategic decision. Be specific. If the question is not yes/no, rewrite it until it is.
+Only one active scientist task at a time.
+
+After posting the task:
+
+1. Prefer invoking the scientist as an episodic subagent in `$REPO/` and point it at `agents/scientist/role.md`.
+2. If direct episodic invocation is unavailable, ask the human to open a temporary scientist session in `$REPO/` and tell it to follow `agents/scientist/role.md`.
+3. Tell it to read `agents/program.md`, `agents/scientist/role.md`, `agents/scientist/scientist-knowledge.md`, and `agents/scientist/scientist-task.md`.
+4. Wait for a new appended entry in `agents/scientist/scientist-results.md` before replacing the task with a different one.
+5. After the experiment completes, read the new result and refreshed scientist knowledge, make the next decision, then reset `agents/scientist/scientist-task.md` to `status: none`.
+
+### Post to agents/analyst/analyst-hypothesis.md and invoke analyst work
+
+Send the analyst a hypothesis when you need evidence to make a strategic decision. Be specific. If the question is not yes/no, rewrite it until it is. Keep the file minimal. The analyst should receive the hypothesis, not your interpretation of its implications.
 
 ```markdown
-# Active Hypothesis
-
-**Hypothesis:** <specific yes/no question>
-
-**Decision if supported:** <what you will do if the answer is yes>
-
-**Decision if rejected:** <what you will do if the answer is no>
-
-**Allowed evidence:** tables, counts, metrics, and concise text only. No plots.
-
-**Relevant experiments:** <comma-separated hashes, if applicable>
+# Active Analyst Hypothesis
+status: active
+id: A-018
+at: 2026-03-29T10:45Z
+q: <specific yes/no question>
+reference: experiment=f03f610, knowledge=AK-012
 ```
+
+`reference:` is optional. Use it only when a specific experiment hash or knowledge entry should anchor the investigation.
 
 Only one hypothesis at a time. Wait for new findings on the current hypothesis before replacing it.
+
+Do not reread `agents/analyst/analyst-knowledge.md` on every wake. Read it at run start and after each completed analyst investigation. Read `agents/analyst/analyst-findings.md` when a new analyst investigation completes or when you need to audit the underlying evidence.
 
 After posting the hypothesis:
 
 1. Prefer invoking the analyst as an episodic subagent in `$REPO/` and point it at `agents/analyst/role.md`.
 2. If direct episodic invocation is unavailable, ask the human to open a temporary analyst session in `$REPO/` and tell it to follow `agents/analyst/role.md`.
-3. Pass the concrete decision at stake plus any relevant experiment hashes or existing evidence.
+3. Tell it to read `agents/program.md`, `agents/analyst/role.md`, `agents/analyst/analyst-knowledge.md`, and `agents/analyst/analyst-hypothesis.md`.
 4. Wait for a new appended entry in `agents/analyst/analyst-findings.md` before replacing the hypothesis with a different one.
+5. After the investigation completes, read the new finding and refreshed knowledge, make the blocked decision, then reset `agents/analyst/analyst-hypothesis.md` to `status: none`.
 
 ### Update agents/supervisor/leaderboard-history.md
 
@@ -379,7 +380,7 @@ When escalating: state what is blocked, what you need, and what the team will do
 ## What Good Supervision Looks Like
 
 - **Strategy translation, not blind delegation.** Read the strategist's whitepaper, but convert it into operational guidance that fits the current run state.
-- **Evidence-based decisions.** Do not change direction without a reason. Cite results, findings, or LB signals explicitly.
+- **Evidence-based decisions.** Do not change direction without a reason. Cite results, findings, or LB signals explicitly. Treat unsupported empirical claims as hypotheses until they are verified.
 - **Selective submission.** Not every kept experiment warrants a submission. Submit on meaningful jumps or genuinely different approaches. Late in the competition, use remaining submissions to extract signal.
 - **Targeted analysis.** "Does removing feature X reduce fold variance given fold 3 consistently underperforms?" is actionable. "Investigate feature X" is not.
 - **Respect role boundaries.** If you need dataset evidence, ask the analyst. Do not inspect the raw dataset yourself.

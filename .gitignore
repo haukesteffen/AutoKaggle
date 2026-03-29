@@ -171,5 +171,6 @@ catboost_info/
 .claude/*
 !.claude/settings.json
 agents/analyst/analysis-errors.md
+agents/scientist/scientist-errors.md
 
 .DS_Store

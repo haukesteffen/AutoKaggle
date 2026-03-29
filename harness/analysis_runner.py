@@ -2,12 +2,20 @@ import argparse
 import os
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ANALYSIS_PATH = Path("agents/analyst/analysis.py")
 DEFAULT_ERRORS_FILENAME = "analysis-errors.md"
+
+
+@dataclass(frozen=True)
+class HypothesisMetadata:
+    title: str
+    question: str
+    reference: str | None
 
 
 def main() -> None:
@@ -22,7 +30,7 @@ def main() -> None:
     )
 
     hypothesis_text = hypothesis_file.read_text()
-    title = _extract_title(hypothesis_text)
+    metadata = _extract_hypothesis_metadata(hypothesis_text)
 
     completed = subprocess.run(
         [sys.executable, str(analysis_path)],
@@ -35,8 +43,7 @@ def main() -> None:
     if completed.returncode != 0:
         _append_failure_entry(
             errors_file=errors_file,
-            title=title,
-            hypothesis_text=hypothesis_text,
+            metadata=metadata,
             analysis_path=analysis_path,
             completed=completed,
         )
@@ -45,8 +52,7 @@ def main() -> None:
 
     _append_findings_entry(
         findings_file=findings_file,
-        title=title,
-        hypothesis_text=hypothesis_text,
+        metadata=metadata,
         stdout=completed.stdout,
     )
 
@@ -74,7 +80,37 @@ def _analysis_env() -> dict[str, str]:
     return env
 
 
+def _extract_hypothesis_metadata(hypothesis_text: str) -> HypothesisMetadata:
+    fields = _parse_key_value_fields(hypothesis_text)
+    question = fields.get("q") or _extract_legacy_question(hypothesis_text) or "Analysis"
+    return HypothesisMetadata(
+        title=fields.get("id") or question,
+        question=question,
+        reference=fields.get("reference"),
+    )
+
+
 def _extract_title(hypothesis_text: str) -> str:
+    return _extract_hypothesis_metadata(hypothesis_text).title
+
+
+def _parse_key_value_fields(hypothesis_text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in hypothesis_text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        normalized_key = key.strip().lower()
+        if normalized_key not in {"status", "id", "at", "q", "reference"}:
+            continue
+        normalized_value = value.strip()
+        if normalized_value and normalized_key not in fields:
+            fields[normalized_key] = normalized_value
+    return fields
+
+
+def _extract_legacy_question(hypothesis_text: str) -> str | None:
     lines = hypothesis_text.splitlines()
     for index, line in enumerate(lines):
         stripped = line.strip()
@@ -87,35 +123,36 @@ def _extract_title(hypothesis_text: str) -> str:
             fallback_title = _next_nonempty_line(lines[index + 1 :])
             if fallback_title:
                 return fallback_title
-    return "Analysis"
+    return None
 
 
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
 
 
-def _append_findings_entry(findings_file: Path, title: str, hypothesis_text: str, stdout: str) -> None:
+def _append_findings_entry(findings_file: Path, metadata: HypothesisMetadata, stdout: str) -> None:
     findings_file.parent.mkdir(parents=True, exist_ok=True)
     with findings_file.open("a") as f:
         if f.tell() > 0:
             f.write("\n\n")
-        f.write(f"## {title}\n")
-        f.write(f"*{_utc_timestamp()}*\n\n")
-        f.write("**Hypothesis:**\n")
-        f.write(f"{hypothesis_text.rstrip()}\n\n")
-        f.write("**Verdict:** *(fill in: Supported / Rejected / Inconclusive)*\n\n")
-        f.write("**Evidence:**\n")
+        f.write(f"## {metadata.title}\n")
+        f.write(f"at: {_utc_timestamp()}\n")
+        f.write(f"q: {metadata.question}\n")
+        f.write("verdict: *(fill in: supported | rejected | inconclusive)*\n")
+        f.write("conf: *(fill in: high | medium | low)*\n")
+        if metadata.reference:
+            f.write(f"reference: {metadata.reference}\n")
+        f.write("evidence:\n")
         f.write(f"{_format_stream(stdout)}\n\n")
-        f.write("**Implications:**\n")
-        f.write("*(fill in)*\n\n")
-        f.write("**Suggested next hypotheses:** *(optional)*\n")
-        f.write("*(fill in or delete)*\n")
+        f.write("follow_up:\n")
+        f.write("- *(fill in yes/no hypothesis)*\n")
+        f.write("- *(fill in yes/no hypothesis)*\n")
+        f.write("- *(fill in yes/no hypothesis)*\n")
 
 
 def _append_failure_entry(
     errors_file: Path,
-    title: str,
-    hypothesis_text: str,
+    metadata: HypothesisMetadata,
     analysis_path: Path,
     completed: subprocess.CompletedProcess[str],
 ) -> None:
@@ -123,15 +160,16 @@ def _append_failure_entry(
     with errors_file.open("a") as f:
         if f.tell() > 0:
             f.write("\n\n")
-        f.write(f"## {title}\n")
-        f.write(f"*{_utc_timestamp()}*\n\n")
-        f.write("**Hypothesis:**\n")
-        f.write(f"{hypothesis_text.rstrip()}\n\n")
-        f.write(f"**Analysis path:** `{_display_path(analysis_path)}`\n\n")
-        f.write(f"**Exit code:** `{completed.returncode}`\n\n")
-        f.write("**Stdout:**\n")
+        f.write(f"## {metadata.title}\n")
+        f.write(f"at: {_utc_timestamp()}\n")
+        f.write(f"q: {metadata.question}\n")
+        if metadata.reference:
+            f.write(f"reference: {metadata.reference}\n")
+        f.write(f"analysis_path: `{_display_path(analysis_path)}`\n")
+        f.write(f"exit_code: `{completed.returncode}`\n")
+        f.write("stdout:\n")
         f.write(f"{_format_stream(completed.stdout)}\n\n")
-        f.write("**Stderr:**\n")
+        f.write("stderr:\n")
         f.write(f"{_format_stream(completed.stderr)}\n")
 
 
