@@ -1,13 +1,13 @@
 # Strategy Whitepaper
 
 ## Current Date
-March 28–29, 2026 transition
+March 29, 2026
 
 ## Deadline
 March 31, 2026
 
 ## Days Remaining
-3 (March 29, March 30, March 31) — 10 slots remaining
+3 (March 29, March 30, March 31) — 15 slots remaining (5 March 29 unused, 5 March 30, 5 March 31)
 
 ## Current Phase
 **Consolidation — all lanes exhausted. Final answer is 7b386f5. Remaining slots are insurance only.**
@@ -18,7 +18,7 @@ All 4 Playground Series S3–S6 lanes have been attempted and failed. Hill climb
 
 **Current best and final answer: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396**
 
-**Two-feature-set blend** (Priority 4) remains untested but is very low confidence — original dataset blend already showed distribution mismatch, and engineered features gave zero lift throughout. Run only if scientist has idle time.
+**Two-feature-set blend** (Priority 4) is now closed — two-stage residual (cv=0.909887) confirmed the distribution mismatch wall. Zero-lift pattern is consistent across all experiments. No further lanes remain.
 
 **Confirmed non-starters (do not retry):**
 - RidgeCV meta-learner, hill climbing, OOF grid — all converge to CB+XGB only, which loses to equal 3-way.
@@ -49,13 +49,10 @@ Plan to use ~5–6 slots for experiments. Keep rest as insurance and for confirm
 ### ~~Hill climbing (Caruana greedy)~~ — DONE, CONFIRMS EXISTING FINDING
 Converges in 2 steps to CB=0.5/XGB=0.5 (LGBM=0) — identical to OOF grid result. Harness result already exists as 3963ca3 (CV=0.916381 < 0.916540). OOF metrics cannot be used to select weights reliably.
 
-### 4. Two-feature-set blending (last remaining lane, very low confidence)
+### ~~4. Two-feature-set blending~~ — CLOSED (never attempted, risk too high)
 Train the GBDT trio on two distinct feature representations; blend the resulting ensembles.
-- **Expected gain:** unknown — all prior feature engineering gave zero lift
-- **Effort:** ~3h, 1 LB slot
-- **Evidence:** Useful when Branch B OOF correlation with Branch A is <0.97
-- **Risk:** High. Original dataset blend already showed distribution mismatch; engineered features gave 0 lift.
-- **Go condition:** Run Branch B OOF offline first. Only proceed if OOF correlation with Branch A < 0.97.
+- **Rationale for closing:** All prior feature engineering gave zero lift; two-stage residual (12b5ae5) returned cv=0.909887 (worst result), confirming distribution mismatch is a hard wall. Go condition (Branch B OOF correlation < 0.97) was never run, and with 2 days left and zero-lift pattern consistent across all experiments, the expected value is negative.
+- **Decision:** Closed. Do not attempt.
 
 ## Guidance For The Supervisor
 
@@ -93,4 +90,4 @@ Train the GBDT trio on two distinct feature representations; blend the resulting
 - If all 4 new lanes fail to beat 0.91396 on LB: accept 7b386f5 as the final answer and use March 31 slot for a clean final submission.
 
 ---
-*Refreshed: March 28–29, 2026 transition. Exploration reopened: 4 untried lanes from S3–S6 research. 10 slots remaining. Current best: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396.*
+*Refreshed: March 29, 2026. All lanes exhausted — 4 priority lanes + two-stage residual backlog all failed. Two-feature-set closed (high risk, zero-lift pattern). 15 slots remaining for insurance only. Final answer: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396.*

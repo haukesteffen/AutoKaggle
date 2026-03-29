@@ -18,6 +18,6 @@
 - Best valid LB: **0.91396** (7b386f5, ensemble_lgbm_cb_xgb_fixed)
 - OOF grid showed CB=0.5/XGB=0.5/LGBM=0.0 as optimal, but real training of CB+XGB only (3963ca3, cv=0.916381) scored worse than equal 3-way (7b386f5, cv=0.916540). OOF-grid weights don't transfer to real training.
 - March 28 budget exhausted (5/5). March 29: 5 fresh slots.
-- All new Playground Series techniques exhausted: seed bagging (0.916382), orig blend (0.916341), pseudo-labeling (LB 0.9134), CB+XGB+MLP (0.916228) — all worse.
+- All post-best lanes exhausted: seed bagging (0.916382), orig blend (0.916341), pseudo-labeling (LB 0.9134), CB+XGB+MLP (0.916228), two-stage residual (0.909887) — all worse. Two-feature-set lane closed (zero-lift pattern from all prior feature engineering; too high risk with 2 days left).
 - **Final answer: 7b386f5 (CV=0.916540, LB=0.91396).** Remaining slots for insurance only.
-- Remaining: 4 slots March 29, 5 March 30, 5 March 31 = 14 slots.
+- Remaining: 5 slots March 29 (unused), 5 March 30, 5 March 31 = 15 slots. Reserve 1 slot March 31 for clean final re-submit of 7b386f5.
