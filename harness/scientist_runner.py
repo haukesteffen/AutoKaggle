@@ -283,7 +283,11 @@ def _best_kept_score(results_file: Path) -> float | None:
 
 
 def _evaluate_keep_if(expression: str, score: float) -> bool:
-    match = re.fullmatch(r"mean_cv_roc_auc\s*(>=|>|<=|<)\s*([0-9]*\.?[0-9]+)", expression.strip())
+    match = re.fullmatch(
+        r"mean_cv_roc_auc\s*(>=|>|<=|<)\s*([+-]?(?:inf|infinity|[0-9]*\.?[0-9]+))",
+        expression.strip(),
+        flags=re.IGNORECASE,
+    )
     if match is None:
         raise ValueError(f"unsupported keep_if expression: {expression}")
     operator, raw_threshold = match.groups()

@@ -12,6 +12,35 @@ from harness import analysis_runner
 
 
 class AnalysisRunnerTests(unittest.TestCase):
+    def test_inactive_hypothesis_exits_without_running(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            hypothesis_file = root / "analyst-hypothesis.md"
+            findings_file = root / "analyst-findings.md"
+            hypothesis_file.write_text("# Active Analyst Hypothesis\nstatus: none\n")
+
+            stdout = io.StringIO()
+            with mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "analysis_runner",
+                    "--hypothesis-file",
+                    str(hypothesis_file),
+                    "--findings-file",
+                    str(findings_file),
+                ],
+            ), mock.patch("harness.analysis_runner.subprocess.run") as run, mock.patch(
+                "sys.stdout",
+                stdout,
+            ):
+                analysis_runner.main()
+
+            run.assert_not_called()
+            self.assertEqual(stdout.getvalue().strip(), "status: no_active_hypothesis")
+            self.assertFalse(findings_file.exists())
+            self.assertFalse((root / "analysis-errors.md").exists())
+
     def test_success_appends_findings_without_stderr(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

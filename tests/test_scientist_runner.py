@@ -210,6 +210,16 @@ class ScientistRunnerTests(unittest.TestCase):
         self.assertEqual(task.keep_if, "mean_cv_roc_auc >= 0.916540")
         self.assertEqual(task.reference, "result=S-003, knowledge=SK-009")
 
+    def test_missing_keep_if_defaults_to_unconditional_keep(self) -> None:
+        task = scientist_runner._extract_task_metadata(
+            "# Active Scientist Task\n"
+            "status: active\n"
+            "id: S-005\n"
+            "goal: Test default keep rule.\n"
+        )
+        self.assertEqual(task.keep_if, "mean_cv_roc_auc > -inf")
+        self.assertTrue(scientist_runner._evaluate_keep_if(task.keep_if, 0.0))
+
 
 if __name__ == "__main__":
     unittest.main()

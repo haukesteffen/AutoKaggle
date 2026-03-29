@@ -13,6 +13,7 @@ DEFAULT_ERRORS_FILENAME = "analysis-errors.md"
 
 @dataclass(frozen=True)
 class HypothesisMetadata:
+    status: str
     title: str
     question: str
     reference: str | None
@@ -31,6 +32,9 @@ def main() -> None:
 
     hypothesis_text = hypothesis_file.read_text()
     metadata = _extract_hypothesis_metadata(hypothesis_text)
+    if metadata.status != "active":
+        print("status: no_active_hypothesis")
+        return
 
     completed = subprocess.run(
         [sys.executable, str(analysis_path)],
@@ -84,6 +88,7 @@ def _extract_hypothesis_metadata(hypothesis_text: str) -> HypothesisMetadata:
     fields = _parse_key_value_fields(hypothesis_text)
     question = fields.get("q") or _extract_legacy_question(hypothesis_text) or "Analysis"
     return HypothesisMetadata(
+        status=fields.get("status", "none"),
         title=fields.get("id") or question,
         question=question,
         reference=fields.get("reference"),
