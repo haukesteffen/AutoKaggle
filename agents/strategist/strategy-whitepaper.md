@@ -10,16 +10,18 @@ March 31, 2026
 3 (March 29, March 30, March 31) — 10 slots remaining
 
 ## Current Phase
-**Reopened exploration — 4 untried lanes identified; attempt sequentially March 29–31**
+**Consolidation — all lanes exhausted. Final answer is 7b386f5. Remaining slots are insurance only.**
 
 ## Status Summary
 
-All previously known lanes are exhausted. However, research into Kaggle Playground Series S3–S6 winning solutions surfaced 4 genuinely untried techniques. These are not retreads of prior work; they operate at a different level (training data diversity, seed diversity, and test-set information reuse) rather than model architecture or ensemble weighting.
+All 4 Playground Series S3–S6 lanes have been attempted and failed. Hill climbing on all available OOF arrays also confirmed: converges to CB=0.5/XGB=0.5 (same as OOF grid), which loses to equal 3-way in real harness (3963ca3 CV=0.916381 < 0.916540). OOF metrics cannot be trusted for weight selection.
 
-**Current best: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396 (scored March 28, 23:25)**
+**Current best and final answer: 7b386f5, equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396**
+
+**Two-feature-set blend** (Priority 4) remains untested but is very low confidence — original dataset blend already showed distribution mismatch, and engineered features gave zero lift throughout. Run only if scientist has idle time.
 
 **Confirmed non-starters (do not retry):**
-- RidgeCV meta-learner: OOF delta = +0.000077 — same noise-floor result as prior grid search. Closed.
+- RidgeCV meta-learner, hill climbing, OOF grid — all converge to CB+XGB only, which loses to equal 3-way.
 - All lanes in the "Closed Lanes" section below.
 
 ## Slot Budget
@@ -35,37 +37,25 @@ Plan to use ~5–6 slots for experiments. Keep rest as insurance and for confirm
 
 ## New Lanes — Priority Order for March 29–31
 
-### 1. Seed diversity bagging (Priority 1 — March 29)
-Train each of LGBM, CatBoost, XGBoost across 5 random seeds (15 models total), then average all predictions.
-- **Expected gain:** +0.0005–0.002 LB
-- **Effort:** ~1h, 1 LB slot
-- **Evidence:** Used by S4E8 1st-place winner (72 OOF models), NVIDIA Grandmaster Playbook
-- **Risk:** Low. Pure averaging; cannot hurt unless seed variance is unusually high.
-- **Go condition:** Offline harness CV clearly above 0.9166 before submitting.
+### ~~1. Seed diversity bagging~~ — DONE, FAILED
+`ensemble_seed_bag_15` (3eaeb6c): CV=0.916382 < 0.916540. 15-model seed average worse than equal single-seed 3-way.
 
-### 2. Original Telco dataset blend (Priority 2 — March 29/30)
-Augment training data with ~7k rows from the IBM Telco Customer Churn dataset (the original source for this Playground series).
-- **Expected gain:** +0.0003–0.002 LB
-- **Effort:** ~2h, 1 LB slot
-- **Evidence:** Standard top-5 technique across multiple Playground seasons.
-- **Risk:** Low-medium. Extra rows with slightly different distribution may hurt CV but help LB.
-- **Go condition:** LB slot justified even if CV is flat; pattern is well-established.
+### ~~2. Original Telco dataset blend~~ — DONE, FAILED
+`ensemble_lgbm_cb_xgb_orig` (b465548): CV=0.916341 < 0.916540. 7k IBM Telco rows introduce distribution noise.
 
-### 3. Soft pseudo-labeling on test set (Priority 3 — March 30)
-Use 7b386f5 test predictions as soft labels; retrain ensemble on combined train + soft-labeled test set.
-- **Expected gain:** +0.001–0.004 LB
-- **Effort:** ~3h, 1 LB slot
-- **Evidence:** High-ceiling technique in multiple Playground top solutions.
-- **Risk:** High uncertainty — CV is **uninformative** here (model has seen test labels during training). Only LB tells the truth.
-- **Go condition:** Always spend the slot if capacity allows; CV cannot be used as a gate.
+### ~~3. Soft pseudo-labeling~~ — DONE, FAILED
+`ensemble_lgbm_cb_xgb_pseudo` (48a125b): CV=0.916321, LB=0.91340. Worse on both metrics.
 
-### 4. Two-feature-set blending (Priority 4 — March 30/31)
+### ~~Hill climbing (Caruana greedy)~~ — DONE, CONFIRMS EXISTING FINDING
+Converges in 2 steps to CB=0.5/XGB=0.5 (LGBM=0) — identical to OOF grid result. Harness result already exists as 3963ca3 (CV=0.916381 < 0.916540). OOF metrics cannot be used to select weights reliably.
+
+### 4. Two-feature-set blending (last remaining lane, very low confidence)
 Train the GBDT trio on two distinct feature representations; blend the resulting ensembles.
-- **Expected gain:** +0.001–0.003 LB
+- **Expected gain:** unknown — all prior feature engineering gave zero lift
 - **Effort:** ~3h, 1 LB slot
-- **Evidence:** Useful when Branch B OOF correlation with Branch A is <0.97, even if solo CV does not improve.
-- **Risk:** Medium. Correlation check must be done offline before spending a slot.
-- **Go condition:** Run correlation check first; only submit if cross-branch OOF correlation <0.97.
+- **Evidence:** Useful when Branch B OOF correlation with Branch A is <0.97
+- **Risk:** High. Original dataset blend already showed distribution mismatch; engineered features gave 0 lift.
+- **Go condition:** Run Branch B OOF offline first. Only proceed if OOF correlation with Branch A < 0.97.
 
 ## Guidance For The Supervisor
 

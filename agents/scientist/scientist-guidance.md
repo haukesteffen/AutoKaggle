@@ -74,8 +74,9 @@ class MultiModelEnsemble(BaseEstimator, ClassifierMixin):
 
 **Current status (March 29 — consolidation phase):**
 - Best result: `7b386f5` equal-weight LGBM+CB+XGB, CV=0.916540, LB=0.91396 — **this is the ceiling**
-- OOF weight grid (step=0.05, all-positive) completed by supervisor: best was LGBM=0.05/CB=0.50/XGB=0.45 → OOF 0.916657 vs equal-weight OOF 0.916580. Delta +0.000077 is too small to trust given OOF-grid unreliability (past experience: OOF overestimates by ~0.0002–0.0003 vs harness). **Do NOT implement.**
-- All lanes exhausted: feature engineering, GBDT tuning, weight optimization, MLP ensemble, CB+XGB only.
+- OOF weight grid (step=0.05, all-positive): best was LGBM=0.05/CB=0.50/XGB=0.45 → OOF 0.916657. **Do NOT implement** — real harness shows CB+XGB-only (3963ca3, CV=0.916381) is worse than equal 3-way.
+- Caruana hill climbing on all 5 OOF arrays (LGBM/CB/XGB/MLP/LR): converged in 2 steps to CB=0.5/XGB=0.5, LGBM=0. **Same as OOF grid. Harness result already exists as 3963ca3 (CV=0.916381 < 0.916540).** Hill climbing confirms OOF metrics cannot be trusted for weight selection; equal 3-way is real-training optimum.
+- All lanes exhausted: feature engineering, GBDT tuning, weight optimization, MLP ensemble, CB+XGB only, seed bagging, orig blend, pseudo-labeling, two-stage residual, hill climbing.
 
 ## Status: NEW LANES OPENED — Resume Exploration
 
