@@ -84,6 +84,8 @@ The human is expected to:
 
 Useful places to inspect:
 
+- [agents/strategist/strategy-lifecycle-guide.md](agents/strategist/strategy-lifecycle-guide.md)
+- [agents/strategist/strategy-request.md](agents/strategist/strategy-request.md) when present
 - [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md) when present
 - [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md)
 - [agents/scientist/scientist-task.md](agents/scientist/scientist-task.md) when present
@@ -100,8 +102,10 @@ Useful places to inspect:
 Key tracked files:
 
 - [agents/program.md](agents/program.md): shared agent contract
+- [agents/strategist/strategy-lifecycle-guide.md](agents/strategist/strategy-lifecycle-guide.md): strategist-owned macro guide
+- [agents/strategist/strategy-request.md](agents/strategist/strategy-request.md): supervisor-owned factual strategist input
 - [agents/strategist/strategy-whitepaper.md](agents/strategist/strategy-whitepaper.md): strategist-owned current plan
-- [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md): strategist-owned reusable playbook
+- [agents/strategist/strategy-idea-cookbook.md](agents/strategist/strategy-idea-cookbook.md): strategist-owned reusable idea bank
 - [agents/scientist/scientist-task.md](agents/scientist/scientist-task.md): supervisor-owned active scientist task
 - [agents/scientist/scientist-results.md](agents/scientist/scientist-results.md): append-only scientist result history
 - [agents/scientist/scientist-knowledge.md](agents/scientist/scientist-knowledge.md): concise scientist-owned durable memory

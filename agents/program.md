@@ -26,7 +26,7 @@ Persistent roles:
 
 Episodic roles:
 
-- **Strategist** — long-horizon planning role. Produces `agents/strategist/strategy-whitepaper.md` and maintains `agents/strategist/strategy-idea-cookbook.md`. The strategist recommends; the supervisor decides.
+- **Strategist** — long-horizon planning role. Produces `agents/strategist/strategy-whitepaper.md`, maintains `agents/strategist/strategy-lifecycle-guide.md` and `agents/strategist/strategy-idea-cookbook.md`, and reads the supervisor-owned `agents/strategist/strategy-request.md`. The strategist recommends; the supervisor decides.
 - **Analyst** — signal quality expert. Invoked by the supervisor only when there is a concrete yes/no hypothesis to test. Inspects model artifacts and data, appends a durable findings entry, updates concise durable knowledge when warranted, then exits or idles until the next request.
 - **Scientist** — experiment engine. Invoked by the supervisor only when there is one concrete experiment task to execute. Implements one experiment, retries invalid launches locally, records one terminal result, updates concise durable knowledge when warranted, then exits.
 
@@ -37,7 +37,11 @@ Episodic roles:
 - The supervisor coordinates strategy and owns submission timing, submission notes, and leaderboard bookkeeping.
 - The supervisor does not inspect raw dataset files itself. If it needs dataset evidence, it asks the analyst.
 - The supervisor should treat unverified empirical claims as hypotheses. If a claim is decision-relevant and not already supported by experiment results, leaderboard history, or analyst output, route it to the analyst before acting on it.
+- The supervisor owns `agents/strategist/strategy-request.md`. The request is factual. The whitepaper is interpretive.
 - The strategist recommends the high-level plan. The supervisor translates that plan into operational guidance for the scientist and the rest of the team.
+- The strategist normally reads the strategy request, durable analyst knowledge, durable scientist knowledge, and leaderboard history. It does not need to reread raw findings and result histories on every refresh.
+- Early thin coverage is a strategy problem even if current CV is improving.
+- When time is abundant, no major cookbook area should remain completely untested.
 - The analyst is on-demand. It is invoked only for concrete decision-relevant hypotheses and does not require a standing terminal or polling loop.
 - The analyst answers one active, falsifiable hypothesis at a time. Hypotheses should be yes/no questions tied to a concrete decision.
 - The analyst presents evidence in code, tables, counts, and metrics. Findings should stay neutral and factual. Do not use plots unless the human explicitly asks.
@@ -78,6 +82,8 @@ Episodic roles:
         submission.py                # supervisor-owned submission prep helper
       strategist/
         role.md
+        strategy-lifecycle-guide.md
+        strategy-request.md          # supervisor-owned factual strategist input
         strategy-whitepaper.md
         strategy-idea-cookbook.md
       analyst/
@@ -111,15 +117,16 @@ All inter-agent coordination flows through tracked files in the repository, read
 
 | File | Owned by | Read by | Lives in |
 |------|----------|---------|----------|
+| `agents/strategist/strategy-request.md` | Supervisor | Strategist | `AutoKaggle/` |
 | `agents/strategist/strategy-whitepaper.md` | Strategist | Supervisor | `AutoKaggle/` |
 | `agents/strategist/strategy-idea-cookbook.md` | Strategist | Strategist, Supervisor | `AutoKaggle/` |
 | `agents/scientist/scientist-task.md` | Supervisor | Scientist | `AutoKaggle/` |
 | `agents/analyst/analyst-hypothesis.md` | Supervisor | Analyst | `AutoKaggle/` |
-| `agents/analyst/analyst-findings.md` | Analyst | Supervisor, Strategist | `AutoKaggle/` |
-| `agents/analyst/analyst-knowledge.md` | Analyst | Analyst, Supervisor | `AutoKaggle/` |
+| `agents/analyst/analyst-findings.md` | Analyst | Supervisor | `AutoKaggle/` |
+| `agents/analyst/analyst-knowledge.md` | Analyst | Analyst, Supervisor, Strategist | `AutoKaggle/` |
 | `agents/supervisor/leaderboard-history.md` | Supervisor | Supervisor, Strategist | `AutoKaggle/` |
-| `agents/scientist/scientist-results.md` | Scientist | Supervisor, Analyst, Strategist | `AutoKaggle/` |
-| `agents/scientist/scientist-knowledge.md` | Scientist | Scientist, Supervisor | `AutoKaggle/` |
+| `agents/scientist/scientist-results.md` | Scientist | Supervisor, Analyst | `AutoKaggle/` |
+| `agents/scientist/scientist-knowledge.md` | Scientist | Scientist, Supervisor, Strategist | `AutoKaggle/` |
 
 Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never committed. They live in `AutoKaggle/artifacts/experiments/<hash>/` and are accessed by all agents via absolute path. Per-run logs and exit-code files may live beside them as untracked local runtime state.
 
@@ -133,7 +140,7 @@ Binary artifacts (`oof-preds.npy`, `model.pkl`, `test-preds.npy`) are never comm
 
 CV score is the default local optimisation metric, but it is not the sole objective. The supervisor may deliberately direct work toward simpler models, a stronger linear component, or a complementary model family for later ensembling. The supervisor tracks whether CV gains translate to LB gains in `agents/supervisor/leaderboard-history.md`. If they stop correlating, treat this as a priority signal over chasing further CV improvement.
 
-The strategist decides the current phase using the current date, the competition deadline assumption, and the evidence accumulated so far. The whitepaper should explicitly state the current date, the deadline assumption, and the number of calendar days remaining using absolute dates.
+The supervisor refreshes `agents/strategist/strategy-request.md` from factual run state and durable knowledge. The strategist then computes the current date, the deadline assumption, the number of calendar days remaining, and the current emphasis across the full cycle. The whitepaper should explicitly state the current date, the deadline assumption, and the number of calendar days remaining using absolute dates.
 
 ### Experimentation
 
