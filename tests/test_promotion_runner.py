@@ -11,6 +11,7 @@ from unittest import mock
 from kagglesdk.competitions.types.submission_status import SubmissionStatus
 
 from harness import promotion_runner
+from harness.scientist_contract import ResultRow
 
 
 class FakeSubmitResponse:
@@ -70,21 +71,21 @@ class FakeApi:
 
 class PromotionRunnerTests(unittest.TestCase):
     def test_main_emits_json_for_scored_submission(self) -> None:
-        hash_value = "abcdef1"
+        task_id = "S-018"
         with TemporaryDirectory() as tmpdir:
-            artifact_dir = Path(tmpdir) / hash_value
+            artifact_dir = Path(tmpdir) / task_id
             artifact_dir.mkdir()
             (artifact_dir / "test-preds.npy").write_bytes(b"ready")
 
             pending = FakeSubmission(
                 ref=42,
-                description=hash_value,
+                description=task_id,
                 file_name="submission.csv",
                 status=SubmissionStatus.PENDING,
             )
             complete = FakeSubmission(
                 ref=42,
-                description=hash_value,
+                description=task_id,
                 file_name="submission.csv",
                 status=SubmissionStatus.COMPLETE,
                 public_score="0.91821",
@@ -101,22 +102,27 @@ class PromotionRunnerTests(unittest.TestCase):
             exit_code, payload = self._run_main(
                 [
                     "promotion_runner",
-                    "--hash",
-                    hash_value,
-                    "--artifact-dir",
-                    str(artifact_dir),
-                    "--cv-score",
-                    "0.916481",
+                    "--task-id",
+                    task_id,
                     "--poll-interval-seconds",
                     "0.01",
                 ],
+                artifact_dir=artifact_dir,
+                result_row=ResultRow(
+                    task_id=task_id,
+                    status="kept",
+                    score=0.916481,
+                    std=0.001083,
+                    delta_best=0.0,
+                    desc="demo",
+                ),
                 create_api=api,
                 create_submission_csv=fake_create_submission_csv,
                 rank=142,
             )
 
         self.assertEqual(exit_code, 0)
-        self.assertEqual(payload["hash"], hash_value)
+        self.assertEqual(payload["task_id"], task_id)
         self.assertEqual(payload["terminal_status"], "scored")
         self.assertEqual(payload["submission_status"], "complete")
         self.assertEqual(payload["submission_id"], 42)
@@ -126,19 +132,19 @@ class PromotionRunnerTests(unittest.TestCase):
         self.assertEqual(payload["cv_score"], 0.916481)
         self.assertIsNone(payload["error_category"])
         self.assertEqual(len(api.submit_calls), 1)
-        self.assertEqual(api.submit_calls[0][1], hash_value)
+        self.assertEqual(api.submit_calls[0][1], task_id)
         self.assertTrue(payload["submission_file"].endswith("/submission.csv"))
 
     def test_main_times_out_with_machine_readable_error(self) -> None:
-        hash_value = "abcdef1"
+        task_id = "S-018"
         with TemporaryDirectory() as tmpdir:
-            artifact_dir = Path(tmpdir) / hash_value
+            artifact_dir = Path(tmpdir) / task_id
             artifact_dir.mkdir()
             (artifact_dir / "test-preds.npy").write_bytes(b"ready")
 
             pending = FakeSubmission(
                 ref=42,
-                description=hash_value,
+                description=task_id,
                 file_name="submission.csv",
                 status=SubmissionStatus.PENDING,
             )
@@ -147,15 +153,22 @@ class PromotionRunnerTests(unittest.TestCase):
             exit_code, payload = self._run_main(
                 [
                     "promotion_runner",
-                    "--hash",
-                    hash_value,
-                    "--artifact-dir",
-                    str(artifact_dir),
+                    "--task-id",
+                    task_id,
                     "--timeout-seconds",
                     "0",
                     "--poll-interval-seconds",
                     "0.01",
                 ],
+                artifact_dir=artifact_dir,
+                result_row=ResultRow(
+                    task_id=task_id,
+                    status="kept",
+                    score=0.916481,
+                    std=0.001083,
+                    delta_best=0.0,
+                    desc="demo",
+                ),
                 create_api=api,
                 create_submission_csv=self._fake_create_submission_csv,
             )
@@ -167,25 +180,47 @@ class PromotionRunnerTests(unittest.TestCase):
         self.assertIn("not scored", payload["error_message"])
 
     def test_main_reports_validation_errors_as_json(self) -> None:
-        hash_value = "abcdef1"
+        task_id = "S-018"
         with TemporaryDirectory() as tmpdir:
-            artifact_dir = Path(tmpdir) / hash_value
+            artifact_dir = Path(tmpdir) / task_id
             artifact_dir.mkdir()
 
             exit_code, payload = self._run_main(
                 [
                     "promotion_runner",
-                    "--hash",
-                    hash_value,
-                    "--artifact-dir",
-                    str(artifact_dir),
+                    "--task-id",
+                    task_id,
                 ],
+                artifact_dir=artifact_dir,
+                result_row=ResultRow(
+                    task_id=task_id,
+                    status="kept",
+                    score=0.916481,
+                    std=0.001083,
+                    delta_best=0.0,
+                    desc="demo",
+                ),
             )
 
         self.assertEqual(exit_code, 1)
         self.assertEqual(payload["terminal_status"], "error")
         self.assertEqual(payload["error_category"], "validation_error")
         self.assertIn("test-preds.npy", payload["error_message"])
+
+    def test_main_reports_missing_result_row_as_json(self) -> None:
+        exit_code, payload = self._run_main(
+            [
+                "promotion_runner",
+                "--task-id",
+                "S-999",
+            ],
+            result_lookup_error=ValueError("task_id 'S-999' not found in scientist-results.md"),
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(payload["terminal_status"], "error")
+        self.assertEqual(payload["error_category"], "validation_error")
+        self.assertIn("S-999", payload["error_message"])
 
     def test_lookup_leaderboard_rank_walks_pages(self) -> None:
         entry1 = mock.Mock(team_name="team-a", score="0.92000")
@@ -208,16 +243,19 @@ class PromotionRunnerTests(unittest.TestCase):
 
         self.assertEqual(rank, 3)
 
-    def test_default_artifact_dir_is_tag_free(self) -> None:
+    def test_default_artifact_dir_uses_task_id(self) -> None:
         self.assertEqual(
-            promotion_runner._default_artifact_dir("abcdef1"),
-            Path("artifacts/experiments/abcdef1"),
+            promotion_runner._default_artifact_dir("S-018"),
+            Path("artifacts/S-018"),
         )
 
     def _run_main(
         self,
         argv: list[str],
         *,
+        artifact_dir: Path | None = None,
+        result_row: ResultRow | None = None,
+        result_lookup_error: Exception | None = None,
         create_api: FakeApi | None = None,
         create_submission_csv=None,
         rank: int | None = None,
@@ -228,6 +266,12 @@ class PromotionRunnerTests(unittest.TestCase):
             mock.patch("harness.promotion_runner.time.sleep", return_value=None),
         ]
 
+        if artifact_dir is not None:
+            patches.append(mock.patch("harness.promotion_runner._default_artifact_dir", return_value=artifact_dir))
+        if result_lookup_error is not None:
+            patches.append(mock.patch("harness.promotion_runner.read_result_row", side_effect=result_lookup_error))
+        elif result_row is not None:
+            patches.append(mock.patch("harness.promotion_runner.read_result_row", return_value=result_row))
         if create_api is not None:
             patches.append(mock.patch("harness.promotion_runner._create_api", return_value=create_api))
         if create_submission_csv is not None:

@@ -1,5 +1,4 @@
 import argparse
-import hashlib
 import os
 import re
 import subprocess
@@ -9,15 +8,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from harness.experiment_runner import INVALID_EXIT_CODE
+from harness.scientist_contract import (
+    DEFAULT_EXPERIMENT_PATH,
+    ensure_results_file,
+    normalize_repo_path,
+    parse_task_metadata,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_EXPERIMENT_PATH = Path("agents/scientist/experiment.py")
 DEFAULT_ERRORS_FILENAME = "scientist-errors.md"
-RESULTS_HEADER = """# Scientist Results
-
-| id | code | status | score | std | delta_best | desc |
-|----|------|--------|-------|-----|------------|------|
-"""
 
 
 @dataclass(frozen=True)
@@ -39,23 +38,20 @@ class ExperimentSummary:
 
 def main() -> None:
     args = _parse_args()
-    task_file = _normalize_repo_path(args.task_file)
-    results_file = _normalize_repo_path(args.results_file)
-    experiment_path = _normalize_repo_path(args.experiment_path)
+    task_file = normalize_repo_path(args.task_file)
+    results_file = normalize_repo_path(args.results_file)
     errors_file = (
-        _normalize_repo_path(args.errors_file)
+        normalize_repo_path(args.errors_file)
         if args.errors_file
         else results_file.with_name(DEFAULT_ERRORS_FILENAME)
     )
-    artifact_root = _normalize_repo_path(args.artifact_root) if args.artifact_root else None
 
     task = _extract_task_metadata(task_file.read_text())
     if task.status != "active":
         print("status: no_active_task")
         return
-    code = _code_fingerprint(experiment_path)
     completed = subprocess.run(
-        _experiment_command(experiment_path=experiment_path, artifact_root=artifact_root, code=code),
+        _experiment_command(),
         capture_output=True,
         cwd=REPO_ROOT,
         env=_runner_env(),
@@ -64,11 +60,11 @@ def main() -> None:
     summary = _parse_summary(completed.stdout)
 
     if completed.returncode == INVALID_EXIT_CODE or summary.status == "invalid":
-        _append_invalid_entry(errors_file=errors_file, task=task, code=code, completed=completed)
+        _append_invalid_entry(errors_file=errors_file, task=task, completed=completed)
         _report_invalid(errors_file=errors_file, completed=completed)
         raise SystemExit(INVALID_EXIT_CODE)
 
-    _append_results_row(results_file=results_file, task=task, code=code, completed=completed, summary=summary)
+    _append_results_row(results_file=results_file, task=task, completed=completed, summary=summary)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -81,12 +77,6 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _normalize_repo_path(path: Path) -> Path:
-    if path.is_absolute():
-        return path.resolve()
-    return (REPO_ROOT / path).resolve()
-
-
 def _runner_env() -> dict[str, str]:
     env = os.environ.copy()
     repo_root = str(REPO_ROOT)
@@ -96,48 +86,20 @@ def _runner_env() -> dict[str, str]:
 
 
 def _extract_task_metadata(task_text: str) -> TaskMetadata:
-    fields = _parse_key_value_fields(task_text)
+    parsed = parse_task_metadata(task_text)
     return TaskMetadata(
-        status=fields.get("status", "none"),
-        task_id=fields.get("id") or "S-unknown",
-        goal=fields.get("goal") or "Unspecified experiment goal",
-        keep_if=fields.get("keep_if") or "mean_cv_roc_auc > -inf",
-        reference=fields.get("reference"),
+        status=parsed.status,
+        task_id=parsed.task_id,
+        goal=parsed.goal,
+        keep_if=parsed.keep_if,
+        reference=parsed.reference,
     )
-
-
-def _parse_key_value_fields(task_text: str) -> dict[str, str]:
-    fields: dict[str, str] = {}
-    for line in task_text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or ":" not in stripped:
-            continue
-        key, value = stripped.split(":", 1)
-        normalized_key = key.strip().lower()
-        if normalized_key not in {"status", "id", "at", "goal", "keep_if", "reference"}:
-            continue
-        normalized_value = value.strip()
-        if normalized_value and normalized_key not in fields:
-            fields[normalized_key] = normalized_value
-    return fields
-
-
-def _code_fingerprint(experiment_path: Path) -> str:
-    digest = hashlib.sha1(experiment_path.read_bytes()).hexdigest()
-    return digest[:7]
-
-
-def _experiment_command(experiment_path: Path, artifact_root: Path | None, code: str) -> list[str]:
-    command = [
+def _experiment_command() -> list[str]:
+    return [
         sys.executable,
         "-m",
         "harness.experiment_runner",
-        "--experiment-path",
-        str(experiment_path),
     ]
-    if artifact_root is not None:
-        command.extend(["--artifact-dir", str(artifact_root / "experiments" / code)])
-    return command
 
 
 def _parse_summary(stdout: str) -> ExperimentSummary:
@@ -168,7 +130,6 @@ def _maybe_float(value: str | None) -> float | None:
 def _append_invalid_entry(
     errors_file: Path,
     task: TaskMetadata,
-    code: str,
     completed: subprocess.CompletedProcess[str],
 ) -> None:
     errors_file.parent.mkdir(parents=True, exist_ok=True)
@@ -178,7 +139,6 @@ def _append_invalid_entry(
         f.write(f"## {task.task_id}\n")
         f.write(f"at: {_utc_timestamp()}\n")
         f.write(f"goal: {task.goal}\n")
-        f.write(f"code: {code}\n")
         if task.reference:
             f.write(f"reference: {task.reference}\n")
         f.write(f"exit_code: `{completed.returncode}`\n")
@@ -201,24 +161,16 @@ def _report_invalid(errors_file: Path, completed: subprocess.CompletedProcess[st
 def _append_results_row(
     results_file: Path,
     task: TaskMetadata,
-    code: str,
     completed: subprocess.CompletedProcess[str],
     summary: ExperimentSummary,
 ) -> None:
-    _ensure_results_file(results_file)
+    ensure_results_file(results_file)
     outcome = _terminal_outcome(task=task, completed=completed, summary=summary, results_file=results_file)
     desc = _table_cell(task.goal)
     with results_file.open("a") as f:
         f.write(
-            f"| {task.task_id} | {code} | {outcome['status']} | {outcome['score']} | {outcome['std']} | {outcome['delta_best']} | {desc} |\n"
+            f"| {task.task_id} | {outcome['status']} | {outcome['score']} | {outcome['std']} | {outcome['delta_best']} | {desc} |\n"
         )
-
-
-def _ensure_results_file(results_file: Path) -> None:
-    results_file.parent.mkdir(parents=True, exist_ok=True)
-    if results_file.exists() and results_file.read_text().strip():
-        return
-    results_file.write_text(RESULTS_HEADER)
 
 
 def _terminal_outcome(
@@ -268,13 +220,13 @@ def _best_kept_score(results_file: Path) -> float | None:
         return None
     for line in results_file.read_text().splitlines():
         stripped = line.strip()
-        if not stripped.startswith("|") or stripped.startswith("| id ") or stripped.startswith("|----"):
+        if not stripped.startswith("|") or stripped.startswith("| task_id ") or stripped.startswith("|---------"):
             continue
         columns = [column.strip() for column in stripped.strip("|").split("|")]
-        if len(columns) != 7:
+        if len(columns) != 6:
             continue
-        status = columns[2]
-        score = _maybe_float(columns[3])
+        status = columns[1]
+        score = _maybe_float(columns[2])
         if status != "kept" or score is None:
             continue
         if best is None or score > best:

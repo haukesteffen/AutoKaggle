@@ -123,7 +123,7 @@ This downloads competition data and generates `data/folds.csv`. If it fails due 
 ### 4. Create the artifacts directory
 
 ```bash
-mkdir -p artifacts/experiments
+mkdir -p artifacts
 ```
 
 ### 5. Initialise missing communication files
@@ -138,8 +138,8 @@ EOF
 test -f agents/scientist/scientist-results.md || cat > agents/scientist/scientist-results.md <<'EOF'
 # Scientist Results
 
-| id | code | status | score | std | delta_best | desc |
-|----|------|--------|-------|-----|------------|------|
+| task_id | status | score | std | delta_best | desc |
+|---------|--------|-------|-----|------------|------|
 EOF
 test -f agents/scientist/scientist-knowledge.md || echo "# Scientist Knowledge" > agents/scientist/scientist-knowledge.md
 test -f agents/analyst/analyst-hypothesis.md || cat > agents/analyst/analyst-hypothesis.md <<'EOF'
@@ -168,8 +168,8 @@ test -f agents/supervisor/leaderboard-history.md || cat > agents/supervisor/lead
 
 ## Submission Ledger
 
-| hash | submitted_at | cv_score | status | lb_score | lb_rank | rationale |
-|------|--------------|----------|--------|----------|---------|-----------|
+| task_id | submitted_at | cv_score | status | lb_score | lb_rank | rationale |
+|---------|--------------|----------|--------|----------|---------|-----------|
 
 ## Notes
 
@@ -282,8 +282,8 @@ trigger: refresh
 - moonshots: <count or short note>
 
 ## Current
-- best_cv: <score and hash>
-- best_lb: <score and hash or none>
+- best_cv: <score and task_id>
+- best_lb: <score and task_id or none>
 - active_scientist_lane: <short phrase>
 - active_analyst_topic: <short phrase or none>
 
@@ -333,10 +333,10 @@ status: active
 id: A-018
 at: 2026-03-29T10:45Z
 q: <specific yes/no question>
-reference: experiment=f03f610, knowledge=AK-012
+reference: task_id=S-017, knowledge=AK-012
 ```
 
-`reference:` is optional. Use it only when a specific experiment hash or knowledge entry should anchor the investigation.
+`reference:` is optional. Use it only when a specific experiment task id or knowledge entry should anchor the investigation.
 
 Only one hypothesis at a time. Wait for new findings on the current hypothesis before replacing it.
 
@@ -373,10 +373,10 @@ Use this structure:
 
 ## Submission Ledger
 
-| hash | submitted_at | cv_score | status | lb_score | lb_rank | rationale |
-|------|--------------|----------|--------|----------|---------|-----------|
-| f03f610 | 2026-03-27T14:32Z | 0.916481 | scored | 0.91821 | 142 | Ridge meta-learner |
-| 3d9a201 | 2026-03-27T18:05Z | 0.914200 | pending | pending | pending | LGBM baseline |
+| task_id | submitted_at | cv_score | status | lb_score | lb_rank | rationale |
+|---------|--------------|----------|--------|----------|---------|-----------|
+| S-018 | 2026-03-27T14:32Z | 0.916481 | scored | 0.91821 | 142 | Ridge meta-learner |
+| S-019 | 2026-03-27T18:05Z | 0.914200 | pending | pending | pending | LGBM baseline |
 
 ## Notes
 
@@ -385,7 +385,7 @@ Use this structure:
 
 Rules:
 
-- never add a second row for the same hash
+- never add a second row for the same task_id
 - write a row when you submit, with `status`, `lb_score`, and `lb_rank` set to `pending` if Kaggle has not scored it yet
 - update that row in place once the result is available
 - use the `Notes` section for CV/LB mismatch commentary, submission-budget posture, or failure context that does not belong in a row
@@ -399,14 +399,12 @@ The harness now owns the full submission lifecycle. Do not call raw `kaggle comp
 Workflow:
 
 ```text
-1. Verify the hash is not already present in agents/supervisor/leaderboard-history.md.
+1. Verify the task_id is not already present in agents/supervisor/leaderboard-history.md.
 2. Verify the daily submission budget still allows a new submission.
 3. Run harness/promotion_runner.py:
    uv run python -m harness.promotion_runner \
-     --hash <hash> \
-     --artifact-dir $ARTIFACTS/experiments/<hash> \
-     --cv-score <cv_score>
-4. Consume the JSON result from the harness. It validates the artifact, generates submission.csv if needed, submits to Kaggle, polls until scored or timeout/error, and returns fields such as submitted_at, submission_id, terminal_status, lb_score, lb_rank when available, and error_category on failure.
+     --task-id <task_id>
+4. Consume the JSON result from the harness. It resolves `artifacts/<task_id>/`, reads the matching CV score from `agents/scientist/scientist-results.md`, generates submission.csv if needed, submits to Kaggle, polls until scored or timeout/error, and returns fields such as submitted_at, submission_id, terminal_status, lb_score, lb_rank when available, and error_category on failure.
 5. Update agents/supervisor/leaderboard-history.md deterministically from that JSON and commit it.
 ```
 
@@ -421,7 +419,7 @@ You are the team's interface to the human. Report at the end of every wake, even
 ```text
 [<timestamp>] Supervisor wake - <trigger>
 
-Experiments: <N kept> kept, <N total> run. Best CV: <score> (<hash>).
+Experiments: <N kept> kept, <N total> run. Best CV: <score> (<task_id>).
 Strategy: <current phase and one-line objective>.
 Scientist: <one line on current direction>.
 Analyst: <last finding in one line, "invoked", or "idle">.
