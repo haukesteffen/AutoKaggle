@@ -54,9 +54,9 @@ $REPO/agents/analyst/analyst-findings.md                   # durable append-only
 $REPO/agents/analyst/analyst-knowledge.md                  # concise durable analyst memory
 $REPO/agents/scientist/scientist-results.md                # experiment history
 $REPO/agents/scientist/experiment.py                       # scientist's current code
-$ARTIFACTS/experiments/<hash>/oof-preds.npy                # OOF probabilities aligned to training rows
-$ARTIFACTS/experiments/<hash>/model.pkl                    # fitted sklearn Pipeline
-$ARTIFACTS/experiments/<hash>/test-preds.npy               # test set probabilities
+$ARTIFACTS/<task_id>/oof-preds.npy                         # OOF probabilities aligned to training rows
+$ARTIFACTS/<task_id>/model.pkl                             # fitted sklearn Pipeline
+$ARTIFACTS/<task_id>/test-preds.npy                        # test set probabilities
 $DATA/train.csv                                            # training data
 $DATA/test.csv                                             # test data
 ```
@@ -64,7 +64,7 @@ $DATA/test.csv                                             # test data
 To read experiment code at a specific commit (works from any checkout):
 
 ```bash
-git show <hash>:agents/scientist/experiment.py
+git show <commit>:agents/scientist/experiment.py
 ```
 
 ## Setup
@@ -133,7 +133,7 @@ import pickle
 import numpy as np
 import pandas as pd
 
-ARTIFACTS_ROOT = "<root>/AutoKaggle/artifacts/experiments"
+ARTIFACTS_ROOT = "<root>/AutoKaggle/artifacts"
 DATA = "<root>/AutoKaggle/data"
 
 def main():

@@ -16,8 +16,6 @@ class ScientistRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             task_file = root / "scientist-task.md"
             results_file = root / "scientist-results.md"
-            experiment_file = root / "experiment.py"
-            experiment_file.write_text("EXPERIMENT_NAME = 'demo'\n")
             task_file.write_text("# Active Scientist Task\nstatus: none\n")
 
             with mock.patch.object(
@@ -29,8 +27,6 @@ class ScientistRunnerTests(unittest.TestCase):
                     str(task_file),
                     "--results-file",
                     str(results_file),
-                    "--experiment-path",
-                    str(experiment_file),
                 ],
             ), mock.patch("harness.scientist_runner.subprocess.run") as run:
                 scientist_runner.main()
@@ -43,8 +39,6 @@ class ScientistRunnerTests(unittest.TestCase):
             root = Path(tmpdir)
             task_file = root / "scientist-task.md"
             results_file = root / "scientist-results.md"
-            experiment_file = root / "experiment.py"
-            experiment_file.write_text("EXPERIMENT_NAME = 'demo'\n")
             task_file.write_text(
                 "# Active Scientist Task\n"
                 "status: active\n"
@@ -77,29 +71,24 @@ class ScientistRunnerTests(unittest.TestCase):
                     str(task_file),
                     "--results-file",
                     str(results_file),
-                    "--experiment-path",
-                    str(experiment_file),
                 ],
             ), mock.patch("harness.scientist_runner.subprocess.run", return_value=completed):
                 scientist_runner.main()
 
             results = results_file.read_text()
-            code = scientist_runner._code_fingerprint(experiment_file)
-            self.assertIn("| S-001 |", results)
-            self.assertIn(f"| {code} | kept | 0.916540 | 0.001083 | +0.000000 | Test demo experiment. |", results)
+            self.assertIn("| task_id | status | score | std | delta_best | desc |", results)
+            self.assertIn("| S-001 | kept | 0.916540 | 0.001083 | +0.000000 | Test demo experiment. |", results)
 
     def test_success_discarded_uses_previous_best_for_delta(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             task_file = root / "scientist-task.md"
             results_file = root / "scientist-results.md"
-            experiment_file = root / "experiment.py"
-            experiment_file.write_text("EXPERIMENT_NAME = 'demo'\n")
             results_file.write_text(
                 "# Scientist Results\n\n"
-                "| id | code | status | score | std | delta_best | desc |\n"
-                "|----|------|--------|-------|-----|------------|------|\n"
-                "| S-000 | abc1234 | kept | 0.916540 | 0.001083 | +0.000000 | prior best |\n"
+                "| task_id | status | score | std | delta_best | desc |\n"
+                "|---------|--------|-------|-----|------------|------|\n"
+                "| S-000 | kept | 0.916540 | 0.001083 | +0.000000 | prior best |\n"
             )
             task_file.write_text(
                 "# Active Scientist Task\n"
@@ -131,27 +120,22 @@ class ScientistRunnerTests(unittest.TestCase):
                     str(task_file),
                     "--results-file",
                     str(results_file),
-                    "--experiment-path",
-                    str(experiment_file),
                 ],
             ), mock.patch("harness.scientist_runner.subprocess.run", return_value=completed):
                 scientist_runner.main()
 
             results = results_file.read_text()
-            self.assertIn("| S-002 |", results)
-            self.assertIn("| discarded | 0.916228 | 0.001041 | -0.000312 | Test weaker experiment. |", results)
+            self.assertIn("| S-002 | discarded | 0.916228 | 0.001041 | -0.000312 | Test weaker experiment. |", results)
 
     def test_invalid_writes_error_log_without_results_row(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             task_file = root / "scientist-task.md"
             results_file = root / "scientist-results.md"
-            experiment_file = root / "experiment.py"
-            experiment_file.write_text("EXPERIMENT_NAME = 'demo'\n")
             results_file.write_text(
                 "# Scientist Results\n\n"
-                "| id | code | status | score | std | delta_best | desc |\n"
-                "|----|------|--------|-------|-----|------------|------|\n"
+                "| task_id | status | score | std | delta_best | desc |\n"
+                "|---------|--------|-------|-----|------------|------|\n"
             )
             task_file.write_text(
                 "# Active Scientist Task\n"
@@ -177,8 +161,6 @@ class ScientistRunnerTests(unittest.TestCase):
                     str(task_file),
                     "--results-file",
                     str(results_file),
-                    "--experiment-path",
-                    str(experiment_file),
                 ],
             ), mock.patch("harness.scientist_runner.subprocess.run", return_value=completed), redirect_stderr(
                 stderr
@@ -187,8 +169,7 @@ class ScientistRunnerTests(unittest.TestCase):
                     scientist_runner.main()
 
             self.assertEqual(exc.exception.code, scientist_runner.INVALID_EXIT_CODE)
-            results = results_file.read_text()
-            self.assertNotIn("S-003", results)
+            self.assertNotIn("S-003", results_file.read_text())
             errors = (root / "scientist-errors.md").read_text()
             self.assertIn("## S-003", errors)
             self.assertIn("goal: Test broken experiment.", errors)

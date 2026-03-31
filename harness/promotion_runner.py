@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -20,6 +19,7 @@ from kagglesdk.competitions.types.submission_status import SubmissionStatus
 
 from agents.supervisor.submission import create_submission_csv
 from harness.dataset import COMPETITION
+from harness.scientist_contract import normalize_repo_path, read_result_row
 
 DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
 DEFAULT_SUBMISSION_FILENAME = "submission.csv"
@@ -28,7 +28,6 @@ DEFAULT_TIMEOUT_SECONDS = 30.0 * 60.0
 DEFAULT_LEADERBOARD_PAGE_SIZE = 100
 DEFAULT_SUBMISSIONS_PAGE_SIZE = 100
 DEFAULT_KAGGLE_ATTEMPTS = 3
-HASH_PATTERN = re.compile(r"[0-9a-f]{7,40}")
 TRANSIENT_KAGGLE_TOKENS = (
     "429",
     "500",
@@ -61,7 +60,7 @@ T = TypeVar("T")
 
 @dataclass
 class PromotionResult:
-    hash: str
+    task_id: str
     competition: str
     artifact_dir: str
     submission_file: str
@@ -97,15 +96,15 @@ def main() -> None:
 
 
 def _run_promotion(args: argparse.Namespace) -> PromotionResult:
-    artifact_dir = _normalize_repo_path(args.artifact_dir or _default_artifact_dir(args.hash))
-    submission_file = _normalize_repo_path(args.submission_file or artifact_dir / DEFAULT_SUBMISSION_FILENAME)
+    artifact_dir = normalize_repo_path(_default_artifact_dir(args.task_id))
+    submission_file = normalize_repo_path(args.submission_file or artifact_dir / DEFAULT_SUBMISSION_FILENAME)
     result = PromotionResult(
-        hash=args.hash,
+        task_id=args.task_id,
         competition=COMPETITION,
         artifact_dir=str(artifact_dir),
         submission_file=str(submission_file),
         submitted_at=None,
-        cv_score=args.cv_score,
+        cv_score=None,
         submission_id=None,
         kaggle_message=None,
         terminal_status="error",
@@ -117,7 +116,9 @@ def _run_promotion(args: argparse.Namespace) -> PromotionResult:
         error_message=None,
     )
 
-    _validate_inputs(args, artifact_dir, submission_file, result)
+    cv_result = _load_result_row(args.task_id, result)
+    result.cv_score = cv_result.score
+    _validate_inputs(args, artifact_dir, submission_file, cv_result, result)
     _ensure_submission_file(args, artifact_dir, submission_file, result)
 
     api = _create_api()
@@ -136,7 +137,7 @@ def _run_promotion(args: argparse.Namespace) -> PromotionResult:
         submit_response = _call_with_retry(
             lambda: api.competition_submit(
                 str(submission_file),
-                args.hash,
+                args.task_id,
                 COMPETITION,
                 quiet=True,
             )
@@ -162,7 +163,7 @@ def _run_promotion(args: argparse.Namespace) -> PromotionResult:
                 lambda: _get_submission(
                     api=api,
                     submission_id=result.submission_id,
-                    hash_value=args.hash,
+                    task_id=args.task_id,
                     submission_file=submission_file,
                     page_size=args.submissions_page_size,
                 )
@@ -215,12 +216,23 @@ def _run_promotion(args: argparse.Namespace) -> PromotionResult:
         time.sleep(args.poll_interval_seconds)
 
 
+def _load_result_row(task_id: str, result: PromotionResult):
+    try:
+        return read_result_row(task_id)
+    except ValueError as exc:
+        _fail(
+            result,
+            exit_code=1,
+            terminal_status="error",
+            error_category="validation_error",
+            error_message=str(exc),
+        )
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hash", required=True)
-    parser.add_argument("--artifact-dir", type=Path)
+    parser.add_argument("--task-id", required=True)
     parser.add_argument("--submission-file", type=Path)
-    parser.add_argument("--cv-score", type=float)
     parser.add_argument("--force-regenerate-submission-file", action="store_true")
     parser.add_argument("--poll-interval-seconds", type=float, default=DEFAULT_POLL_INTERVAL_SECONDS)
     parser.add_argument("--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS)
@@ -233,24 +245,9 @@ def _validate_inputs(
     args: argparse.Namespace,
     artifact_dir: Path,
     submission_file: Path,
+    cv_result,
     result: PromotionResult,
 ) -> None:
-    if HASH_PATTERN.fullmatch(args.hash) is None:
-        _fail(
-            result,
-            exit_code=1,
-            terminal_status="error",
-            error_category="validation_error",
-            error_message=f"hash must look like a git commit id, got {args.hash!r}",
-        )
-    if artifact_dir.name != args.hash:
-        _fail(
-            result,
-            exit_code=1,
-            terminal_status="error",
-            error_category="validation_error",
-            error_message=f"artifact directory must end with the hash {args.hash!r}",
-        )
     if not artifact_dir.is_dir():
         _fail(
             result,
@@ -266,6 +263,14 @@ def _validate_inputs(
             terminal_status="error",
             error_category="validation_error",
             error_message=f"missing required artifact: {artifact_dir / 'test-preds.npy'}",
+        )
+    if cv_result.score is None:
+        _fail(
+            result,
+            exit_code=1,
+            terminal_status="error",
+            error_category="validation_error",
+            error_message=f"task_id {args.task_id!r} does not have a numeric CV score in scientist-results.md",
         )
     if submission_file.exists() and not submission_file.is_file():
         _fail(
@@ -351,7 +356,7 @@ def _call_with_retry(call: Callable[[], T], attempts: int = DEFAULT_KAGGLE_ATTEM
 def _get_submission(
     api: KaggleApi,
     submission_id: int | None,
-    hash_value: str,
+    task_id: str,
     submission_file: Path,
     page_size: int,
 ):
@@ -366,7 +371,7 @@ def _get_submission(
     for submission in submissions:
         if submission is None:
             continue
-        if submission.description.strip() != hash_value:
+        if submission.description.strip() != task_id:
             continue
         if submission.file_name and submission.file_name != target_file_name:
             continue
@@ -470,14 +475,8 @@ def _is_transient_kaggle_error(exc: Exception) -> bool:
     return any(token in message for token in TRANSIENT_KAGGLE_TOKENS)
 
 
-def _default_artifact_dir(hash_value: str) -> Path:
-    return DEFAULT_ARTIFACTS_ROOT / "experiments" / hash_value
-
-
-def _normalize_repo_path(path: Path) -> Path:
-    if path.is_absolute():
-        return path.resolve()
-    return (REPO_ROOT / path).resolve()
+def _default_artifact_dir(task_id: str) -> Path:
+    return DEFAULT_ARTIFACTS_ROOT / task_id
 
 
 def _submission_status_name(status: Any) -> str | None:

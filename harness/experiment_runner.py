@@ -1,4 +1,3 @@
-import argparse
 import builtins
 import importlib.util
 import multiprocessing as mp
@@ -12,15 +11,21 @@ from pathlib import Path
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(os.cpu_count() or 1))
 
 from harness.dataset import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
+from harness.scientist_contract import (
+    DEFAULT_EXPERIMENT_PATH,
+    default_artifact_dir,
+    normalize_repo_path,
+    read_task_metadata,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_EXPERIMENT_PATH = Path("agents/scientist/experiment.py")
 INVALID_EXIT_CODE = 2
 
 
 def main() -> None:
-    args = _parse_args()
-    experiment_path = _normalize_repo_path(args.experiment_path)
+    task = _load_active_task()
+    experiment_path = normalize_repo_path(DEFAULT_EXPERIMENT_PATH)
+    artifact_dir = normalize_repo_path(default_artifact_dir(task.task_id))
 
     total_start = time.perf_counter()
     deadline = time.monotonic() + TIME_BUDGET_SECONDS
@@ -101,21 +106,20 @@ def main() -> None:
         )
         raise SystemExit(124)
 
-    if args.artifact_dir is not None:
-        if oof_preds is None:
-            print("artifact generation failed: worker did not return out-of-fold predictions", file=sys.stderr)
-            raise SystemExit(1)
-        try:
-            _generate_artifacts(args.artifact_dir, oof_preds, experiment_path)
-        except BaseException as exc:
-            classification = _classify_exception(exc)
-            if classification == "invalid":
-                _print_invalid_summary(experiment_name, result.completed_folds, total_seconds)
-                print(traceback.format_exc(), file=sys.stderr, end="")
-                raise SystemExit(INVALID_EXIT_CODE) from exc
-            _print_error_summary(experiment_name, result.completed_folds, total_seconds)
+    if oof_preds is None:
+        print("artifact generation failed: worker did not return out-of-fold predictions", file=sys.stderr)
+        raise SystemExit(1)
+    try:
+        _generate_artifacts(artifact_dir, oof_preds, experiment_path)
+    except BaseException as exc:
+        classification = _classify_exception(exc)
+        if classification == "invalid":
+            _print_invalid_summary(experiment_name, result.completed_folds, total_seconds)
             print(traceback.format_exc(), file=sys.stderr, end="")
-            raise SystemExit(1) from exc
+            raise SystemExit(INVALID_EXIT_CODE) from exc
+        _print_error_summary(experiment_name, result.completed_folds, total_seconds)
+        print(traceback.format_exc(), file=sys.stderr, end="")
+        raise SystemExit(1) from exc
     _print_success_summary(
         experiment_name=experiment_name,
         result=result,
@@ -158,11 +162,20 @@ def _run_evaluation(messages: mp.Queue, experiment_path: Path) -> None:
         )
 
 
-def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--artifact-dir", type=Path)
-    parser.add_argument("--experiment-path", type=Path, default=DEFAULT_EXPERIMENT_PATH)
-    return parser.parse_args()
+def _load_active_task():
+    try:
+        task = read_task_metadata()
+    except FileNotFoundError:
+        print("error: active scientist task file is missing", file=sys.stderr)
+        raise SystemExit(1) from None
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
+
+    if task.status != "active":
+        print("error: scientist task must be active before experiment_runner can run", file=sys.stderr)
+        raise SystemExit(1)
+    return task
 
 
 def _terminate_process(process: mp.Process) -> None:
@@ -198,7 +211,7 @@ def _generate_artifacts(artifact_dir: Path, oof_preds, experiment_path: Path) ->
     experiment = _load_module_from_path(experiment_path, "autokaggle_experiment_artifacts")
     from harness.dataset import ID_COLUMN, TEST_PATH, load_train_with_folds, predict_positive_scores, split_xy
 
-    artifact_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_clean_artifact_dir(artifact_dir)
     np.save(artifact_dir / "oof-preds.npy", oof_preds)
 
     train_df = load_train_with_folds()
@@ -226,15 +239,18 @@ def _generate_artifacts(artifact_dir: Path, oof_preds, experiment_path: Path) ->
     print(f"artifacts written to {artifact_dir}")
 
 
-def _normalize_repo_path(path: Path) -> Path:
-    if path.is_absolute():
-        return path.resolve()
-    return (REPO_ROOT / path).resolve()
+def _ensure_clean_artifact_dir(artifact_dir: Path) -> None:
+    if artifact_dir.exists():
+        existing = {path.name for path in artifact_dir.iterdir()}
+        collision = existing.intersection({"oof-preds.npy", "model.pkl", "test-preds.npy", "submission.csv"})
+        if collision:
+            raise FileExistsError(f"artifacts already exist for task_id {artifact_dir.name!r}: {sorted(collision)}")
+    artifact_dir.mkdir(parents=True, exist_ok=True)
 
 
 def _load_module_from_path(module_path: Path, module_name: str):
     _ensure_repo_root_on_syspath()
-    resolved_path = _normalize_repo_path(module_path)
+    resolved_path = normalize_repo_path(module_path)
     spec = importlib.util.spec_from_file_location(module_name, resolved_path)
     if spec is None or spec.loader is None:
         raise ImportError(f"could not load module from {resolved_path}")

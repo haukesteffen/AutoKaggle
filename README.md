@@ -134,7 +134,8 @@ Important untracked paths:
 
 Supervisor submissions should go through [harness/promotion_runner.py](harness/promotion_runner.py), not raw Kaggle CLI calls. The harness:
 
-- validates the artifact directory against the target hash
+- resolves the artifact directory from the scientist task id
+- reads the CV score for that task id from `agents/scientist/scientist-results.md`
 - generates `submission.csv` if needed
 - submits to Kaggle
 - polls until the submission is scored, errors, or times out
@@ -144,9 +145,7 @@ Example invocation:
 
 ```bash
 uv run python -m harness.promotion_runner \
-  --hash <hash> \
-  --artifact-dir artifacts/experiments/<hash> \
-  --cv-score <cv_score>
+  --task-id <task_id>
 ```
 
 ## Notes
