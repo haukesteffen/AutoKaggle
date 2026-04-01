@@ -95,7 +95,7 @@ class PromotionRunnerTests(unittest.TestCase):
 
             def fake_create_submission_csv(_artifact_dir: Path, output: Path) -> Path:
                 output.parent.mkdir(parents=True, exist_ok=True)
-                output.write_text("id,Churn\n1,0.1\n")
+                output.write_text("id,Irrigation_Need\n1,Low\n")
                 return output
 
             exit_code, payload = self._run_main(
@@ -289,7 +289,7 @@ class PromotionRunnerTests(unittest.TestCase):
 
     def _fake_create_submission_csv(self, _artifact_dir: Path, output: Path) -> Path:
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text("id,Churn\n1,0.1\n")
+        output.write_text("id,Irrigation_Need\n1,Low\n")
         return output
 
 

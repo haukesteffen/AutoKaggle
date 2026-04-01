@@ -12,7 +12,7 @@ from pathlib import Path
 
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(os.cpu_count() or 1))
 
-from harness.dataset import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
+from harness.dataset import METRIC_NAME, N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXPERIMENT_PATH = Path("agents/scientist/experiment.py")
@@ -261,7 +261,7 @@ def _generate_artifacts(artifact_dir: Path, oof_preds, experiment_path: Path) ->
     import pandas as pd
 
     experiment = _load_module_from_path(experiment_path, "autokaggle_experiment_artifacts")
-    from harness.dataset import ID_COLUMN, TEST_PATH, load_train_with_folds, predict_positive_scores, split_xy
+    from harness.dataset import ID_COLUMN, TEST_PATH, load_train_with_folds, predict_class_probabilities, split_xy
 
     _ensure_clean_artifact_dir(artifact_dir)
     np.save(artifact_dir / "oof-preds.npy", oof_preds)
@@ -285,7 +285,7 @@ def _generate_artifacts(artifact_dir: Path, oof_preds, experiment_path: Path) ->
     if X_full.columns.tolist() != X_test.columns.tolist():
         raise ValueError("build_features must return the same columns for train and test splits")
 
-    test_preds = predict_positive_scores(model, X_test)
+    test_preds = predict_class_probabilities(model, X_test)
     np.save(artifact_dir / "test-preds.npy", test_preds)
 
     print(f"artifacts written to {artifact_dir}")
@@ -323,8 +323,9 @@ def _print_success_summary(experiment_name: str, result: EvaluationResult, total
     print("---")
     print(f"experiment_name:   {experiment_name}")
     print("status:            ok")
-    print(f"mean_cv_roc_auc:   {result.mean_score:.6f}")
-    print(f"std_cv_roc_auc:    {result.std_score:.6f}")
+    print(f"metric_name:       {METRIC_NAME}")
+    print(f"mean_cv_score:     {result.mean_score:.6f}")
+    print(f"std_cv_score:      {result.std_score:.6f}")
     print(f"completed_folds:   {result.completed_folds}/{N_SPLITS}")
     print(f"training_seconds:  {result.training_seconds:.1f}")
     print(f"total_seconds:     {total_seconds:.1f}")

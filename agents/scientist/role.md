@@ -60,7 +60,7 @@ On each invocation:
 - One task ID maps to at most one result row
 - Append only; never edit prior rows
 - Do not log invalid attempts, log only terminal outcomes
-- On `ok`, copy `mean_cv_roc_auc` and `std_cv_roc_auc` from stdout
+- On `ok`, copy `mean_cv_score` and `std_cv_score` from stdout
 - On `timeout` or `error`, write `-` for `score`, `std`, and `delta_best`
 - `desc` must be short
 - `delta_best` is relative to the best previous scored run before the current result
