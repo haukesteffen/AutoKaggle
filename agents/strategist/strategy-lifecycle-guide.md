@@ -20,19 +20,13 @@ They are not exact experiment counts and they are not hard quotas.
 
 | Stage | EDA | Base Models | Refinement | Ensembling | Moonshots |
 |------|---:|---:|---:|---:|---:|
-| Opening (week 1 / first quarter) | 30 | 30 | 20 | 10 | 10 |
-| Build (week 2 / second quarter) | 20 | 25 | 30 | 15 | 10 |
-| Integration (week 3 / third quarter) | 10 | 15 | 25 | 35 | 15 |
-| Finale (week 4 / last quarter) | 5 | 10 | 15 | 25 | 45 |
+| Opening (week 1 / first quarter) | 70 | 25 | 5 | 0 | 0 |
+| Build (week 2 / second quarter) | 30 | 55 | 10 | 5 | 0 |
+| Integration (week 3 / third quarter) | 10 | 25 | 30 | 30 | 5 |
+| Finale (week 4 / last quarter) | 5 | 10 | 15 | 45 | 25 |
 
 Use these as center points, not hard rules.
 The strategist may move a lane up or down when the run state justifies it, but should explain the deviation.
-
-## Pace Modifiers
-
-- **Slow:** shift about 10 points from ensembling and moonshots into EDA and base models.
-- **Fast:** shift about 10 points from EDA and base models into refinement and ensembling.
-- **Compressed:** keep every lane alive, but prefer representative probes over broad coverage.
 
 ## Guardrails
 

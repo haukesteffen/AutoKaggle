@@ -11,7 +11,6 @@ from unittest import mock
 from kagglesdk.competitions.types.submission_status import SubmissionStatus
 
 from harness import promotion_runner
-from harness.scientist_contract import ResultRow
 
 
 class FakeSubmitResponse:
@@ -108,9 +107,8 @@ class PromotionRunnerTests(unittest.TestCase):
                     "0.01",
                 ],
                 artifact_dir=artifact_dir,
-                result_row=ResultRow(
+                result_row=promotion_runner.ResultRow(
                     task_id=task_id,
-                    status="kept",
                     score=0.916481,
                     std=0.001083,
                     delta_best=0.0,
@@ -161,9 +159,8 @@ class PromotionRunnerTests(unittest.TestCase):
                     "0.01",
                 ],
                 artifact_dir=artifact_dir,
-                result_row=ResultRow(
+                result_row=promotion_runner.ResultRow(
                     task_id=task_id,
-                    status="kept",
                     score=0.916481,
                     std=0.001083,
                     delta_best=0.0,
@@ -192,9 +189,8 @@ class PromotionRunnerTests(unittest.TestCase):
                     task_id,
                 ],
                 artifact_dir=artifact_dir,
-                result_row=ResultRow(
+                result_row=promotion_runner.ResultRow(
                     task_id=task_id,
-                    status="kept",
                     score=0.916481,
                     std=0.001083,
                     delta_best=0.0,
@@ -254,7 +250,7 @@ class PromotionRunnerTests(unittest.TestCase):
         argv: list[str],
         *,
         artifact_dir: Path | None = None,
-        result_row: ResultRow | None = None,
+        result_row: promotion_runner.ResultRow | None = None,
         result_lookup_error: Exception | None = None,
         create_api: FakeApi | None = None,
         create_submission_csv=None,

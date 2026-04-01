@@ -3,23 +3,31 @@ import importlib.util
 import multiprocessing as mp
 import os
 import queue
+import re
 import sys
 import time
 import traceback
+from dataclasses import dataclass
 from pathlib import Path
 
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(os.cpu_count() or 1))
 
 from harness.dataset import N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
-from harness.scientist_contract import (
-    DEFAULT_EXPERIMENT_PATH,
-    default_artifact_dir,
-    normalize_repo_path,
-    read_task_metadata,
-)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_EXPERIMENT_PATH = Path("agents/scientist/experiment.py")
+DEFAULT_TASK_PATH = Path("agents/scientist/scientist-task.md")
+DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
+TASK_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 INVALID_EXIT_CODE = 2
+
+
+@dataclass(frozen=True)
+class TaskMetadata:
+    status: str
+    task_id: str
+    goal: str
+    reference: str | None
 
 
 def main() -> None:
@@ -176,6 +184,50 @@ def _load_active_task():
         print("error: scientist task must be active before experiment_runner can run", file=sys.stderr)
         raise SystemExit(1)
     return task
+
+
+def normalize_repo_path(path: Path) -> Path:
+    if path.is_absolute():
+        return path.resolve()
+    return (REPO_ROOT / path).resolve()
+
+
+def default_artifact_dir(task_id: str) -> Path:
+    _validate_task_id(task_id)
+    return DEFAULT_ARTIFACTS_ROOT / task_id
+
+
+def read_task_metadata(task_path: Path = DEFAULT_TASK_PATH) -> TaskMetadata:
+    fields = _parse_key_value_fields(normalize_repo_path(task_path).read_text())
+    task_id = fields.get("id") or "S-unknown"
+    _validate_task_id(task_id)
+    return TaskMetadata(
+        status=fields.get("status", "none"),
+        task_id=task_id,
+        goal=fields.get("goal") or "Unspecified experiment goal",
+        reference=fields.get("reference"),
+    )
+
+
+def _validate_task_id(task_id: str) -> None:
+    if TASK_ID_PATTERN.fullmatch(task_id) is None:
+        raise ValueError(f"invalid task id: {task_id!r}")
+
+
+def _parse_key_value_fields(task_text: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for line in task_text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        normalized_key = key.strip().lower()
+        if normalized_key not in {"status", "id", "at", "goal", "reference"}:
+            continue
+        normalized_value = value.strip()
+        if normalized_value and normalized_key not in fields:
+            fields[normalized_key] = normalized_value
+    return fields
 
 
 def _terminate_process(process: mp.Process) -> None:

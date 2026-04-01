@@ -22,6 +22,7 @@ dependencies = [
     { name = "lightgbm" },
     { name = "pandas" },
     { name = "scikit-learn" },
+    { name = "scipy" },
     { name = "shap" },
     { name = "xgboost" },
 ]
@@ -33,6 +34,7 @@ requires-dist = [
     { name = "lightgbm", specifier = ">=4.6.0" },
     { name = "pandas", specifier = ">=2.3.0" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
+    { name = "scipy", specifier = ">=1.17.1" },
     { name = "shap", specifier = ">=0.47.0" },
     { name = "xgboost", specifier = ">=3.2.0" },
 ]

@@ -19,9 +19,9 @@ from kagglesdk.competitions.types.submission_status import SubmissionStatus
 
 from agents.supervisor.submission import create_submission_csv
 from harness.dataset import COMPETITION
-from harness.scientist_contract import normalize_repo_path, read_result_row
 
 DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
+DEFAULT_RESULTS_PATH = Path("agents/scientist/scientist-results.md")
 DEFAULT_SUBMISSION_FILENAME = "submission.csv"
 DEFAULT_POLL_INTERVAL_SECONDS = 30.0
 DEFAULT_TIMEOUT_SECONDS = 30.0 * 60.0
@@ -82,6 +82,15 @@ class PromotionFailure(RuntimeError):
         super().__init__(result.error_message or result.error_category or result.terminal_status)
         self.result = result
         self.exit_code = exit_code
+
+
+@dataclass(frozen=True)
+class ResultRow:
+    task_id: str
+    score: float | None
+    std: float | None
+    delta_best: float | None
+    desc: str
 
 
 def main() -> None:
@@ -477,6 +486,51 @@ def _is_transient_kaggle_error(exc: Exception) -> bool:
 
 def _default_artifact_dir(task_id: str) -> Path:
     return DEFAULT_ARTIFACTS_ROOT / task_id
+
+
+def normalize_repo_path(path: Path) -> Path:
+    if path.is_absolute():
+        return path.resolve()
+    return (REPO_ROOT / path).resolve()
+
+
+def read_result_row(task_id: str, results_path: Path = DEFAULT_RESULTS_PATH) -> ResultRow:
+    resolved = normalize_repo_path(results_path)
+    if not resolved.exists():
+        raise ValueError(f"results file does not exist: {resolved}")
+
+    matches: list[ResultRow] = []
+    for line in resolved.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|") or stripped.startswith("| id ") or stripped.startswith("|----"):
+            continue
+        columns = [column.strip() for column in stripped.strip("|").split("|")]
+        if len(columns) != 5 or columns[0] != task_id:
+            continue
+        matches.append(
+            ResultRow(
+                task_id=columns[0],
+                score=_maybe_float(columns[1]),
+                std=_maybe_float(columns[2]),
+                delta_best=_maybe_float(columns[3]),
+                desc=columns[4],
+            )
+        )
+
+    if not matches:
+        raise ValueError(f"task_id {task_id!r} not found in {resolved}")
+    if len(matches) > 1:
+        raise ValueError(f"task_id {task_id!r} appears multiple times in {resolved}")
+    return matches[0]
+
+
+def _maybe_float(value: str | None) -> float | None:
+    if value is None or value in {"-", "—"}:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
 
 
 def _submission_status_name(status: Any) -> str | None:
