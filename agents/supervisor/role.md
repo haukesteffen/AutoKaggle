@@ -73,7 +73,7 @@ git checkout run || git checkout -b run
 3. Ensure data is available:
 
 ~~~bash
-ls data/train.csv data/test.csv 2>/dev/null
+ls data/train.csv data/test.csv data/sample_submission.csv 2>/dev/null
 ~~~
 
 If either file is missing, run:
@@ -82,7 +82,7 @@ If either file is missing, run:
 uv run python -m harness.dataset
 ~~~
 
-This must produce competition data and `data/folds.csv`. If it fails because of Kaggle auth or access, escalate immediately.
+This must produce competition data, `data/sample_submission.csv`, and `data/folds.csv`. If it fails because of Kaggle auth or access, escalate immediately.
 
 4. Ensure `artifacts/` exists:
 

@@ -12,7 +12,7 @@ This is a project to have a full team of agents work together on the shared goal
 
 A Kaggle competition is a hosted ML benchmark where you train on a provided dataset and submit test-set predictions to a leaderboard. The Playground Series is the lightweight tabular version: small, month-long, recurring competitions that emphasise experimentation over domain knowledge. In practice, they are mostly exercises in validation, feature engineering, model diversity, and ensembling.
 
-The current competition is **Predict Customer Churn** (S6E3). Submissions are evaluated on area under the ROC curve between the predicted probability and the observed target.
+The current competition is **Predicting Irrigation Need** (S6E4). It is a multiclass classification problem with `High`, `Low`, and `Medium` targets, and submissions are evaluated on balanced accuracy.
 
 Leaderboard scores are calculated with approximately 20% of the test data. The final results will be based on the other 80%, so the final standings may differ. There is a limit of **5 submissions per day**.
 

@@ -15,7 +15,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from harness.dataset import RANDOM_STATE
 
 
-EXPERIMENT_NAME = "baseline_logistic_regression"
+EXPERIMENT_NAME = "baseline_weighted_logistic_regression"
 
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -54,6 +54,14 @@ def build_model(schema: pd.DataFrame) -> Pipeline:
     return Pipeline(
         steps=[
             ("preprocessor", preprocessor),
-            ("model", LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)),
+            (
+                "model",
+                LogisticRegression(
+                    max_iter=2000,
+                    random_state=RANDOM_STATE,
+                    class_weight="balanced",
+                    solver="saga",
+                ),
+            ),
         ]
     )
