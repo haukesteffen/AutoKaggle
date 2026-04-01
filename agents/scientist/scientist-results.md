@@ -8,3 +8,4 @@
 | S-004 | 0.968439 | 0.001039 | +0.001315 | HistGBM max_iter=500 lr=0.05 max_leaf_nodes=63 balanced, OrdinalEncoder+categorical_features |
 | S-005 | 0.969900 | 0.000806 | +0.001461 | XGBoost n=500 lr=0.05 depth=6 sample_weight balanced, OrdinalEncoder |
 | S-006 | 0.968353 | 0.001164 | -0.001547 | CatBoost iter=500 lr=0.05 depth=6 auto_class_weights=Balanced, native cat |
+| S-016 | 0.968737 | 0.001164 | -0.002119 | CatBoost+SM², iterations=500 lr=0.05 depth=5 subsample=0.8 balanced |
