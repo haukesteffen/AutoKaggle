@@ -53,3 +53,57 @@ at: 2026-04-01
 - Soil_Moisture has the highest single-feature Pearson correlation with the label-encoded target (−0.250).
 - Next strongest: Wind_Speed_kmh (0.129), Temperature_C (0.099).
 - All other numeric features are weak (|corr| < 0.03).
+
+## AK-008 — Soil_Moisture Exhibits Non-Linear Relationship with High Class
+source: A-002
+at: 2026-04-01
+
+Soil_Moisture shows clear threshold behavior, not linear relationship:
+- Low SM range (8–20): 10.88% High-class prevalence
+- Mid SM range (20–30): 6.38% prevalence
+- High SM range (>30): 0.14–0.16% prevalence (60–70× drop-off)
+
+This requires polynomial or binning-based feature engineering. Linear terms alone
+will not capture the decision boundary.
+
+## AK-009 — Soil_Moisture × Rainfall is Strongest Interaction for High Class
+source: A-002
+at: 2026-04-01
+
+(Low Soil_Moisture, Low Rainfall) → 23.38% High-class rate (7.0× baseline).
+This is the dominant decision boundary for High-class predictions.
+
+Feature to engineer: I(Soil_Moisture < 20 AND Rainfall < 1000 mm)
+
+## AK-010 — Soil_Moisture × Temperature is Second-Strongest Interaction
+source: A-002
+at: 2026-04-01
+
+(Low Soil_Moisture, High Temperature) → 21.16% High-class rate (6.4× baseline).
+S-005 XGBoost mispredictions show +4.96°C temperature bias, indicating model
+overfits temperature at the expense of Soil_Moisture interaction signal.
+
+Feature to engineer: I(Soil_Moisture < 20 AND Temperature > 33°C)
+
+## AK-011 — Crop Type Modulates Soil_Moisture Signal (Maize, Sugarcane > Others)
+source: A-002
+at: 2026-04-01
+
+Within Low Soil_Moisture stratum:
+- Maize: 12.61% High-class rate
+- Sugarcane: 12.28%
+- Rice: 7.24%
+
+Suggests crop-specific moisture thresholds. Consider separate Soil_Moisture bins
+or interaction terms for Maize/Sugarcane vs. other crops.
+
+Feature to engineer: I(Crop_Type in ['Maize', 'Sugarcane'] AND Soil_Moisture < 20)
+
+## AK-012 — Soil_Moisture × Humidity and Season are Weak Signals
+source: A-002
+at: 2026-04-01
+
+Humidity shows mild non-linearity within Low SM (9–13% prevalence) but is weak
+overall. Season shows negligible variation across Zaid/Kharif/Rabi.
+
+Not recommended for feature engineering.

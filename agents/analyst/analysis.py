@@ -7,207 +7,251 @@ if str(REPO_ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
-from scipy.stats import ks_2samp
+from harness.dataset import TARGET_COLUMN, TRAIN_PATH
 
-from harness.dataset import TARGET_COLUMN, TEST_PATH, TRAIN_PATH
+
+def load_data():
+    """Load train data, targets, and S-005 OOF predictions."""
+    train_df = pd.read_csv(TRAIN_PATH, index_col=0)
+
+    # Load S-005 OOF predictions
+    oof_preds = np.load(REPO_ROOT / "artifacts" / "S-005" / "oof-preds.npy")
+
+    return train_df, oof_preds
+
+
+def get_predicted_class(probs):
+    """Convert probability array to predicted class index."""
+    return np.argmax(probs, axis=1)
 
 
 def main() -> None:
-    train = pd.read_csv(TRAIN_PATH)
-    test = pd.read_csv(TEST_PATH)
+    train_df, oof_preds = load_data()
 
-    feature_cols = [c for c in train.columns if c not in ("id", TARGET_COLUMN)]
-    numeric_cols = train[feature_cols].select_dtypes(include="number").columns.tolist()
-    cat_cols = train[feature_cols].select_dtypes(exclude="number").columns.tolist()
+    # Map class names to indices (assumed order: Low=0, Medium=1, High=2)
+    class_to_idx = {"Low": 0, "Medium": 1, "High": 2}
+    idx_to_class = {v: k for k, v in class_to_idx.items()}
 
-    print("=" * 60)
-    print("DATASET DIMENSIONS")
-    print("=" * 60)
-    print(f"train_rows:    {len(train)}")
-    print(f"test_rows:     {len(test)}")
-    print(f"total_features: {len(feature_cols)}")
-    print(f"numeric_features: {len(numeric_cols)}")
-    print(f"categorical_features: {len(cat_cols)}")
-    print(f"numeric_cols: {numeric_cols}")
-    print(f"categorical_cols: {cat_cols}")
+    # Get true targets
+    y_true = train_df[TARGET_COLUMN].map(class_to_idx).values
 
-    # -------------------------------------------------------
-    # 1. CLASS BALANCE
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("CLASS BALANCE (target = Irrigation_Need)")
-    print("=" * 60)
-    vc = train[TARGET_COLUMN].value_counts()
-    vcp = train[TARGET_COLUMN].value_counts(normalize=True)
-    balance_df = pd.DataFrame({"count": vc, "proportion": vcp.round(4)})
-    print(balance_df.to_string())
-    max_prop = vcp.max()
-    min_prop = vcp.min()
-    imbalance_ratio = max_prop / min_prop
-    print(f"imbalance_ratio (max/min): {imbalance_ratio:.4f}")
-    if imbalance_ratio > 2.0:
-        print("ALERT: severe_class_imbalance=True")
-    else:
-        print("severe_class_imbalance=False")
+    # Get predicted classes
+    y_pred = get_predicted_class(oof_preds)
 
-    # -------------------------------------------------------
-    # 2. MISSINGNESS
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("MISSINGNESS")
-    print("=" * 60)
-    train_miss = train[feature_cols].isna().mean().sort_values(ascending=False)
-    test_miss = test[feature_cols].isna().mean().sort_values(ascending=False)
-    any_train_miss = train_miss[train_miss > 0]
-    any_test_miss = test_miss[test_miss > 0]
-    if any_train_miss.empty:
-        print("train_missing: none")
-    else:
-        print("train_missing (top):")
-        print(any_train_miss.head(10).to_string())
-    if any_test_miss.empty:
-        print("test_missing: none")
-    else:
-        print("test_missing (top):")
-        print(any_test_miss.head(10).to_string())
+    # Overall accuracy
+    accuracy = (y_true == y_pred).sum() / len(y_true)
 
-    # -------------------------------------------------------
-    # 3. BOOLEAN-LIKE NUMERICS
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("BOOLEAN-LIKE NUMERICS (<=2 unique values in numeric cols)")
-    print("=" * 60)
-    bool_like = []
-    for c in numeric_cols:
-        u = train[c].dropna().nunique()
-        vals = sorted(train[c].dropna().unique().tolist())
-        if u <= 2:
-            bool_like.append((c, u, vals))
-    if bool_like:
-        for c, u, vals in bool_like:
-            print(f"  {c}: nunique={u}, values={vals}")
-    else:
-        print("  none found")
+    # Identify mispredictions
+    is_correct = (y_true == y_pred)
+    is_mispredicted = ~is_correct
 
-    # -------------------------------------------------------
-    # 4. CATEGORICAL CARDINALITY
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("CATEGORICAL CARDINALITY")
-    print("=" * 60)
-    for c in cat_cols:
-        n_train = train[c].nunique()
-        n_test = test[c].nunique()
-        print(f"  {c}: train_unique={n_train}, test_unique={n_test}")
-        train_vals = set(train[c].dropna().unique())
-        test_vals = set(test[c].dropna().unique())
-        only_train = train_vals - test_vals
-        only_test = test_vals - train_vals
-        if only_train:
-            print(f"    only_in_train: {sorted(only_train)}")
-        if only_test:
-            print(f"    only_in_test:  {sorted(only_test)}")
+    # Focus on High class (index 2)
+    high_mask = y_true == class_to_idx["High"]
+    high_correct = is_correct & high_mask
+    high_mispredicted = is_mispredicted & high_mask
 
-    # -------------------------------------------------------
-    # 5. OUTLIER FLAGS (numeric: values beyond 5 IQR fences)
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("OUTLIER FLAGS (|z-score| > 5)")
-    print("=" * 60)
-    outlier_summary = []
-    for c in numeric_cols:
-        col = train[c].dropna()
-        mean = col.mean()
-        std = col.std()
-        if std == 0:
-            continue
-        z = (col - mean) / std
-        n_outlier = (z.abs() > 5).sum()
-        if n_outlier > 0:
-            pct = n_outlier / len(col) * 100
-            outlier_summary.append((c, n_outlier, f"{pct:.3f}%"))
-    if outlier_summary:
-        out_df = pd.DataFrame(outlier_summary, columns=["feature", "n_outliers", "pct"])
-        print(out_df.to_string(index=False))
-    else:
-        print("  no features with |z|>5 outliers")
+    print("=" * 70)
+    print("OVERALL MODEL PERFORMANCE")
+    print("=" * 70)
+    print(f"OOF Accuracy: {accuracy:.4f}")
+    print(f"Total samples: {len(y_true)}")
+    print(f"Correct predictions: {is_correct.sum()}")
+    print(f"Mispredictions: {is_mispredicted.sum()}")
+    print()
 
-    # -------------------------------------------------------
-    # 6. TRAIN/TEST DISTRIBUTIONAL SHIFT (KS test, numeric)
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("TRAIN/TEST DISTRIBUTIONAL SHIFT (KS test, numeric features)")
-    print("=" * 60)
-    shift_results = []
-    for c in numeric_cols:
-        tr = train[c].dropna().values
-        te = test[c].dropna().values
-        stat, pval = ks_2samp(tr, te)
-        shift_results.append((c, round(stat, 5), round(pval, 6)))
-    shift_df = pd.DataFrame(shift_results, columns=["feature", "ks_stat", "p_value"])
-    shift_df = shift_df.sort_values("ks_stat", ascending=False)
-    print(shift_df.to_string(index=False))
-    n_significant = (shift_df["p_value"] < 0.01).sum()
-    print(f"\nn_features_with_significant_shift (p<0.01): {n_significant} / {len(numeric_cols)}")
-    if n_significant > 0:
-        print("ALERT: meaningful_train_test_shift=True")
-    else:
-        print("meaningful_train_test_shift=False")
+    print("=" * 70)
+    print("HIGH CLASS PERFORMANCE (Target = High)")
+    print("=" * 70)
+    print(f"Total High samples: {high_mask.sum()}")
+    print(f"High correctly predicted: {high_correct.sum()}")
+    print(f"High mispredicted: {high_mispredicted.sum()}")
+    print(f"High recall: {high_correct.sum() / high_mask.sum():.4f}")
+    print()
 
-    # -------------------------------------------------------
-    # 7. NUMERIC FEATURE SUMMARY (range, mean, std)
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("NUMERIC FEATURE SUMMARY (train)")
-    print("=" * 60)
-    desc = train[numeric_cols].describe().T[["min", "max", "mean", "std"]]
-    print(desc.round(4).to_string())
+    # Analyze feature distributions in High class
+    print("=" * 70)
+    print("SOIL_MOISTURE DISTRIBUTION IN HIGH CLASS")
+    print("=" * 70)
 
-    # -------------------------------------------------------
-    # 8. LEAKAGE CHECK: numeric cols that perfectly predict target
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("LEAKAGE SCREEN (numeric feature mean absolute correlation with label-encoded target)")
-    print("=" * 60)
-    label_map = {v: i for i, v in enumerate(sorted(train[TARGET_COLUMN].unique()))}
-    y = train[TARGET_COLUMN].map(label_map)
-    corrs = []
-    for c in numeric_cols:
-        corr = train[c].corr(y)
-        corrs.append((c, round(corr, 5)))
-    corr_df = pd.DataFrame(corrs, columns=["feature", "pearson_corr_with_label"])
-    corr_df = corr_df.reindex(corr_df["pearson_corr_with_label"].abs().sort_values(ascending=False).index)
-    print(corr_df.to_string(index=False))
-    max_abs_corr = corr_df["pearson_corr_with_label"].abs().max()
-    if max_abs_corr > 0.95:
-        print(f"\nALERT: possible_leakage=True (max_abs_corr={max_abs_corr:.4f})")
-    else:
-        print(f"\nmax_abs_corr={max_abs_corr:.4f} — no obvious leakage detected")
+    high_subset = train_df[high_mask].copy()
+    high_correct_subset = train_df[high_correct].copy()
+    high_mispredicted_subset = train_df[high_mispredicted].copy()
 
-    # -------------------------------------------------------
-    # SUMMARY VERDICT
-    # -------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
-    issues = []
-    if imbalance_ratio > 2.0:
-        issues.append(f"severe class imbalance (ratio={imbalance_ratio:.2f})")
-    if not any_train_miss.empty:
-        issues.append(f"missing values in train ({len(any_train_miss)} features)")
-    if not any_test_miss.empty:
-        issues.append(f"missing values in test ({len(any_test_miss)} features)")
-    if max_abs_corr > 0.95:
-        issues.append(f"potential leakage feature (max_abs_corr={max_abs_corr:.4f})")
-    if n_significant > 0:
-        issues.append(f"train/test shift in {n_significant} features (KS p<0.01)")
-    if issues:
-        print("critical_issues_found: YES")
-        for issue in issues:
-            print(f"  - {issue}")
-    else:
-        print("critical_issues_found: NO")
-        print("  Dataset appears clean: no missingness, no leakage, no severe imbalance, no significant distributional shift.")
+    # Show overall stats for High class
+    print("\nSOIL_MOISTURE stats for all High samples:")
+    print(f"  Mean: {high_subset['Soil_Moisture'].mean():.2f}")
+    print(f"  Std:  {high_subset['Soil_Moisture'].std():.2f}")
+    print(f"  Min:  {high_subset['Soil_Moisture'].min():.2f}")
+    print(f"  Max:  {high_subset['Soil_Moisture'].max():.2f}")
+
+    if len(high_correct_subset) > 0:
+        print("\nSOIL_MOISTURE stats for correctly predicted High samples:")
+        print(f"  Mean: {high_correct_subset['Soil_Moisture'].mean():.2f}")
+        print(f"  Std:  {high_correct_subset['Soil_Moisture'].std():.2f}")
+        print(f"  Min:  {high_correct_subset['Soil_Moisture'].min():.2f}")
+        print(f"  Max:  {high_correct_subset['Soil_Moisture'].max():.2f}")
+        print(f"  Count: {len(high_correct_subset)}")
+
+    if len(high_mispredicted_subset) > 0:
+        print("\nSOIL_MOISTURE stats for MISPREDICTED High samples:")
+        print(f"  Mean: {high_mispredicted_subset['Soil_Moisture'].mean():.2f}")
+        print(f"  Std:  {high_mispredicted_subset['Soil_Moisture'].std():.2f}")
+        print(f"  Min:  {high_mispredicted_subset['Soil_Moisture'].min():.2f}")
+        print(f"  Max:  {high_mispredicted_subset['Soil_Moisture'].max():.2f}")
+        print(f"  Count: {len(high_mispredicted_subset)}")
+
+    print()
+
+    # Interaction analysis: Soil_Moisture × Temperature
+    print("=" * 70)
+    print("INTERACTION: Soil_Moisture × Temperature_C")
+    print("=" * 70)
+
+    # Bin Soil_Moisture and Temperature
+    sm_bins = pd.cut(train_df["Soil_Moisture"], bins=3, labels=["Low_SM", "Mid_SM", "High_SM"])
+    temp_bins = pd.cut(train_df["Temperature_C"], bins=3, labels=["Low_Temp", "Mid_Temp", "High_Temp"])
+
+    interaction_df = pd.DataFrame({
+        "SM_bin": sm_bins,
+        "Temp_bin": temp_bins,
+        "is_high": y_true == class_to_idx["High"]
+    })
+
+    pivot_high = interaction_df.groupby(["SM_bin", "Temp_bin"])["is_high"].agg(["sum", "count", "mean"])
+    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
+    print("\nHigh-class proportion by Soil_Moisture × Temperature bins:")
+    print(pivot_high)
+    print()
+
+    # Interaction analysis: Soil_Moisture × Humidity
+    print("=" * 70)
+    print("INTERACTION: Soil_Moisture × Humidity")
+    print("=" * 70)
+
+    humidity_bins = pd.cut(train_df["Humidity"], bins=3, labels=["Low_Humidity", "Mid_Humidity", "High_Humidity"])
+    interaction_df = pd.DataFrame({
+        "SM_bin": sm_bins,
+        "Humidity_bin": humidity_bins,
+        "is_high": y_true == class_to_idx["High"]
+    })
+
+    pivot_high = interaction_df.groupby(["SM_bin", "Humidity_bin"])["is_high"].agg(["sum", "count", "mean"])
+    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
+    print("\nHigh-class proportion by Soil_Moisture × Humidity bins:")
+    print(pivot_high)
+    print()
+
+    # Interaction analysis: Soil_Moisture × Rainfall
+    print("=" * 70)
+    print("INTERACTION: Soil_Moisture × Rainfall_mm")
+    print("=" * 70)
+
+    rainfall_bins = pd.cut(train_df["Rainfall_mm"], bins=3, labels=["Low_Rain", "Mid_Rain", "High_Rain"])
+    interaction_df = pd.DataFrame({
+        "SM_bin": sm_bins,
+        "Rainfall_bin": rainfall_bins,
+        "is_high": y_true == class_to_idx["High"]
+    })
+
+    pivot_high = interaction_df.groupby(["SM_bin", "Rainfall_bin"])["is_high"].agg(["sum", "count", "mean"])
+    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
+    print("\nHigh-class proportion by Soil_Moisture × Rainfall bins:")
+    print(pivot_high)
+    print()
+
+    # Interaction analysis: Soil_Moisture × Crop_Type
+    print("=" * 70)
+    print("INTERACTION: Soil_Moisture × Crop_Type")
+    print("=" * 70)
+
+    interaction_df = pd.DataFrame({
+        "SM_bin": sm_bins,
+        "Crop_Type": train_df["Crop_Type"],
+        "is_high": y_true == class_to_idx["High"]
+    })
+
+    pivot_high = interaction_df.groupby(["SM_bin", "Crop_Type"])["is_high"].agg(["sum", "count", "mean"])
+    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
+    print("\nHigh-class proportion by Soil_Moisture × Crop_Type:")
+    print(pivot_high.sort_values("High_proportion", ascending=False).head(10))
+    print()
+
+    # Interaction analysis: Soil_Moisture × Season
+    print("=" * 70)
+    print("INTERACTION: Soil_Moisture × Season")
+    print("=" * 70)
+
+    interaction_df = pd.DataFrame({
+        "SM_bin": sm_bins,
+        "Season": train_df["Season"],
+        "is_high": y_true == class_to_idx["High"]
+    })
+
+    pivot_high = interaction_df.groupby(["SM_bin", "Season"])["is_high"].agg(["sum", "count", "mean"])
+    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
+    print("\nHigh-class proportion by Soil_Moisture × Season:")
+    print(pivot_high.sort_values("High_proportion", ascending=False))
+    print()
+
+    # Analyze mispredictions more deeply
+    print("=" * 70)
+    print("MISPREDICTION ANALYSIS (High Class)")
+    print("=" * 70)
+
+    if len(high_mispredicted_subset) > 0:
+        # What were they predicted as?
+        pred_classes = y_pred[high_mispredicted]
+        pred_class_names = [idx_to_class[p] for p in pred_classes]
+        pred_counts = pd.Series(pred_class_names).value_counts()
+        print("\nHigh samples mispredicted as:")
+        print(pred_counts)
+        print()
+
+        # Feature patterns in mispredicted High samples
+        print("Feature comparison: Correctly predicted HIGH vs. Mispredicted HIGH")
+        print("-" * 70)
+
+        feature_cols = ["Soil_Moisture", "Temperature_C", "Humidity", "Rainfall_mm",
+                       "Wind_Speed_kmh", "Sunlight_Hours"]
+
+        comparison_data = []
+        for col in feature_cols:
+            correct_mean = high_correct_subset[col].mean() if len(high_correct_subset) > 0 else np.nan
+            correct_std = high_correct_subset[col].std() if len(high_correct_subset) > 0 else np.nan
+            mispred_mean = high_mispredicted_subset[col].mean() if len(high_mispredicted_subset) > 0 else np.nan
+            mispred_std = high_mispredicted_subset[col].std() if len(high_mispredicted_subset) > 0 else np.nan
+
+            diff = mispred_mean - correct_mean if not np.isnan(correct_mean) and not np.isnan(mispred_mean) else 0
+
+            comparison_data.append({
+                "Feature": col,
+                "Correct_Mean": correct_mean,
+                "Correct_Std": correct_std,
+                "Mispred_Mean": mispred_mean,
+                "Mispred_Std": mispred_std,
+                "Difference": diff
+            })
+
+        comparison_df = pd.DataFrame(comparison_data)
+        print(comparison_df.to_string(index=False))
+        print()
+
+    # Check for non-linearity: Soil_Moisture in different regions
+    print("=" * 70)
+    print("SOIL_MOISTURE NON-LINEARITY CHECK: Stratified by High-class density")
+    print("=" * 70)
+
+    # Create finer bins to check for local patterns
+    sm_fine_bins = pd.cut(train_df["Soil_Moisture"], bins=5)
+    high_by_sm_bin = train_df.groupby(sm_fine_bins).apply(
+        lambda x: (x[TARGET_COLUMN] == "High").sum() / len(x) if len(x) > 0 else 0
+    )
+
+    print("\nHigh-class prevalence by Soil_Moisture quintile:")
+    for i, (bin_range, proportion) in enumerate(high_by_sm_bin.items()):
+        print(f"  Bin {i+1} {bin_range}: {proportion:.4f}")
+
+    print()
 
 
 if __name__ == "__main__":
