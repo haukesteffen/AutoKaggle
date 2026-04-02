@@ -52,7 +52,7 @@ Operational files:
 - Only one active analyst hypothesis at a time.
 - Do not launch serious scientist work until a current strategy whitepaper exists.
 - Strategist recommends; you decide.
-- Commit only when strategist, scientist, and analyst are all idle.
+- Commit after each completed strategist, scientist, or analyst invocation, once strategist, scientist, and analyst are all idle.
 - Never submit the same `task_id` twice.
 - Keep the run moving unless the human explicitly says `stop`.
 
@@ -170,7 +170,7 @@ On each wake:
 5. Invoke the analyst with a new hypothesis when needed.
 6. Post at most one new scientist task when needed.
 7. Submit only when strategically justified and update `agents/supervisor/leaderboard-history.md` when submission state changes.
-8. Commit only if all subagents are idle and the tracked diff respects role ownership.
+8. Commit each completed invocation once all subagents are idle and the tracked diff respects role ownership.
 9. Leave the human a concise status note, even if nothing changed.
 
 ## Strategy Refresh
@@ -252,6 +252,7 @@ trigger:
 ## Scientist Control
 
 Post a scientist task only when there is exactly one concrete experiment to run. Do not declare a scientist lane exhausted after one experiment. Default rule: do not close a lane before at least five experiments.
+Prefer small experiment series over isolated one-offs. For promising or surprising results, schedule nearby repeats such as alternate seeds and slight hyperparameter perturbations before closing the lane.
 
 Task shape:
 
@@ -273,7 +274,7 @@ After posting the task:
    - `agents/scientist/role.md`
    - `agents/scientist/scientist-task.md`
 3. Wait for the scientist to run `harness.experiment_runner`, read stdout, and append exactly one terminal row to `agents/scientist/scientist-results.md`.
-4. Read the result.
+4. Read the result and `agents/scientist/experiment.py`; verify the implementation matches the assigned task before treating the result row as canon.
 5. Reset `agents/scientist/scientist-task.md` to:
 
 ~~~markdown
@@ -306,7 +307,7 @@ After posting the hypothesis:
    - `agents/analyst/analyst-knowledge.md`
    - `agents/analyst/analyst-hypothesis.md`
 3. Wait for a new appended finding.
-4. Read the new finding and refreshed knowledge.
+4. Read the new finding, refreshed knowledge, and `agents/analyst/analysis.py`; verify the implementation answers the posted hypothesis before treating the finding as canon.
 5. Make the blocked decision.
 6. Reset `agents/analyst/analyst-hypothesis.md` to:
 
@@ -376,6 +377,7 @@ Before committing:
 3. Check that every tracked change respects role ownership.
 4. If a subagent touched files outside its allowed set, do not commit; send it back to fix the checkpoint.
 5. Commit completed work, not temporary control-file churn.
+6. Do not batch multiple completed invocations into one commit when separate checkpoint commits are possible.
 
 Prefer not to edit tracked files yourself while a subagent is running.
 
