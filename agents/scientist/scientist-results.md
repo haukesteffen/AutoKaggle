@@ -34,3 +34,7 @@
 | S-030 | - | - | - | CatBoost iter=600 lr=0.04 depth=5 subsample=0.9 Bernoulli balanced SM² timed out |
 | S-032 | 0.888151 | 0.000811 | -0.082705 | LR A-004 transformations: SM², log(Rainfall), I_SM_low, StandardScaler+OHE, balanced |
 | S-033 | 0.726934 | 0.010742 | -0.243922 | SGDClassifier loss=log_loss A-004 features, StandardScaler+OHE, balanced |
+| S-034 | 0.888128 | 0.000894 | -0.000023 | LR A-004 + I_SM_Rain + I_SM_Temp interactions, StandardScaler+OHE, balanced |
+| S-035 | 0.892708 | 0.001235 | +0.004557 | LR degree-2 poly on top-4 numeric (14 features) + remaining 7 numeric, StandardScaler+OHE, balanced |
+| S-036 | 0.705966 | 0.001609 | -0.186742 | LinearSVC C=1.0 max_iter=5000 balanced, same poly2 feature set as S-035, CalibratedClassifierCV cv=3 |
+| S-037 | 0.892753 | 0.001233 | -0.078103 | LR C=10 degree-2 poly on top-4 numeric + remaining 7 numeric, StandardScaler+OHE, balanced |

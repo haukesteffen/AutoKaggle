@@ -227,3 +227,74 @@ at: 2026-04-02
 Hypothesis: drop Humidity, Previous_Irrigation_mm, Sunlight_Hours (bottom 3 by coefficient).
 Result: CV drops from 0.6919 to 0.6916 (−0.0003). Weak features do not add noise;
 they add small signal. Keep all 11 numeric features for linear models.
+
+## AK-023 — S-032 LR: Subgroup (SM<20 AND Rainfall<1000) is Already Well-Recalled
+source: A-005
+at: 2026-04-02
+
+S-032 LR with SM², log(Rainfall), I_SM_low, StandardScaler+OHE (CV=0.8882):
+- High recall IN subgroup (SM<20 AND Rainfall<1000, 5.6% of data): 0.9515
+- High recall OUTSIDE subgroup (94.4% of data): 0.9059
+- Delta: +0.0457 better inside than outside subgroup
+
+The (SM<20 AND Rainfall<1000) subgroup is the model's stronger zone.
+Adding the joint indicator I(SM<20 AND Rainfall<1000) is unlikely to improve recall here.
+The primary LR weakness is outside the subgroup (1329 of 1663 total High-class FNs = 80%).
+All subgroup FNs (334) are predicted as Medium, not Low — a calibration/boundary issue,
+not a missing indicator issue. Out-of-subgroup improvements should be the focus.
+
+## AK-024 — S-032 LR Out-of-Subgroup FNs Cluster in Two Extreme Zones
+source: A-006
+at: 2026-04-02
+
+Out-of-subgroup High-class FNs (1329 total, 79.9% of all LR FNs) cluster in two distinct
+high-FN-rate regions — NOT spread uniformly across SM or Rainfall:
+
+Zone analysis:
+- Zone B (SM>=20 AND Rain<1000): 40.6% of out-subgroup FNs, recall 87.3%
+- Zone A (SM<20 AND Rain>=1000): 29.2% of out-subgroup FNs, recall 94.2%
+- Zone C (SM>=20 AND Rain>=1000): 30.2% of out-subgroup FNs, recall 87.6%
+
+Two high-FN-rate pockets identified:
+1. SM>=35 region: 49.7% FN rate (235 FNs, 238 TPs). High prevalence drops to 0.53% here
+   but FN/(FN+TP) is extreme — model badly mislabels most High-class samples in this zone.
+2. Temperature<25 region: 59.1% FN rate (338 FNs, 234 TPs). Also very high FN rate.
+
+SM 20-25 zone (Zone B core): large absolute FN count (659 FNs, 49.6% of all out-subgroup
+FNs) but only 9.7% FN rate — model already captures most High here. Adding I(SM 20-25)
+would include too many TPs for minimal gain.
+
+SM x Temperature cross-tab:
+- SM<25 & Temp<33: 54.3% of FNs but only 17.0% FN rate (mixed zone)
+- SM>=25 & Temp<33: 57.4% FN rate (151 FNs, 112 TPs) — most concentrated cluster
+- SM>=25 & Temp>=33: 33.6% FN rate (131 FNs, 259 TPs)
+
+All out-of-subgroup FNs are predicted as Medium (99.0%), not Low.
+LR model consistently confused High → Medium in these out-of-subgroup zones.
+
+Best candidate threshold indicators ranked by FN-rate purity:
+- I(Temperature<25): 59.1% FN rate, captures 25.4% of FNs
+- I(SM>=35): 49.7% FN rate, captures 19.6% of FNs (but very small High prevalence)
+- I(SM>=25 AND Temp<33): 57.4% FN rate, captures 11.4% of FNs
+
+NOTE (A-007): High FN rate does NOT equal High-class enrichment. See AK-025 for selectivity analysis.
+
+## AK-025 — Candidate Threshold Indicators from A-006 Are DEPLETED Zones (Not Enriched)
+source: A-007
+at: 2026-04-02
+
+The three A-006 candidate indicators are in heavily depleted High-class zones, not enriched ones:
+- I(Temp<25): 0.218% High prevalence (0.07× baseline of 3.3%)
+- I(SM>=35): 0.149% High prevalence (0.04× baseline)
+- I(SM>=25 AND Temp<33): 0.082% High prevalence (0.02× baseline)
+- I(Temp<25 AND SM>=35): 0.016% High prevalence (0.00× baseline — almost no High-class)
+
+Their complement zones have High prevalence of 3.2%–5.5% (above baseline).
+
+Interpretation: These indicators do NOT have sufficient selectivity (High-class enrichment) to justify
+adding them as positive-signal indicators for LR. The high FN rate in these zones reflects that
+the model struggles in low-prevalence zones — not that the zones are enriched for High-class.
+
+Adding these indicators as binary features to LR would encode negative signal (depletion, not enrichment).
+Whether that negative signal is already captured by SM² and Temperature terms needs investigation
+(see A-007 follow_up hypotheses).
