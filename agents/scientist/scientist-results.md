@@ -21,3 +21,8 @@
 | S-017 | 0.969275 | 0.000982 | +0.000538 | LGBM+SM², n=500 lr=0.05 leaves=31 balanced, OrdinalEncoder |
 | S-018 | 0.969459 | 0.001013 | +0.000184 | HistGBM+SM², max_iter=500 lr=0.05 max_leaf_nodes=31 balanced |
 | S-019 | 0.961740 | 0.000788 | -0.008160 | XGB depth=5 subsample=0.8 colsample=0.8 lr=0.05 n=500 with StandardScaler+Poly2 |
+| S-020 | 0.961446 | 0.000677 | -0.009410 | XGB S-014 + East region-aware features (SM², low rainfall) |
+| S-021 | 0.961374 | 0.000722 | -0.009482 | XGB S-014 + crop-specific SM thresholds (Maize<18, Rice<20, Sugarcane<22) |
+| S-022 | 0.961417 | 0.000863 | -0.009439 | XGBoost S-014 config + SM² + reg_lambda=0.5 |
+| S-023 | 0.961265 | 0.000865 | -0.009591 | XGBoost S-014 config with subsample=0.6 |
+| S-024 | 0.961004 | 0.000815 | -0.009852 | XGBoost S-014 config with n_estimators=300 |

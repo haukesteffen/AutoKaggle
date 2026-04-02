@@ -8,31 +8,25 @@ if str(REPO_ROOT) not in sys.path:
 import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier
-from sklearn.preprocessing import OrdinalEncoder, StandardScaler, PolynomialFeatures
+from sklearn.preprocessing import OrdinalEncoder
 
 from harness.dataset import RANDOM_STATE
 
 
-EXPERIMENT_NAME = "xgboost_scaled_polynomial_features"
+EXPERIMENT_NAME = "xgboost_s014_n_estimators_300"
 
 
-class XGBoostWithPreprocessing:
+class SimpleXGBoostWrapper:
     """
-    Wrapper for XGBoost with StandardScaler on numeric features and PolynomialFeatures
-    on key signal features, plus OrdinalEncoder for categorical features.
+    Wrapper for XGBoost with OrdinalEncoder for categorical features.
+    Features are engineered in build_features(); no scaling applied here.
     """
 
-    def __init__(self, xgb_model, scaler, poly_features, encoder, categorical_cols, numeric_cols, key_numeric_cols):
+    def __init__(self, xgb_model, encoder, categorical_cols):
         self.xgb_model = xgb_model
-        self.scaler = scaler
-        self.poly_features = poly_features
         self.encoder = encoder
         self.categorical_cols = categorical_cols
-        self.numeric_cols = numeric_cols
-        self.key_numeric_cols = key_numeric_cols
         self.classes_ = None
-        self.scaler_fitted = False
-        self.poly_fitted = False
         self.encoder_fitted = False
 
     def fit(self, X: pd.DataFrame, y: np.ndarray):
@@ -48,32 +42,6 @@ class XGBoostWithPreprocessing:
     def _process_features_for_fit(self, X: pd.DataFrame) -> pd.DataFrame:
         X_proc = X.copy()
 
-        # Fit and apply StandardScaler to numeric features
-        if self.numeric_cols:
-            if not self.scaler_fitted:
-                scaled = self.scaler.fit_transform(X_proc[self.numeric_cols])
-                self.scaler_fitted = True
-            else:
-                scaled = self.scaler.transform(X_proc[self.numeric_cols])
-            for i, col in enumerate(self.numeric_cols):
-                X_proc[col] = scaled[:, i]
-
-        # Fit and apply PolynomialFeatures to key numeric columns
-        if self.key_numeric_cols:
-            if not self.poly_fitted:
-                poly_features = self.poly_features.fit_transform(X_proc[self.key_numeric_cols])
-                self.poly_fitted = True
-            else:
-                poly_features = self.poly_features.transform(X_proc[self.key_numeric_cols])
-
-            # Get feature names from PolynomialFeatures
-            feature_names = self.poly_features.get_feature_names_out(self.key_numeric_cols)
-            # Create DataFrame with polynomial features
-            poly_df = pd.DataFrame(poly_features, columns=feature_names, index=X_proc.index)
-            # Drop original key numeric columns and add polynomial features
-            X_proc = X_proc.drop(columns=self.key_numeric_cols)
-            X_proc = pd.concat([X_proc, poly_df], axis=1)
-
         # Encode categorical columns
         if self.categorical_cols:
             if not self.encoder_fitted:
@@ -88,20 +56,6 @@ class XGBoostWithPreprocessing:
     def _process_features(self, X: pd.DataFrame) -> pd.DataFrame:
         X_proc = X.copy()
 
-        # Apply StandardScaler to numeric features
-        if self.numeric_cols:
-            scaled = self.scaler.transform(X_proc[self.numeric_cols])
-            for i, col in enumerate(self.numeric_cols):
-                X_proc[col] = scaled[:, i]
-
-        # Apply PolynomialFeatures to key numeric columns
-        if self.key_numeric_cols:
-            poly_features = self.poly_features.transform(X_proc[self.key_numeric_cols])
-            feature_names = self.poly_features.get_feature_names_out(self.key_numeric_cols)
-            poly_df = pd.DataFrame(poly_features, columns=feature_names, index=X_proc.index)
-            X_proc = X_proc.drop(columns=self.key_numeric_cols)
-            X_proc = pd.concat([X_proc, poly_df], axis=1)
-
         # Encode categorical columns
         if self.categorical_cols:
             encoded = self.encoder.transform(X_proc[self.categorical_cols])
@@ -113,60 +67,53 @@ class XGBoostWithPreprocessing:
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    No feature engineering here; preprocessing is handled in the model wrapper.
-    Return features as-is for the model to process.
+    Build features including:
+    - Soil_Moisture squared (SM²) from S-014
     """
-    return df.copy()
+    X = df.copy()
+
+    # Add Soil_Moisture squared (SM²) - same as S-014
+    # This captures the non-linear threshold behavior in soil moisture
+    X['Soil_Moisture_squared'] = X['Soil_Moisture'] ** 2
+
+    return X
 
 
-def build_model(schema: pd.DataFrame) -> XGBoostWithPreprocessing:
+def build_model(schema: pd.DataFrame) -> SimpleXGBoostWrapper:
     """
-    XGBoost with S-014 tuning configuration:
+    XGBoost with S-014 tuning configuration but fewer trees (n_estimators=300):
     - max_depth=5
-    - subsample=0.8
+    - subsample=0.8 (from S-014)
     - colsample_bytree=0.8
     - learning_rate=0.05
-    - n_estimators=500
+    - n_estimators=300 (shallower ensemble vs S-014's 500)
+    - reg_lambda=1.0 (XGBoost default)
 
-    Preprocessing:
-    - StandardScaler on all numeric features
-    - PolynomialFeatures(degree=2, include_bias=False) on key signal features
-      (Soil_Moisture, Temperature_C, Humidity)
+    Features:
+    - Soil_Moisture² (SM²) from S-014
     - OrdinalEncoder on categorical features
     """
     numeric_cols = schema.select_dtypes(include=["number"]).columns.tolist()
     categorical_cols = [col for col in schema.columns if col not in numeric_cols]
 
-    # Key signal features for polynomial expansion
-    key_numeric_cols = ["Soil_Moisture", "Temperature_C", "Humidity"]
-
-    # Filter to only those key columns that exist in the schema
-    key_numeric_cols = [col for col in key_numeric_cols if col in numeric_cols]
-
-    # Create preprocessors
-    scaler = StandardScaler()
-    poly_features = PolynomialFeatures(degree=2, include_bias=False)
+    # Create ordinal encoder for categorical features
     ordinal_encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
 
-    # Create XGBoost model with S-014 tuning config
+    # Create XGBoost model with S-014 tuning config but n_estimators=300
     xgb_model = XGBClassifier(
         max_depth=5,
         subsample=0.8,
         colsample_bytree=0.8,
         learning_rate=0.05,
-        n_estimators=500,
+        n_estimators=300,
         random_state=RANDOM_STATE,
         tree_method="hist",
         device="cpu",
         verbosity=0,
     )
 
-    return XGBoostWithPreprocessing(
+    return SimpleXGBoostWrapper(
         xgb_model=xgb_model,
-        scaler=scaler,
-        poly_features=poly_features,
         encoder=ordinal_encoder,
         categorical_cols=categorical_cols,
-        numeric_cols=numeric_cols,
-        key_numeric_cols=key_numeric_cols,
     )
