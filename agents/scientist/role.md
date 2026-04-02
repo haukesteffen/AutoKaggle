@@ -96,5 +96,6 @@ reference: result=S-017
 
 - Execute the assigned task, don't invent new directions.
 - Repair invalid runs locally, within constraints.
+- Prefer full local CPU parallelism when the estimator supports it (`n_jobs=-1` or equivalent) unless the task says otherwise.
 - Prefer simple, clean implementations over fragile complexity.
 - Leave changes uncommitted for the supervisor.

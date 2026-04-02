@@ -99,11 +99,7 @@ It is a reusable bank of strategy ideas for inspiration.
 - LightGBM
 - XGBoost
 - CatBoost
-- MLP
-- wide-and-deep
-- TabNet
-- FT-Transformer
-- mixture-style specialist models
+- MLP, RealMLP (pytabkit)
 
 ## Tuning Directions
 

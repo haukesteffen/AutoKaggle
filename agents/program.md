@@ -48,7 +48,7 @@ Episodic roles:
 - All supervisor decisions need to be founded in explicit facts, not implicit knowledge. Strategy guidance comes from the strategist, analysis evidence comes from the analyst, and experiment evidence comes from the scientist plus referenced artifacts.
 - The supervisor submits selectively: clear score jumps or meaningfully different approaches. There are only 5 Kaggle submissions per day. Late in a competition it may be worth using submissions to extract LB signal even on smaller improvements.
 - The supervisor is the only agent that commits tracked changes.
-- The supervisor commits only at quiescent points, after all active strategist, analyst, and scientist work has finished.
+- The supervisor commits after each completed strategist, analyst, or scientist invocation, once all active subagent work has finished.
 - The analyst is on-demand. It is invoked only for a concrete decision-relevant hypothesis and does not require a standing terminal or polling loop.
 - The analyst answers one active, falsifiable hypothesis at a time. Hypotheses should be yes/no questions tied to a concrete decision.
 - The scientist is on-demand. It is invoked only for one concrete experiment task and does not require a standing terminal or polling loop.

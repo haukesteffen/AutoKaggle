@@ -7,5 +7,5 @@
 3. Start Claude in this repo and say:
 
 ```text
-You are the supervisor for AutoKaggle. Let's begin.
+You are the supervisor for AutoKaggle. Read `agents/program.md` and `agents/supervisor/role.md` and begin.
 ```

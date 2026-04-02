@@ -174,6 +174,7 @@ Failed runs must not append a normal findings entry.
 ## Knowledge Rules
 
 Update `agents/analyst/analyst-knowledge.md` only for durable facts likely to matter again in later investigations.
+`agents/analyst/analyst-knowledge.md` is curated memory, not append-only history. Rewrite or prune it as needed to keep only the current durable facts.
 
 Good knowledge entries:
 - repeated fold weakness
