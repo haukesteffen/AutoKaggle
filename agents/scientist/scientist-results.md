@@ -8,6 +8,15 @@
 | S-004 | 0.968439 | 0.001039 | +0.001315 | HistGBM max_iter=500 lr=0.05 max_leaf_nodes=63 balanced, OrdinalEncoder+categorical_features |
 | S-005 | 0.969900 | 0.000806 | +0.001461 | XGBoost n=500 lr=0.05 depth=6 sample_weight balanced, OrdinalEncoder |
 | S-006 | 0.968353 | 0.001164 | -0.001547 | CatBoost iter=500 lr=0.05 depth=6 auto_class_weights=Balanced, native cat |
+| S-007 | 0.969646 | 0.000871 | -0.000254 | XGB+SM²+interactions (4 features), depth=6, sample_weight balanced |
+| S-008 | 0.969900 | 0.000806 | +0.000000 | XGB+SM² only, depth=6, sample_weight balanced |
+| S-009 | 0.969860 | 0.000768 | -0.000040 | XGB+SM²+I(SM<20 & Rainfall<1000), depth=6, sample_weight balanced |
+| S-010 | 0.970484 | 0.000710 | +0.000624 | XGB+SM², depth=5, lr=0.05, sample_weight balanced |
+| S-011 | 0.970016 | 0.000736 | -0.000468 | XGB+SM², depth=4, lr=0.05, sample_weight balanced |
+| S-012 | 0.969160 | 0.000992 | -0.001324 | XGB+SM², depth=5, lr=0.03, sample_weight balanced |
+| S-013 | 0.970719 | 0.000787 | +0.000235 | XGB+SM², depth=5, subsample=0.8, lr=0.05, sample_weight balanced |
+| S-014 | 0.970856 | 0.000645 | +0.000137 | XGB+SM², depth=5, subsample=0.8, colsample_bytree=0.8, lr=0.05 |
+| S-015 | 0.970648 | 0.000769 | -0.000208 | XGB+SM², depth=5, subsample=0.8, colsample=0.8, min_child_weight=5 |
 | S-016 | 0.968737 | 0.001164 | -0.002119 | CatBoost+SM², iterations=500 lr=0.05 depth=5 subsample=0.8 balanced |
 | S-017 | 0.969275 | 0.000982 | +0.000538 | LGBM+SM², n=500 lr=0.05 leaves=31 balanced, OrdinalEncoder |
 | S-018 | 0.969459 | 0.001013 | +0.000184 | HistGBM+SM², max_iter=500 lr=0.05 max_leaf_nodes=31 balanced |
