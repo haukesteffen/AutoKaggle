@@ -26,3 +26,9 @@
 | S-022 | 0.961417 | 0.000863 | -0.009439 | XGBoost S-014 config + SM² + reg_lambda=0.5 |
 | S-023 | 0.961265 | 0.000865 | -0.009591 | XGBoost S-014 config with subsample=0.6 |
 | S-024 | 0.961004 | 0.000815 | -0.009852 | XGBoost S-014 config with n_estimators=300 |
+| S-025 | 0.867516 | 0.001247 | -0.103340 | LogisticRegression linear diversity: StandardScaler+Poly2(SM²,SM²*Temp,SM²*Humidity)+OHE |
+| S-026 | 0.911483 | 0.000673 | -0.059373 | ExtraTreesClassifier n=500 depth=15 min_leaf=2 balanced, SM²+OHE |
+| S-027 | 0.960892 | 0.000530 | -0.009964 | RandomForest n=500 depth=20 min_leaf=2 balanced, SM²+OHE |
+| S-028 | 0.970123 | 0.001049 | -0.000733 | LGBM n=800 lr=0.03 leaves=15 subsample=0.9 balanced, SM²+OrdinalEncoder |
+| S-029 | - | - | - | CatBoost iter=800 lr=0.03 depth=5 subsample=0.9 Bernoulli balanced SM² timed out |
+| S-030 | - | - | - | CatBoost iter=600 lr=0.04 depth=5 subsample=0.9 Bernoulli balanced SM² timed out |

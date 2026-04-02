@@ -7,113 +7,110 @@ if str(REPO_ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
-from xgboost import XGBClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.preprocessing import OrdinalEncoder
 
 from harness.dataset import RANDOM_STATE
 
 
-EXPERIMENT_NAME = "xgboost_s014_n_estimators_300"
+EXPERIMENT_NAME = "histgradientboosting_s031_aggressive_tuning_with_sm2"
 
 
-class SimpleXGBoostWrapper:
+class HistGBMWrapper:
     """
-    Wrapper for XGBoost with OrdinalEncoder for categorical features.
-    Features are engineered in build_features(); no scaling applied here.
+    Wrapper for HistGradientBoosting with OrdinalEncoder on categoricals.
+    Passes categorical feature indices to the model for native handling.
     """
 
-    def __init__(self, xgb_model, encoder, categorical_cols):
-        self.xgb_model = xgb_model
+    def __init__(self, model, encoder, categorical_indices):
+        self.model = model
         self.encoder = encoder
-        self.categorical_cols = categorical_cols
+        self.categorical_indices = categorical_indices
         self.classes_ = None
         self.encoder_fitted = False
 
     def fit(self, X: pd.DataFrame, y: np.ndarray):
         X_processed = self._process_features_for_fit(X)
-        self.xgb_model.fit(X_processed, y)
-        self.classes_ = self.xgb_model.classes_
+        self.model.fit(X_processed, y)
+        self.classes_ = self.model.classes_
         return self
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
         X_processed = self._process_features(X)
-        return self.xgb_model.predict_proba(X_processed)
+        return self.model.predict_proba(X_processed)
 
     def _process_features_for_fit(self, X: pd.DataFrame) -> pd.DataFrame:
         X_proc = X.copy()
 
-        # Encode categorical columns
-        if self.categorical_cols:
-            if not self.encoder_fitted:
-                self.encoder.fit(X_proc[self.categorical_cols])
-                self.encoder_fitted = True
-            encoded = self.encoder.transform(X_proc[self.categorical_cols])
-            for i, col in enumerate(self.categorical_cols):
-                X_proc[col] = encoded[:, i]
+        # Fit and apply OrdinalEncoder to categorical columns
+        if self.categorical_indices:
+            categorical_cols = [X.columns[i] for i in self.categorical_indices if i < len(X.columns)]
+            if categorical_cols:
+                if not self.encoder_fitted:
+                    encoded = self.encoder.fit_transform(X_proc[categorical_cols])
+                    self.encoder_fitted = True
+                else:
+                    encoded = self.encoder.transform(X_proc[categorical_cols])
+                for i, col in enumerate(categorical_cols):
+                    X_proc[col] = encoded[:, i]
 
         return X_proc
 
     def _process_features(self, X: pd.DataFrame) -> pd.DataFrame:
         X_proc = X.copy()
 
-        # Encode categorical columns
-        if self.categorical_cols:
-            encoded = self.encoder.transform(X_proc[self.categorical_cols])
-            for i, col in enumerate(self.categorical_cols):
-                X_proc[col] = encoded[:, i]
+        # Apply OrdinalEncoder to categorical columns
+        if self.categorical_indices:
+            categorical_cols = [X.columns[i] for i in self.categorical_indices if i < len(X.columns)]
+            if categorical_cols:
+                encoded = self.encoder.transform(X_proc[categorical_cols])
+                for i, col in enumerate(categorical_cols):
+                    X_proc[col] = encoded[:, i]
 
         return X_proc
 
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Build features including:
-    - Soil_Moisture squared (SM²) from S-014
+    Add Soil_Moisture squared feature (SM²).
+    This captures non-linearity in soil moisture effects on irrigation need.
     """
-    X = df.copy()
+    df = df.copy()
 
-    # Add Soil_Moisture squared (SM²) - same as S-014
-    # This captures the non-linear threshold behavior in soil moisture
-    X['Soil_Moisture_squared'] = X['Soil_Moisture'] ** 2
+    # Feature: Soil_Moisture squared (captures non-linearity)
+    df["Soil_Moisture_squared"] = df["Soil_Moisture"] ** 2
 
-    return X
+    return df
 
 
-def build_model(schema: pd.DataFrame) -> SimpleXGBoostWrapper:
+def build_model(schema: pd.DataFrame) -> HistGBMWrapper:
     """
-    XGBoost with S-014 tuning configuration but fewer trees (n_estimators=300):
-    - max_depth=5
-    - subsample=0.8 (from S-014)
-    - colsample_bytree=0.8
-    - learning_rate=0.05
-    - n_estimators=300 (shallower ensemble vs S-014's 500)
-    - reg_lambda=1.0 (XGBoost default)
-
-    Features:
-    - Soil_Moisture² (SM²) from S-014
-    - OrdinalEncoder on categorical features
+    HistGradientBoosting with aggressive tuning and SM² feature.
+    S-031: More iterations, slower learning, more regularization.
+    - max_iter=800 (more boosting)
+    - learning_rate=0.03 (slower, refined)
+    - max_leaf_nodes=31 (regularized)
+    - class_weight='balanced'
+    - categorical_features passed to model
+    Uses OrdinalEncoder for categorical feature handling.
     """
     numeric_cols = schema.select_dtypes(include=["number"]).columns.tolist()
     categorical_cols = [col for col in schema.columns if col not in numeric_cols]
 
-    # Create ordinal encoder for categorical features
+    # Get indices of categorical columns for the model
+    categorical_indices = [schema.columns.get_loc(col) for col in categorical_cols]
+
+    # Create OrdinalEncoder for categorical features
     ordinal_encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
 
-    # Create XGBoost model with S-014 tuning config but n_estimators=300
-    xgb_model = XGBClassifier(
-        max_depth=5,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        learning_rate=0.05,
-        n_estimators=300,
+    # HistGradientBoosting with aggressive tuning
+    hist_gbm = HistGradientBoostingClassifier(
+        max_iter=800,
+        learning_rate=0.03,
+        max_leaf_nodes=31,
+        class_weight='balanced',
         random_state=RANDOM_STATE,
-        tree_method="hist",
-        device="cpu",
-        verbosity=0,
+        categorical_features=categorical_indices if categorical_indices else None,
     )
 
-    return SimpleXGBoostWrapper(
-        xgb_model=xgb_model,
-        encoder=ordinal_encoder,
-        categorical_cols=categorical_cols,
-    )
+    return HistGBMWrapper(hist_gbm, ordinal_encoder, categorical_indices)
