@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+"""
+Analysis of S-014 XGBoost model (CV=0.9709) to understand:
+- Fold stability and which folds drive the score
+- Feature importance, especially SM² contribution
+- Subgroup performance by target class, season, region
+"""
+
 import sys
 from pathlib import Path
 
@@ -7,251 +15,281 @@ if str(REPO_ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
-from harness.dataset import TARGET_COLUMN, TRAIN_PATH
+import pickle
+from sklearn.metrics import balanced_accuracy_score, confusion_matrix, recall_score
+from harness.dataset import (
+    load_train_with_folds, split_xy, class_probabilities_to_indices,
+    CLASS_LABELS, encode_target_labels, TARGET_COLUMN, FOLD_COLUMN
+)
 
 
-def load_data():
-    """Load train data, targets, and S-005 OOF predictions."""
-    train_df = pd.read_csv(TRAIN_PATH, index_col=0)
-
-    # Load S-005 OOF predictions
-    oof_preds = np.load(REPO_ROOT / "artifacts" / "S-005" / "oof-preds.npy")
-
-    return train_df, oof_preds
+ARTIFACTS_DIR = Path(REPO_ROOT) / "artifacts" / "S-014"
 
 
-def get_predicted_class(probs):
-    """Convert probability array to predicted class index."""
-    return np.argmax(probs, axis=1)
-
-
-def main() -> None:
-    train_df, oof_preds = load_data()
-
-    # Map class names to indices (assumed order: Low=0, Medium=1, High=2)
-    class_to_idx = {"Low": 0, "Medium": 1, "High": 2}
-    idx_to_class = {v: k for k, v in class_to_idx.items()}
-
-    # Get true targets
-    y_true = train_df[TARGET_COLUMN].map(class_to_idx).values
-
-    # Get predicted classes
-    y_pred = get_predicted_class(oof_preds)
-
-    # Overall accuracy
-    accuracy = (y_true == y_pred).sum() / len(y_true)
-
-    # Identify mispredictions
-    is_correct = (y_true == y_pred)
-    is_mispredicted = ~is_correct
-
-    # Focus on High class (index 2)
-    high_mask = y_true == class_to_idx["High"]
-    high_correct = is_correct & high_mask
-    high_mispredicted = is_mispredicted & high_mask
-
+def main():
+    # Load model, OOF predictions, train data with folds
     print("=" * 70)
-    print("OVERALL MODEL PERFORMANCE")
-    print("=" * 70)
-    print(f"OOF Accuracy: {accuracy:.4f}")
-    print(f"Total samples: {len(y_true)}")
-    print(f"Correct predictions: {is_correct.sum()}")
-    print(f"Mispredictions: {is_mispredicted.sum()}")
-    print()
-
-    print("=" * 70)
-    print("HIGH CLASS PERFORMANCE (Target = High)")
-    print("=" * 70)
-    print(f"Total High samples: {high_mask.sum()}")
-    print(f"High correctly predicted: {high_correct.sum()}")
-    print(f"High mispredicted: {high_mispredicted.sum()}")
-    print(f"High recall: {high_correct.sum() / high_mask.sum():.4f}")
-    print()
-
-    # Analyze feature distributions in High class
-    print("=" * 70)
-    print("SOIL_MOISTURE DISTRIBUTION IN HIGH CLASS")
+    print("S-014 MODEL ANALYSIS (XGBoost, depth=5, subsample=0.8, colsample=0.8)")
     print("=" * 70)
 
-    high_subset = train_df[high_mask].copy()
-    high_correct_subset = train_df[high_correct].copy()
-    high_mispredicted_subset = train_df[high_mispredicted].copy()
+    # Load model - with fallback if pickle fails
+    model = None
+    try:
+        with open(ARTIFACTS_DIR / "model.pkl", "rb") as f:
+            model = pickle.load(f)
+    except (ModuleNotFoundError, ImportError, pickle.UnpicklingError) as e:
+        print(f"Note: Could not load pickled model ({type(e).__name__}). Feature importance will be unavailable.")
 
-    # Show overall stats for High class
-    print("\nSOIL_MOISTURE stats for all High samples:")
-    print(f"  Mean: {high_subset['Soil_Moisture'].mean():.2f}")
-    print(f"  Std:  {high_subset['Soil_Moisture'].std():.2f}")
-    print(f"  Min:  {high_subset['Soil_Moisture'].min():.2f}")
-    print(f"  Max:  {high_subset['Soil_Moisture'].max():.2f}")
+    # Load OOF predictions
+    oof_preds = np.load(ARTIFACTS_DIR / "oof-preds.npy")
 
-    if len(high_correct_subset) > 0:
-        print("\nSOIL_MOISTURE stats for correctly predicted High samples:")
-        print(f"  Mean: {high_correct_subset['Soil_Moisture'].mean():.2f}")
-        print(f"  Std:  {high_correct_subset['Soil_Moisture'].std():.2f}")
-        print(f"  Min:  {high_correct_subset['Soil_Moisture'].min():.2f}")
-        print(f"  Max:  {high_correct_subset['Soil_Moisture'].max():.2f}")
-        print(f"  Count: {len(high_correct_subset)}")
+    # Load train data with folds and target
+    train_df = load_train_with_folds()
+    raw_X, y = split_xy(train_df)
 
-    if len(high_mispredicted_subset) > 0:
-        print("\nSOIL_MOISTURE stats for MISPREDICTED High samples:")
-        print(f"  Mean: {high_mispredicted_subset['Soil_Moisture'].mean():.2f}")
-        print(f"  Std:  {high_mispredicted_subset['Soil_Moisture'].std():.2f}")
-        print(f"  Min:  {high_mispredicted_subset['Soil_Moisture'].min():.2f}")
-        print(f"  Max:  {high_mispredicted_subset['Soil_Moisture'].max():.2f}")
-        print(f"  Count: {len(high_mispredicted_subset)}")
+    # Decode target labels for reporting
+    y_labels = pd.Series([CLASS_LABELS[i] for i in y], name="Irrigation_Need")
 
-    print()
-
-    # Interaction analysis: Soil_Moisture × Temperature
-    print("=" * 70)
-    print("INTERACTION: Soil_Moisture × Temperature_C")
+    print("\n" + "=" * 70)
+    print("FOLD-BY-FOLD PERFORMANCE")
     print("=" * 70)
 
-    # Bin Soil_Moisture and Temperature
-    sm_bins = pd.cut(train_df["Soil_Moisture"], bins=3, labels=["Low_SM", "Mid_SM", "High_SM"])
-    temp_bins = pd.cut(train_df["Temperature_C"], bins=3, labels=["Low_Temp", "Mid_Temp", "High_Temp"])
+    fold_scores = []
+    fold_details = []
 
-    interaction_df = pd.DataFrame({
-        "SM_bin": sm_bins,
-        "Temp_bin": temp_bins,
-        "is_high": y_true == class_to_idx["High"]
-    })
+    for fold in sorted(train_df[FOLD_COLUMN].unique()):
+        fold_mask = train_df[FOLD_COLUMN] == fold
+        y_fold = y[fold_mask.to_numpy()]
+        oof_fold = oof_preds[fold_mask.to_numpy(), :]
 
-    pivot_high = interaction_df.groupby(["SM_bin", "Temp_bin"])["is_high"].agg(["sum", "count", "mean"])
-    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
-    print("\nHigh-class proportion by Soil_Moisture × Temperature bins:")
-    print(pivot_high)
-    print()
+        y_pred = class_probabilities_to_indices(oof_fold)
+        fold_score = balanced_accuracy_score(y_fold, y_pred)
+        fold_scores.append(fold_score)
 
-    # Interaction analysis: Soil_Moisture × Humidity
-    print("=" * 70)
-    print("INTERACTION: Soil_Moisture × Humidity")
-    print("=" * 70)
+        # Per-class recall for this fold
+        recalls = {}
+        for i, label in enumerate(CLASS_LABELS):
+            class_mask = y_fold == i
+            if class_mask.sum() > 0:
+                class_recall = recall_score(y_fold, y_pred, labels=[i], average='macro')
+                recalls[label] = class_recall
+            else:
+                recalls[label] = np.nan
 
-    humidity_bins = pd.cut(train_df["Humidity"], bins=3, labels=["Low_Humidity", "Mid_Humidity", "High_Humidity"])
-    interaction_df = pd.DataFrame({
-        "SM_bin": sm_bins,
-        "Humidity_bin": humidity_bins,
-        "is_high": y_true == class_to_idx["High"]
-    })
+        fold_details.append({
+            'fold': fold,
+            'score': fold_score,
+            'n_samples': fold_mask.sum(),
+            'recalls': recalls
+        })
 
-    pivot_high = interaction_df.groupby(["SM_bin", "Humidity_bin"])["is_high"].agg(["sum", "count", "mean"])
-    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
-    print("\nHigh-class proportion by Soil_Moisture × Humidity bins:")
-    print(pivot_high)
-    print()
+        print(f"Fold {fold}: score={fold_score:.6f}, n={fold_mask.sum()}, "
+              f"recalls: High={recalls['High']:.4f}, Low={recalls['Low']:.4f}, Medium={recalls['Medium']:.4f}")
 
-    # Interaction analysis: Soil_Moisture × Rainfall
-    print("=" * 70)
-    print("INTERACTION: Soil_Moisture × Rainfall_mm")
-    print("=" * 70)
+    print(f"\nFold Scores: {[f'{s:.6f}' for s in fold_scores]}")
+    print(f"Mean CV: {np.mean(fold_scores):.6f}")
+    print(f"Std CV: {np.std(fold_scores):.6f}")
+    print(f"Min Fold: {np.argmin(fold_scores)} ({np.min(fold_scores):.6f})")
+    print(f"Max Fold: {np.argmax(fold_scores)} ({np.max(fold_scores):.6f})")
 
-    rainfall_bins = pd.cut(train_df["Rainfall_mm"], bins=3, labels=["Low_Rain", "Mid_Rain", "High_Rain"])
-    interaction_df = pd.DataFrame({
-        "SM_bin": sm_bins,
-        "Rainfall_bin": rainfall_bins,
-        "is_high": y_true == class_to_idx["High"]
-    })
+    # Overall fold metrics
+    y_pred_all = class_probabilities_to_indices(oof_preds)
+    overall_score = balanced_accuracy_score(y, y_pred_all)
+    print(f"Overall Balanced Accuracy (OOF): {overall_score:.6f}")
 
-    pivot_high = interaction_df.groupby(["SM_bin", "Rainfall_bin"])["is_high"].agg(["sum", "count", "mean"])
-    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
-    print("\nHigh-class proportion by Soil_Moisture × Rainfall bins:")
-    print(pivot_high)
-    print()
-
-    # Interaction analysis: Soil_Moisture × Crop_Type
-    print("=" * 70)
-    print("INTERACTION: Soil_Moisture × Crop_Type")
+    print("\n" + "=" * 70)
+    print("PER-CLASS PERFORMANCE (OVERALL OOF)")
     print("=" * 70)
 
-    interaction_df = pd.DataFrame({
-        "SM_bin": sm_bins,
-        "Crop_Type": train_df["Crop_Type"],
-        "is_high": y_true == class_to_idx["High"]
-    })
+    for i, label in enumerate(CLASS_LABELS):
+        class_mask = y == i
+        class_recall = recall_score(y, y_pred_all, labels=[i], average='macro')
+        class_count = class_mask.sum()
+        class_pct = 100 * class_count / len(y)
 
-    pivot_high = interaction_df.groupby(["SM_bin", "Crop_Type"])["is_high"].agg(["sum", "count", "mean"])
-    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
-    print("\nHigh-class proportion by Soil_Moisture × Crop_Type:")
-    print(pivot_high.sort_values("High_proportion", ascending=False).head(10))
-    print()
+        # Confusion matrix for this class
+        cm = confusion_matrix(y, y_pred_all, labels=list(range(len(CLASS_LABELS))))
+        tp = cm[i, i]
+        fp = cm[:, i].sum() - tp
+        fn = cm[i, :].sum() - tp
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
 
-    # Interaction analysis: Soil_Moisture × Season
-    print("=" * 70)
-    print("INTERACTION: Soil_Moisture × Season")
-    print("=" * 70)
+        print(f"\n{label} (class idx {i}):")
+        print(f"  Count: {class_count} ({class_pct:.2f}%)")
+        print(f"  Recall: {class_recall:.6f}")
+        print(f"  Precision: {precision:.6f}")
+        print(f"  TP={tp}, FP={fp}, FN={fn}")
 
-    interaction_df = pd.DataFrame({
-        "SM_bin": sm_bins,
-        "Season": train_df["Season"],
-        "is_high": y_true == class_to_idx["High"]
-    })
-
-    pivot_high = interaction_df.groupby(["SM_bin", "Season"])["is_high"].agg(["sum", "count", "mean"])
-    pivot_high.columns = ["High_count", "Total_count", "High_proportion"]
-    print("\nHigh-class proportion by Soil_Moisture × Season:")
-    print(pivot_high.sort_values("High_proportion", ascending=False))
-    print()
-
-    # Analyze mispredictions more deeply
-    print("=" * 70)
-    print("MISPREDICTION ANALYSIS (High Class)")
+    print("\n" + "=" * 70)
+    print("FEATURE IMPORTANCE (from S-014 model)")
     print("=" * 70)
 
-    if len(high_mispredicted_subset) > 0:
-        # What were they predicted as?
-        pred_classes = y_pred[high_mispredicted]
-        pred_class_names = [idx_to_class[p] for p in pred_classes]
-        pred_counts = pd.Series(pred_class_names).value_counts()
-        print("\nHigh samples mispredicted as:")
-        print(pred_counts)
-        print()
+    # Extract feature importance from the model
+    # The model is wrapped, so we need to access the underlying xgb_model
+    if model is not None:
+        if hasattr(model, 'xgb_model'):
+            xgb_model = model.xgb_model
+            if hasattr(xgb_model, 'get_booster'):
+                booster = xgb_model.get_booster()
+                importance_dict = booster.get_score(importance_type='weight')
 
-        # Feature patterns in mispredicted High samples
-        print("Feature comparison: Correctly predicted HIGH vs. Mispredicted HIGH")
-        print("-" * 70)
+                # Sort by importance
+                sorted_importance = sorted(importance_dict.items(), key=lambda x: x[1], reverse=True)
+                print(f"\nTop 10 Features by Weight (total features: {len(importance_dict)}):")
+                for rank, (feat_name, importance) in enumerate(sorted_importance[:10], 1):
+                    print(f"  {rank}. {feat_name}: {importance}")
 
-        feature_cols = ["Soil_Moisture", "Temperature_C", "Humidity", "Rainfall_mm",
-                       "Wind_Speed_kmh", "Sunlight_Hours"]
+                # Check for SM² presence
+                sm_squared_found = False
+                for feat_name, importance in sorted_importance:
+                    if 'Soil_Moisture' in feat_name and '2' in feat_name:
+                        sm_squared_found = True
+                        rank = [f[0] for f in sorted_importance].index(feat_name) + 1
+                        print(f"\nSoil_Moisture² found at rank {rank} with importance {importance}")
+                        break
 
-        comparison_data = []
-        for col in feature_cols:
-            correct_mean = high_correct_subset[col].mean() if len(high_correct_subset) > 0 else np.nan
-            correct_std = high_correct_subset[col].std() if len(high_correct_subset) > 0 else np.nan
-            mispred_mean = high_mispredicted_subset[col].mean() if len(high_mispredicted_subset) > 0 else np.nan
-            mispred_std = high_mispredicted_subset[col].std() if len(high_mispredicted_subset) > 0 else np.nan
+                if not sm_squared_found:
+                    print(f"\nNote: Soil_Moisture² (or polynomial term) not found in top features.")
+                    print("Checking for all polynomial terms...")
+                    poly_terms = [f for f in importance_dict.keys() if any(c.isdigit() for c in f) and 'soil_moisture' in f.lower()]
+                    if poly_terms:
+                        print(f"Polynomial terms found: {poly_terms}")
+        else:
+            print("Note: Model wrapper does not expose feature importance directly.")
+    else:
+        print("Note: Model pickle could not be loaded. Feature importance unavailable.")
 
-            diff = mispred_mean - correct_mean if not np.isnan(correct_mean) and not np.isnan(mispred_mean) else 0
-
-            comparison_data.append({
-                "Feature": col,
-                "Correct_Mean": correct_mean,
-                "Correct_Std": correct_std,
-                "Mispred_Mean": mispred_mean,
-                "Mispred_Std": mispred_std,
-                "Difference": diff
-            })
-
-        comparison_df = pd.DataFrame(comparison_data)
-        print(comparison_df.to_string(index=False))
-        print()
-
-    # Check for non-linearity: Soil_Moisture in different regions
-    print("=" * 70)
-    print("SOIL_MOISTURE NON-LINEARITY CHECK: Stratified by High-class density")
+    print("\n" + "=" * 70)
+    print("SUBGROUP ANALYSIS: PERFORMANCE BY REGION")
     print("=" * 70)
 
-    # Create finer bins to check for local patterns
-    sm_fine_bins = pd.cut(train_df["Soil_Moisture"], bins=5)
-    high_by_sm_bin = train_df.groupby(sm_fine_bins).apply(
-        lambda x: (x[TARGET_COLUMN] == "High").sum() / len(x) if len(x) > 0 else 0
-    )
+    for region in sorted(train_df['Region'].unique()):
+        region_mask = train_df['Region'] == region
+        y_region = y[region_mask.to_numpy()]
+        oof_region = oof_preds[region_mask.to_numpy(), :]
+        y_pred_region = class_probabilities_to_indices(oof_region)
 
-    print("\nHigh-class prevalence by Soil_Moisture quintile:")
-    for i, (bin_range, proportion) in enumerate(high_by_sm_bin.items()):
-        print(f"  Bin {i+1} {bin_range}: {proportion:.4f}")
+        region_score = balanced_accuracy_score(y_region, y_pred_region)
+        region_count = region_mask.sum()
+        region_pct = 100 * region_count / len(y)
 
-    print()
+        print(f"\n{region} (n={region_count}, {region_pct:.2f}%):")
+        print(f"  Balanced Accuracy: {region_score:.6f}")
+
+        for i, label in enumerate(CLASS_LABELS):
+            class_mask = y_region == i
+            if class_mask.sum() > 0:
+                class_recall = recall_score(y_region, y_pred_region, labels=[i], average='macro')
+                print(f"  {label} Recall: {class_recall:.6f} (n={class_mask.sum()})")
+
+    print("\n" + "=" * 70)
+    print("SUBGROUP ANALYSIS: PERFORMANCE BY SEASON")
+    print("=" * 70)
+
+    for season in sorted(train_df['Season'].unique()):
+        season_mask = train_df['Season'] == season
+        y_season = y[season_mask.to_numpy()]
+        oof_season = oof_preds[season_mask.to_numpy(), :]
+        y_pred_season = class_probabilities_to_indices(oof_season)
+
+        season_score = balanced_accuracy_score(y_season, y_pred_season)
+        season_count = season_mask.sum()
+        season_pct = 100 * season_count / len(y)
+
+        print(f"\n{season} (n={season_count}, {season_pct:.2f}%):")
+        print(f"  Balanced Accuracy: {season_score:.6f}")
+
+        for i, label in enumerate(CLASS_LABELS):
+            class_mask = y_season == i
+            if class_mask.sum() > 0:
+                class_recall = recall_score(y_season, y_pred_season, labels=[i], average='macro')
+                print(f"  {label} Recall: {class_recall:.6f} (n={class_mask.sum()})")
+
+    print("\n" + "=" * 70)
+    print("SUBGROUP ANALYSIS: HIGH CLASS RECALL BY REGION & SEASON")
+    print("=" * 70)
+
+    high_class_idx = CLASS_LABELS.index('High')
+
+    # By Region
+    print("\nHigh-class Recall by Region:")
+    region_recalls = {}
+    for region in sorted(train_df['Region'].unique()):
+        region_mask = train_df['Region'] == region
+        y_region = y[region_mask.to_numpy()]
+        oof_region = oof_preds[region_mask.to_numpy(), :]
+        y_pred_region = class_probabilities_to_indices(oof_region)
+
+        high_mask = y_region == high_class_idx
+        if high_mask.sum() > 0:
+            high_recall = recall_score(y_region, y_pred_region, labels=[high_class_idx], average='macro')
+            region_recalls[region] = (high_recall, high_mask.sum())
+            print(f"  {region}: {high_recall:.6f} (n_high={high_mask.sum()})")
+        else:
+            region_recalls[region] = (np.nan, 0)
+            print(f"  {region}: no High samples")
+
+    # By Season
+    print("\nHigh-class Recall by Season:")
+    season_recalls = {}
+    for season in sorted(train_df['Season'].unique()):
+        season_mask = train_df['Season'] == season
+        y_season = y[season_mask.to_numpy()]
+        oof_season = oof_preds[season_mask.to_numpy(), :]
+        y_pred_season = class_probabilities_to_indices(oof_season)
+
+        high_mask = y_season == high_class_idx
+        if high_mask.sum() > 0:
+            high_recall = recall_score(y_season, y_pred_season, labels=[high_class_idx], average='macro')
+            season_recalls[season] = (high_recall, high_mask.sum())
+            print(f"  {season}: {high_recall:.6f} (n_high={high_mask.sum()})")
+        else:
+            season_recalls[season] = (np.nan, 0)
+            print(f"  {season}: no High samples")
+
+    # By Crop Type
+    print("\nHigh-class Recall by Crop_Type:")
+    crop_recalls = {}
+    for crop in sorted(train_df['Crop_Type'].unique()):
+        crop_mask = train_df['Crop_Type'] == crop
+        y_crop = y[crop_mask.to_numpy()]
+        oof_crop = oof_preds[crop_mask.to_numpy(), :]
+        y_pred_crop = class_probabilities_to_indices(oof_crop)
+
+        high_mask = y_crop == high_class_idx
+        if high_mask.sum() > 0:
+            high_recall = recall_score(y_crop, y_pred_crop, labels=[high_class_idx], average='macro')
+            crop_recalls[crop] = (high_recall, high_mask.sum())
+            print(f"  {crop}: {high_recall:.6f} (n_high={high_mask.sum()})")
+        else:
+            crop_recalls[crop] = (np.nan, 0)
+            print(f"  {crop}: no High samples")
+
+    print("\n" + "=" * 70)
+    print("SUMMARY: HARDEST FOLDS & SUBGROUPS")
+    print("=" * 70)
+
+    # Find hardest fold
+    hardest_fold_idx = np.argmin(fold_scores)
+    hardest_fold_score = fold_scores[hardest_fold_idx]
+    print(f"\nHardest Fold: Fold {hardest_fold_idx} with score {hardest_fold_score:.6f}")
+
+    # Find worst subgroup by High-class recall
+    valid_recalls = {k: v[0] for k, v in season_recalls.items() if not np.isnan(v[0])}
+    if valid_recalls:
+        worst_season = min(valid_recalls.items(), key=lambda x: x[1])
+        print(f"Worst Season for High-class Recall: {worst_season[0]} ({worst_season[1]:.6f})")
+
+    valid_region_recalls = {k: v[0] for k, v in region_recalls.items() if not np.isnan(v[0])}
+    if valid_region_recalls:
+        worst_region = min(valid_region_recalls.items(), key=lambda x: x[1])
+        print(f"Worst Region for High-class Recall: {worst_region[0]} ({worst_region[1]:.6f})")
+
+    # Find worst crop
+    valid_crop_recalls = {k: v[0] for k, v in crop_recalls.items() if not np.isnan(v[0])}
+    if valid_crop_recalls:
+        worst_crop = min(valid_crop_recalls.items(), key=lambda x: x[1])
+        print(f"Worst Crop for High-class Recall: {worst_crop[0]} ({worst_crop[1]:.6f})")
 
 
 if __name__ == "__main__":

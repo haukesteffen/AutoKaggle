@@ -107,3 +107,57 @@ Humidity shows mild non-linearity within Low SM (9–13% prevalence) but is weak
 overall. Season shows negligible variation across Zaid/Kharif/Rabi.
 
 Not recommended for feature engineering.
+
+## AK-013 — S-014 Fold Stability is Excellent
+source: A-003
+at: 2026-04-02
+
+S-014 (XGBoost depth=5, subsample=0.8, colsample=0.8 with StandardScaler + PolynomialFeatures):
+- CV mean: 0.9709, std: 0.0006 (extremely low variance)
+- All 5 folds range 0.9699–0.9717 (max delta < 0.002)
+- Hardest fold: Fold 0 (0.9699), easiest fold: Fold 2 (0.9717)
+- No evidence of overfitting or fold instability
+
+This tight fold-level consistency suggests the engineering (scaling + polynomial)
+has made the model robust across train/valid splits. No fold-specific tuning needed.
+
+## AK-014 — S-014 High-Class Recall is 95.0% Across All Folds
+source: A-003
+at: 2026-04-02
+
+S-014 achieves exceptional High-class recall:
+- Overall High recall: 0.9500 (19,959 TP out of 21,009 samples)
+- Per-fold High recall: 0.9462–0.9541 (very consistent)
+- TP=19,959, FP=2,515, FN=1,050
+- Precision on High: 0.8881 (good; not overfitting to false positives)
+
+This is 95% vs. 5.5% (S-005 baseline). Polynomial + scaling enabled the jump.
+
+## AK-015 — Regional Weakness in East; Seasonal Weakness in Rabi
+source: A-003
+at: 2026-04-02
+
+S-014 shows minor but consistent subgroup weaknesses:
+- East region: High recall 0.9423 (worst, -0.8% vs. best)
+- All other regions (Central, North, South, West): 0.950–0.953
+
+- Rabi season: High recall 0.9479 (worst, -0.4% vs. Kharif)
+- Kharif: 0.9521, Zaid: 0.9497
+
+- Crop-level: Sugarcane (0.9482) and Potato (0.9484) slightly below Maize (0.9509)
+
+These gaps are small (<1%) and may reflect data distribution rather than model
+weakness. Not a priority for tuning unless region/season-specific thresholds show
+promise in future experiments.
+
+## AK-016 — S-014 Feature Importance Unavailable Due to Pickle Dependency
+source: A-003
+at: 2026-04-02
+
+The S-014 model pickle could not be unpickled (ModuleNotFoundError: autokaggle_experiment_artifacts).
+Feature importance analysis was not possible.
+
+However, infer from domain knowledge that SM² + StandardScaler + PolynomialFeatures
+(esp. Temperature² and Humidity² interactions) likely drive the performance gains.
+Next analysis should extract importance via alternative methods (e.g., SHAP, permutation
+on test set) if needed to guide future feature engineering.

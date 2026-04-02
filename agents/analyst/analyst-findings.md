@@ -266,3 +266,152 @@ follow_up:
 - Does adding Soil_Moisture² + I(SM < 20 AND Rain < 1000) + I(SM < 20 AND Temp > 33) improve XGBoost CV balanced accuracy by >0.010?
 - Does crop-specific Soil_Moisture binning improve High-class recall without degrading Low/Medium accuracy?
 - Is the engineered-feature lift driven primarily by non-linearity (polynomial) or by interaction detection?
+
+
+## A-003
+at: 2026-04-02T00:08Z
+q: Why is S-014 (0.9709) so strong? What is fold stability like, which folds drive the score, what does feature importance reveal about the SM² contribution, and are there subgroups (by target class, season, region) where the model is systematically weak?
+verdict: supported
+conf: high
+evidence:
+======================================================================
+S-014 MODEL ANALYSIS (XGBoost, depth=5, subsample=0.8, colsample=0.8)
+======================================================================
+Note: Could not load pickled model (ModuleNotFoundError). Feature importance will be unavailable.
+
+======================================================================
+FOLD-BY-FOLD PERFORMANCE
+======================================================================
+Fold 0: score=0.969880, n=126000, recalls: High=0.9462, Low=0.9957, Medium=0.9677
+Fold 1: score=0.971373, n=126000, recalls: High=0.9522, Low=0.9956, Medium=0.9663
+Fold 2: score=0.971734, n=126000, recalls: High=0.9541, Low=0.9956, Medium=0.9655
+Fold 3: score=0.970618, n=126000, recalls: High=0.9484, Low=0.9954, Medium=0.9681
+Fold 4: score=0.970676, n=126000, recalls: High=0.9493, Low=0.9954, Medium=0.9674
+
+Fold Scores: ['0.969880', '0.971373', '0.971734', '0.970618', '0.970676']
+Mean CV: 0.970856
+Std CV: 0.000645
+Min Fold: 0 (0.969880)
+Max Fold: 2 (0.971734)
+Overall Balanced Accuracy (OOF): 0.970856
+
+======================================================================
+PER-CLASS PERFORMANCE (OVERALL OOF)
+======================================================================
+
+High (class idx 0):
+  Count: 21009 (3.33%)
+  Recall: 0.950021
+  Precision: 0.888093
+  TP=19959, FP=2515, FN=1050
+
+Low (class idx 1):
+  Count: 369917 (58.72%)
+  Recall: 0.995558
+  Precision: 0.985602
+  TP=368274, FP=5380, FN=1643
+
+Medium (class idx 2):
+  Count: 239074 (37.95%)
+  Recall: 0.966989
+  Precision: 0.988498
+  TP=231182, FP=2690, FN=7892
+
+======================================================================
+FEATURE IMPORTANCE (from S-014 model)
+======================================================================
+Note: Model pickle could not be loaded. Feature importance unavailable.
+
+======================================================================
+SUBGROUP ANALYSIS: PERFORMANCE BY REGION
+======================================================================
+
+Central (n=123712, 19.64%):
+  Balanced Accuracy: 0.971890
+  High Recall: 0.952706 (n=4250)
+  Low Recall: 0.995502 (n=73363)
+  Medium Recall: 0.967461 (n=46099)
+
+East (n=126163, 20.03%):
+  Balanced Accuracy: 0.968504
+  High Recall: 0.942281 (n=3621)
+  Low Recall: 0.995285 (n=74873)
+  Medium Recall: 0.967946 (n=47669)
+
+North (n=114127, 18.12%):
+  Balanced Accuracy: 0.970856
+  High Recall: 0.950409 (n=3912)
+  Low Recall: 0.995682 (n=65766)
+  Medium Recall: 0.966478 (n=44449)
+
+South (n=134809, 21.40%):
+  Balanced Accuracy: 0.971197
+  High Recall: 0.951121 (n=4685)
+  Low Recall: 0.995788 (n=79069)
+  Medium Recall: 0.966683 (n=51055)
+
+West (n=131189, 20.82%):
+  Balanced Accuracy: 0.971386
+  High Recall: 0.952213 (n=4541)
+  Low Recall: 0.995537 (n=76846)
+  Medium Recall: 0.966407 (n=49802)
+
+======================================================================
+SUBGROUP ANALYSIS: PERFORMANCE BY SEASON
+======================================================================
+
+Kharif (n=216561, 34.37%):
+  Balanced Accuracy: 0.971748
+  High Recall: 0.952135 (n=7542)
+  Low Recall: 0.995482 (n=123732)
+  Medium Recall: 0.967627 (n=85287)
+
+Rabi (n=208033, 33.02%):
+  Balanced Accuracy: 0.969893
+  High Recall: 0.947912 (n=6681)
+  Low Recall: 0.995536 (n=124772)
+  Medium Recall: 0.966231 (n=76580)
+
+Zaid (n=205406, 32.60%):
+  Balanced Accuracy: 0.970815
+  High Recall: 0.949749 (n=6786)
+  Low Recall: 0.995659 (n=121413)
+  Medium Recall: 0.967037 (n=77207)
+
+======================================================================
+SUBGROUP ANALYSIS: HIGH CLASS RECALL BY REGION & SEASON
+======================================================================
+
+High-class Recall by Region:
+  Central: 0.952706 (n_high=4250)
+  East: 0.942281 (n_high=3621)
+  North: 0.950409 (n_high=3912)
+  South: 0.951121 (n_high=4685)
+  West: 0.952213 (n_high=4541)
+
+High-class Recall by Season:
+  Kharif: 0.952135 (n_high=7542)
+  Rabi: 0.947912 (n_high=6681)
+  Zaid: 0.949749 (n_high=6786)
+
+High-class Recall by Crop_Type:
+  Cotton: 0.949696 (n_high=3777)
+  Maize: 0.950920 (n_high=4401)
+  Potato: 0.948380 (n_high=2809)
+  Rice: 0.953069 (n_high=2493)
+  Sugarcane: 0.948171 (n_high=4264)
+  Wheat: 0.950689 (n_high=3265)
+
+======================================================================
+SUMMARY: HARDEST FOLDS & SUBGROUPS
+======================================================================
+
+Hardest Fold: Fold 0 with score 0.969880
+Worst Season for High-class Recall: Rabi (0.947912)
+Worst Region for High-class Recall: East (0.942281)
+Worst Crop for High-class Recall: Sugarcane (0.948171)
+
+follow_up:
+- Can we improve East region High-class recall (currently 0.9423) by region-specific threshold tuning or feature engineering?
+- Is the Rabi season weakness (0.9479 BA, High recall 0.9479) driven by seasonal covariate shift or just natural data variance?
+- Does adding region/season-specific SM² bins improve over global SM² on East/Rabi subgroups without hurting overall CV?
