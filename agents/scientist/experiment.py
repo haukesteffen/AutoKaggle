@@ -7,110 +7,88 @@ if str(REPO_ROOT) not in sys.path:
 
 import numpy as np
 import pandas as pd
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.preprocessing import OrdinalEncoder
+from sklearn.linear_model import SGDClassifier
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
 
 from harness.dataset import RANDOM_STATE
 
 
-EXPERIMENT_NAME = "histgradientboosting_s031_aggressive_tuning_with_sm2"
+EXPERIMENT_NAME = "sgd_classifier_s033_with_a004_transformations"
 
 
-class HistGBMWrapper:
+class SGDClassifierWrapper:
     """
-    Wrapper for HistGradientBoosting with OrdinalEncoder on categoricals.
-    Passes categorical feature indices to the model for native handling.
+    Wrapper for SGDClassifier with preprocessing pipeline.
+    Handles StandardScaler on numerics and OneHotEncoder on categoricals.
     """
 
-    def __init__(self, model, encoder, categorical_indices):
+    def __init__(self, model, preprocessor):
         self.model = model
-        self.encoder = encoder
-        self.categorical_indices = categorical_indices
+        self.preprocessor = preprocessor
         self.classes_ = None
-        self.encoder_fitted = False
 
     def fit(self, X: pd.DataFrame, y: np.ndarray):
-        X_processed = self._process_features_for_fit(X)
+        X_processed = self.preprocessor.fit_transform(X)
         self.model.fit(X_processed, y)
         self.classes_ = self.model.classes_
         return self
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
-        X_processed = self._process_features(X)
-        return self.model.predict_proba(X_processed)
-
-    def _process_features_for_fit(self, X: pd.DataFrame) -> pd.DataFrame:
-        X_proc = X.copy()
-
-        # Fit and apply OrdinalEncoder to categorical columns
-        if self.categorical_indices:
-            categorical_cols = [X.columns[i] for i in self.categorical_indices if i < len(X.columns)]
-            if categorical_cols:
-                if not self.encoder_fitted:
-                    encoded = self.encoder.fit_transform(X_proc[categorical_cols])
-                    self.encoder_fitted = True
-                else:
-                    encoded = self.encoder.transform(X_proc[categorical_cols])
-                for i, col in enumerate(categorical_cols):
-                    X_proc[col] = encoded[:, i]
-
-        return X_proc
-
-    def _process_features(self, X: pd.DataFrame) -> pd.DataFrame:
-        X_proc = X.copy()
-
-        # Apply OrdinalEncoder to categorical columns
-        if self.categorical_indices:
-            categorical_cols = [X.columns[i] for i in self.categorical_indices if i < len(X.columns)]
-            if categorical_cols:
-                encoded = self.encoder.transform(X_proc[categorical_cols])
-                for i, col in enumerate(categorical_cols):
-                    X_proc[col] = encoded[:, i]
-
-        return X_proc
+        X_processed = self.preprocessor.transform(X)
+        return self.model._predict_proba_lr(X_processed)
 
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Add Soil_Moisture squared feature (SM²).
-    This captures non-linearity in soil moisture effects on irrigation need.
+    Add A-004 recommended feature transformations:
+    - SM² (Soil_Moisture squared): captures non-linear threshold at SM≈20
+    - log(Rainfall_mm + 1): handles skew in wide-range rainfall data
+    - I_SM_low = (Soil_Moisture < 20): binary indicator for high-need region
     """
     df = df.copy()
 
-    # Feature: Soil_Moisture squared (captures non-linearity)
+    # Feature 1: Soil_Moisture squared (captures non-linearity)
     df["Soil_Moisture_squared"] = df["Soil_Moisture"] ** 2
+
+    # Feature 2: Log-scale Rainfall (handles skew)
+    df["Rainfall_mm_log"] = np.log(df["Rainfall_mm"] + 1)
+
+    # Feature 3: Binary indicator for low soil moisture (captures threshold)
+    df["I_SM_low"] = (df["Soil_Moisture"] < 20).astype(int)
 
     return df
 
 
-def build_model(schema: pd.DataFrame) -> HistGBMWrapper:
+def build_model(schema: pd.DataFrame) -> SGDClassifierWrapper:
     """
-    HistGradientBoosting with aggressive tuning and SM² feature.
-    S-031: More iterations, slower learning, more regularization.
-    - max_iter=800 (more boosting)
-    - learning_rate=0.03 (slower, refined)
-    - max_leaf_nodes=31 (regularized)
-    - class_weight='balanced'
-    - categorical_features passed to model
-    Uses OrdinalEncoder for categorical feature handling.
+    SGDClassifier with A-004 optimal preprocessing.
+
+    Configuration:
+    - StandardScaler on numeric features (required for SGD convergence)
+    - OneHotEncoder on categorical features
+    - SGDClassifier: loss='log_loss' (multiclass logistic), class_weight='balanced',
+      max_iter=1000, random_state=RANDOM_STATE
     """
     numeric_cols = schema.select_dtypes(include=["number"]).columns.tolist()
     categorical_cols = [col for col in schema.columns if col not in numeric_cols]
 
-    # Get indices of categorical columns for the model
-    categorical_indices = [schema.columns.get_loc(col) for col in categorical_cols]
-
-    # Create OrdinalEncoder for categorical features
-    ordinal_encoder = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
-
-    # HistGradientBoosting with aggressive tuning
-    hist_gbm = HistGradientBoostingClassifier(
-        max_iter=800,
-        learning_rate=0.03,
-        max_leaf_nodes=31,
-        class_weight='balanced',
-        random_state=RANDOM_STATE,
-        categorical_features=categorical_indices if categorical_indices else None,
+    # Create preprocessor with StandardScaler for numerics and OneHotEncoder for categoricals
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("numeric", StandardScaler(), numeric_cols),
+            ("categorical", OneHotEncoder(handle_unknown="ignore", sparse_output=False), categorical_cols),
+        ],
+        remainder="passthrough",
     )
 
-    return HistGBMWrapper(hist_gbm, ordinal_encoder, categorical_indices)
+    # SGDClassifier with log_loss for multiclass logistic regression
+    sgd = SGDClassifier(
+        loss='log_loss',
+        class_weight='balanced',
+        max_iter=1000,
+        random_state=RANDOM_STATE,
+        n_jobs=-1,  # Use all CPU cores
+    )
+
+    return SGDClassifierWrapper(sgd, preprocessor)

@@ -161,3 +161,69 @@ However, infer from domain knowledge that SM² + StandardScaler + PolynomialFeat
 (esp. Temperature² and Humidity² interactions) likely drive the performance gains.
 Next analysis should extract importance via alternative methods (e.g., SHAP, permutation
 on test set) if needed to guide future feature engineering.
+
+## AK-017 — Linear Separability is Moderate (LDA at 0.7227 vs Tree at 0.9709)
+source: A-004
+at: 2026-04-02
+
+LDA classification on numeric features achieves 0.7227 CV, indicating moderate linear separability.
+The 97.5% of variance is captured by the first LDA component, but the 2.5% second component
+(Medium vs High discrimination) is essential. This ~0.24 gap from LDA baseline to tree performance
+suggests non-linear decision boundaries are critical but not insurmountable.
+
+## AK-018 — Top 5 Linear Features (by Logistic Regression Coefficient)
+source: A-004
+at: 2026-04-02
+
+Ranked by absolute coefficient magnitude on numeric-only LR:
+1. Soil_Moisture: 1.042
+2. Temperature_C: 0.688
+3. Wind_Speed_kmh: 0.561
+4. Rainfall_mm: 0.339
+5. Soil_pH: 0.047
+
+Soil_Moisture dominates (1.5× Temperature). Wind_Speed and Rainfall are moderate signals.
+Remaining 6 numeric features (Humidity, Sunlight, Org Carbon, EC, Field Area, Prev Irrig)
+have coefficients < 0.05 and contribute minimally to linear discrimination.
+
+## AK-019 — Preprocessing Choice is Neutral (StandardScaler ≈ RobustScaler ≈ MinMaxScaler)
+source: A-004
+at: 2026-04-02
+
+Logistic Regression CV on numeric + categorical OHE shows near-identical performance:
+- StandardScaler: 0.6977
+- RobustScaler: 0.6977
+- MinMaxScaler: 0.6976
+
+Scaling choice does not drive performance variance. StandardScaler is recommended
+for consistency (standard in literature), not due to superior performance.
+
+## AK-020 — Simple Interactions Yield +0.008 Lift; Transformations Yield +0.037 Lift
+source: A-004
+at: 2026-04-02
+
+Logistic Regression CV (numeric only):
+- Baseline (numeric): 0.6919
+- + simple interactions (SM×Temp, SM×Rainfall, etc.): 0.6999 (+0.008)
+- + transformations (Rainfall_log, SM², SM<20 bin): 0.7290 (+0.037)
+
+Transformations (especially log-scaling Rainfall and binning SM) are far more impactful
+than simple linear products. This aligns with earlier findings (AK-008) that SM exhibits
+threshold behavior at ~20, not linear behavior.
+
+## AK-021 — SM × Rainfall is Strongest Linear Interaction (coef=0.753)
+source: A-004
+at: 2026-04-02
+
+Among 4 tested linear interactions, SM × Rainfall has the highest coefficient (0.753),
+followed by Temp × Rainfall (0.616) and SM × Temperature (0.426). SM × Humidity is weak
+(0.054). This supports domain insight from A-002: low SM + low rainfall is the dominant
+high-irrigation-need pattern (7.0× baseline prevalence).
+
+## AK-022 — Dropping Weak Features Hurts Linear Model (-0.0003 CV)
+source: A-004
+at: 2026-04-02
+
+Hypothesis: drop Humidity, Previous_Irrigation_mm, Sunlight_Hours (bottom 3 by coefficient).
+Result: CV drops from 0.6919 to 0.6916 (−0.0003). Weak features do not add noise;
+they add small signal. Keep all 11 numeric features for linear models.

@@ -415,3 +415,345 @@ follow_up:
 - Can we improve East region High-class recall (currently 0.9423) by region-specific threshold tuning or feature engineering?
 - Is the Rabi season weakness (0.9479 BA, High recall 0.9479) driven by seasonal covariate shift or just natural data variance?
 - Does adding region/season-specific SM² bins improve over global SM² on East/Rabi subgroups without hurting overall CV?
+
+
+## A-004
+at: 2026-04-02T19:41Z
+q: What linear-separability signal exists in this dataset? Which features are most informative in linear space (not just via trees)? Are there interaction patterns or feature transformations (log, binning, polynomial) that would boost linear model performance? What preprocessing (scaling strategy, feature normalization) is optimal for logistic regression / linear SVM?
+verdict: *(fill in: supported | rejected | inconclusive)*
+conf: *(fill in: high | medium | low)*
+evidence:
+================================================================================
+LINEAR MODEL SEPARABILITY ANALYSIS (vs S-014 XGBoost at 0.9709)
+================================================================================
+
+Dataset: 630000 samples, 11 numeric, 8 categorical
+Numeric features: ['Soil_pH', 'Soil_Moisture', 'Organic_Carbon', 'Electrical_Conductivity', 'Temperature_C', 'Humidity', 'Rainfall_mm', 'Sunlight_Hours', 'Wind_Speed_kmh', 'Field_Area_hectare', 'Previous_Irrigation_mm']
+Categorical features: ['Soil_Type', 'Crop_Type', 'Crop_Growth_Stage', 'Season', 'Irrigation_Type', 'Water_Source', 'Mulching_Used', 'Region']
+Target distribution: {1: np.int64(369917), 2: np.int64(239074), 0: np.int64(21009)}
+
+================================================================================
+PART 1: CORRELATION-BASED LINEAR IMPORTANCE (numeric features)
+================================================================================
+
+Top 5 Numeric Features by Absolute Correlation with Target:
+  1. Soil_Moisture: 0.249778
+  2. Wind_Speed_kmh: 0.128551
+  3. Temperature_C: 0.099445
+  4. Rainfall_mm: 0.027262
+  5. Electrical_Conductivity: 0.021587
+
+================================================================================
+PART 2: LINEAR DISCRIMINANT ANALYSIS (LDA)
+================================================================================
+
+LDA Classification Score (numeric features only): 0.722652
+LDA explained variance ratio: [0.97511458 0.02488542]
+
+Class means in LDA space (first 2 components):
+  High: [-2.0750, -0.5060]
+  Low: [0.5527, -0.0329]
+  Medium: [-0.6728, 0.0954]
+
+================================================================================
+PART 3: PREPROCESSING IMPACT (StandardScaler vs RobustScaler vs MinMaxScaler)
+================================================================================
+
+Logistic Regression CV Scores by Scaling Strategy (numeric + categorical OHE):
+  StandardScaler      : mean=0.697717, std=0.001440, scores=['0.7000', '0.6978', '0.6984']...
+  RobustScaler        : mean=0.697659, std=0.001413, scores=['0.6999', '0.6977', '0.6984']...
+  MinMaxScaler        : mean=0.697656, std=0.001433, scores=['0.7000', '0.6976', '0.6984']...
+
+================================================================================
+PART 4: LOGISTIC REGRESSION COEFFICIENTS
+================================================================================
+
+Logistic Regression trained on 19 features (numeric + categorical OHE)
+Classes: ('High', 'Low', 'Medium')
+
+Top 10 Features by Average Absolute Coefficient Magnitude:
+  1. Soil_Moisture                 : 1.123841
+  2. Temperature_C                 : 0.730844
+  3. cat_6                         : 0.649809
+  4. Wind_Speed_kmh                : 0.587779
+  5. Rainfall_mm                   : 0.416059
+  6. cat_5                         : 0.082960
+  7. Soil_pH                       : 0.044526
+  8. Electrical_Conductivity       : 0.038647
+  9. cat_2                         : 0.025592
+  10. Organic_Carbon                : 0.024003
+
+================================================================================
+PART 5: FEATURE IMPORTANCE (numeric features only, no categorical)
+================================================================================
+
+Top 5 Numeric Features by Logistic Regression Coefficient Magnitude:
+  1. Soil_Moisture                 : 1.042429
+  2. Temperature_C                 : 0.687699
+  3. Wind_Speed_kmh                : 0.560858
+  4. Rainfall_mm                   : 0.338685
+  5. Soil_pH                       : 0.046769
+
+================================================================================
+PART 6: INTERACTION STRENGTH (simple products in linear space)
+================================================================================
+
+Feature indices: SM=1, Temp=4, Rainfall=6, Humidity=5
+
+Logistic Regression CV (5-fold) on numeric features with simple interactions:
+  Mean: 0.699875, Std: 0.002067
+Logistic Regression CV (5-fold) on numeric features ONLY:
+  Mean: 0.691913, Std: 0.002261
+
+Lift from interactions: 0.007962
+
+Top 8 Features (numeric + interactions) by Coefficient Magnitude:
+  1. SM × Rainfall                 : 0.753250
+  2. Soil_Moisture                 : 0.713537
+  3. Rainfall_mm                   : 0.638943
+  4. Temp × Rainfall               : 0.615677
+  5. Wind_Speed_kmh                : 0.552910
+  6. Temperature_C                 : 0.505151
+  7. SM × Temp                     : 0.426493
+  8. SM × Humidity                 : 0.054246
+
+================================================================================
+PART 7: FEATURE TRANSFORMATIONS (log, polynomial, binning)
+================================================================================
+
+Logistic Regression CV (5-fold) with transformations (log + poly + binning):
+  Mean: 0.728958, Std: 0.002309
+  Lift vs numeric only: 0.037045
+
+================================================================================
+PART 8: FEATURE SELECTION (weak features to drop)
+================================================================================
+
+Numeric Features Ranked by Importance (Logistic Regression):
+   1. Soil_Moisture                 : 1.042429
+   2. Temperature_C                 : 0.687699
+   3. Wind_Speed_kmh                : 0.560858
+   4. Rainfall_mm                   : 0.338685
+   5. Soil_pH                       : 0.046769
+   6. Electrical_Conductivity       : 0.037054
+   7. Organic_Carbon                : 0.018663
+   8. Field_Area_hectare            : 0.017808
+   9. Humidity                      : 0.015850
+  10. Previous_Irrigation_mm        : 0.013623
+  11. Sunlight_Hours                : 0.006473
+
+Weakest Features (candidates for dropping):
+  - Humidity: 0.015850
+  - Previous_Irrigation_mm: 0.013623
+  - Sunlight_Hours: 0.006473
+
+Logistic Regression CV (5-fold) dropping bottom 3 weak features:
+  Mean: 0.691590, Std: 0.002638
+  Lift vs all numeric: -0.000323
+
+================================================================================
+SUMMARY & RECOMMENDATIONS FOR LINEAR MODELS
+================================================================================
+
+Linear Model Performance (Logistic Regression, 5-fold CV):
+  Numeric features only:         0.691913
+  Numeric + simple interactions: 0.699875 (delta=+0.007962)
+  Numeric + transformations:     0.728958 (delta=+0.037045)
+  Numeric (strong features):     0.691590 (delta=-0.000323)
+
+Gap vs S-014 XGBoost (0.9709):
+  Current best LR:    0.728958
+  Gap:                0.241942
+
+TOP-5 FEATURES (Linear Importance Ranking by Coefficient Magnitude):
+  1. Soil_Moisture                  (coef=1.042429)
+  2. Temperature_C                  (coef=0.687699)
+  3. Wind_Speed_kmh                 (coef=0.560858)
+  4. Rainfall_mm                    (coef=0.338685)
+  5. Soil_pH                        (coef=0.046769)
+
+RECOMMENDED PREPROCESSING FOR LINEAR MODELS:
+  1. StandardScaler (standard choice; RobustScaler for outlier robustness)
+  2. Add Soil_Moisture² (non-linear threshold at SM≈20)
+  3. Binning: SM < 20 as binary feature (captures concentration of High class)
+
+RECOMMENDED FEATURE ENGINEERING (Interaction/Transformation):
+  1. SM × Rainfall interaction (7.0× baseline High-class rate in low SM, low rain)
+  2. SM × Temperature interaction (6.4× baseline in low SM, high temp)
+  3. Log-scale Rainfall (high skew, wide range 0.38–2499.69)
+
+follow_up:
+- *(fill in yes/no hypothesis)*
+- *(fill in yes/no hypothesis)*
+- *(fill in yes/no hypothesis)*
+
+
+## A-004
+at: 2026-04-02T19:42Z
+q: What linear-separability signal exists in this dataset? Which features are most informative in linear space (not just via trees)? Are there interaction patterns or feature transformations (log, binning, polynomial) that would boost linear model performance? What preprocessing (scaling strategy, feature normalization) is optimal for logistic regression / linear SVM?
+verdict: supported
+conf: high
+evidence:
+================================================================================
+LINEAR MODEL SEPARABILITY ANALYSIS (vs S-014 XGBoost at 0.9709)
+================================================================================
+
+Dataset: 630000 samples, 11 numeric, 8 categorical
+Numeric features: ['Soil_pH', 'Soil_Moisture', 'Organic_Carbon', 'Electrical_Conductivity', 'Temperature_C', 'Humidity', 'Rainfall_mm', 'Sunlight_Hours', 'Wind_Speed_kmh', 'Field_Area_hectare', 'Previous_Irrigation_mm']
+Categorical features: ['Soil_Type', 'Crop_Type', 'Crop_Growth_Stage', 'Season', 'Irrigation_Type', 'Water_Source', 'Mulching_Used', 'Region']
+Target distribution: {1: np.int64(369917), 2: np.int64(239074), 0: np.int64(21009)}
+
+================================================================================
+PART 1: CORRELATION-BASED LINEAR IMPORTANCE (numeric features)
+================================================================================
+
+Top 5 Numeric Features by Absolute Correlation with Target:
+  1. Soil_Moisture: 0.249778
+  2. Wind_Speed_kmh: 0.128551
+  3. Temperature_C: 0.099445
+  4. Rainfall_mm: 0.027262
+  5. Electrical_Conductivity: 0.021587
+
+================================================================================
+PART 2: LINEAR DISCRIMINANT ANALYSIS (LDA)
+================================================================================
+
+LDA Classification Score (numeric features only): 0.722652
+LDA explained variance ratio: [0.97511458 0.02488542]
+
+Class means in LDA space (first 2 components):
+  High: [-2.0750, -0.5060]
+  Low: [0.5527, -0.0329]
+  Medium: [-0.6728, 0.0954]
+
+================================================================================
+PART 3: PREPROCESSING IMPACT (StandardScaler vs RobustScaler vs MinMaxScaler)
+================================================================================
+
+Logistic Regression CV Scores by Scaling Strategy (numeric + categorical OHE):
+  StandardScaler      : mean=0.697717, std=0.001440, scores=['0.7000', '0.6978', '0.6984']...
+  RobustScaler        : mean=0.697659, std=0.001413, scores=['0.6999', '0.6977', '0.6984']...
+  MinMaxScaler        : mean=0.697656, std=0.001433, scores=['0.7000', '0.6976', '0.6984']...
+
+================================================================================
+PART 4: LOGISTIC REGRESSION COEFFICIENTS
+================================================================================
+
+Logistic Regression trained on 19 features (numeric + categorical OHE)
+Classes: ('High', 'Low', 'Medium')
+
+Top 10 Features by Average Absolute Coefficient Magnitude:
+  1. Soil_Moisture                 : 1.123841
+  2. Temperature_C                 : 0.730844
+  3. cat_6                         : 0.649809
+  4. Wind_Speed_kmh                : 0.587779
+  5. Rainfall_mm                   : 0.416059
+  6. cat_5                         : 0.082960
+  7. Soil_pH                       : 0.044526
+  8. Electrical_Conductivity       : 0.038647
+  9. cat_2                         : 0.025592
+  10. Organic_Carbon                : 0.024003
+
+================================================================================
+PART 5: FEATURE IMPORTANCE (numeric features only, no categorical)
+================================================================================
+
+Top 5 Numeric Features by Logistic Regression Coefficient Magnitude:
+  1. Soil_Moisture                 : 1.042429
+  2. Temperature_C                 : 0.687699
+  3. Wind_Speed_kmh                : 0.560858
+  4. Rainfall_mm                   : 0.338685
+  5. Soil_pH                       : 0.046769
+
+================================================================================
+PART 6: INTERACTION STRENGTH (simple products in linear space)
+================================================================================
+
+Feature indices: SM=1, Temp=4, Rainfall=6, Humidity=5
+
+Logistic Regression CV (5-fold) on numeric features with simple interactions:
+  Mean: 0.699875, Std: 0.002067
+Logistic Regression CV (5-fold) on numeric features ONLY:
+  Mean: 0.691913, Std: 0.002261
+
+Lift from interactions: 0.007962
+
+Top 8 Features (numeric + interactions) by Coefficient Magnitude:
+  1. SM × Rainfall                 : 0.753250
+  2. Soil_Moisture                 : 0.713537
+  3. Rainfall_mm                   : 0.638943
+  4. Temp × Rainfall               : 0.615677
+  5. Wind_Speed_kmh                : 0.552910
+  6. Temperature_C                 : 0.505151
+  7. SM × Temp                     : 0.426493
+  8. SM × Humidity                 : 0.054246
+
+================================================================================
+PART 7: FEATURE TRANSFORMATIONS (log, polynomial, binning)
+================================================================================
+
+Logistic Regression CV (5-fold) with transformations (log + poly + binning):
+  Mean: 0.728958, Std: 0.002309
+  Lift vs numeric only: 0.037045
+
+================================================================================
+PART 8: FEATURE SELECTION (weak features to drop)
+================================================================================
+
+Numeric Features Ranked by Importance (Logistic Regression):
+   1. Soil_Moisture                 : 1.042429
+   2. Temperature_C                 : 0.687699
+   3. Wind_Speed_kmh                : 0.560858
+   4. Rainfall_mm                   : 0.338685
+   5. Soil_pH                       : 0.046769
+   6. Electrical_Conductivity       : 0.037054
+   7. Organic_Carbon                : 0.018663
+   8. Field_Area_hectare            : 0.017808
+   9. Humidity                      : 0.015850
+  10. Previous_Irrigation_mm        : 0.013623
+  11. Sunlight_Hours                : 0.006473
+
+Weakest Features (candidates for dropping):
+  - Humidity: 0.015850
+  - Previous_Irrigation_mm: 0.013623
+  - Sunlight_Hours: 0.006473
+
+Logistic Regression CV (5-fold) dropping bottom 3 weak features:
+  Mean: 0.691590, Std: 0.002638
+  Lift vs all numeric: -0.000323
+
+================================================================================
+SUMMARY & RECOMMENDATIONS FOR LINEAR MODELS
+================================================================================
+
+Linear Model Performance (Logistic Regression, 5-fold CV):
+  Numeric features only:         0.691913
+  Numeric + simple interactions: 0.699875 (delta=+0.007962)
+  Numeric + transformations:     0.728958 (delta=+0.037045)
+  Numeric (strong features):     0.691590 (delta=-0.000323)
+
+Gap vs S-014 XGBoost (0.9709):
+  Current best LR:    0.728958
+  Gap:                0.241942
+
+TOP-5 FEATURES (Linear Importance Ranking by Coefficient Magnitude):
+  1. Soil_Moisture                  (coef=1.042429)
+  2. Temperature_C                  (coef=0.687699)
+  3. Wind_Speed_kmh                 (coef=0.560858)
+  4. Rainfall_mm                    (coef=0.338685)
+  5. Soil_pH                        (coef=0.046769)
+
+RECOMMENDED PREPROCESSING FOR LINEAR MODELS:
+  1. StandardScaler (standard choice; RobustScaler for outlier robustness)
+  2. Add Soil_Moisture² (non-linear threshold at SM≈20)
+  3. Binning: SM < 20 as binary feature (captures concentration of High class)
+
+RECOMMENDED FEATURE ENGINEERING (Interaction/Transformation):
+  1. SM × Rainfall interaction (7.0× baseline High-class rate in low SM, low rain)
+  2. SM × Temperature interaction (6.4× baseline in low SM, high temp)
+  3. Log-scale Rainfall (high skew, wide range 0.38–2499.69)
+
+follow_up:
+- Does combining all three transformations (SM², SM<20 bin, Rainfall_log) on LR push CV above 0.75?
+- Are SM × Rainfall and SM × Temperature the only high-signal interactions, or do categorical features (Region, Season) unlock better LR performance when combined with numeric transformations?
+- Can Logistic Regression reach 0.80+ CV by adding target-encoding for high-cardinality categoricals and stacking with tree OOF?

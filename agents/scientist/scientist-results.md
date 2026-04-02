@@ -32,3 +32,5 @@
 | S-028 | 0.970123 | 0.001049 | -0.000733 | LGBM n=800 lr=0.03 leaves=15 subsample=0.9 balanced, SM²+OrdinalEncoder |
 | S-029 | - | - | - | CatBoost iter=800 lr=0.03 depth=5 subsample=0.9 Bernoulli balanced SM² timed out |
 | S-030 | - | - | - | CatBoost iter=600 lr=0.04 depth=5 subsample=0.9 Bernoulli balanced SM² timed out |
+| S-032 | 0.888151 | 0.000811 | -0.082705 | LR A-004 transformations: SM², log(Rainfall), I_SM_low, StandardScaler+OHE, balanced |
+| S-033 | 0.726934 | 0.010742 | -0.243922 | SGDClassifier loss=log_loss A-004 features, StandardScaler+OHE, balanced |
