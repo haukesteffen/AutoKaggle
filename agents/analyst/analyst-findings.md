@@ -964,3 +964,326 @@ follow_up:
 - Would adding a negative-signal indicator I(SM>=35) — signalling Low High-class likelihood — improve LR calibration for Medium/Low discrimination in that zone?
 - Does S-035 LR already implicitly capture the SM>=35 and Temp<25 zones via SM² and Temperature terms, making explicit indicators redundant?
 
+
+
+## A-008
+at: 2026-04-02T20:21Z
+q: Does target encoding (mean-encoded per fold) for the 8 categorical features yield materially higher linear model CV than OHE on the same numeric feature set (S-039: degree-2 poly on all 11 numerics), in a logistic regression framework?
+verdict: rejected
+conf: high
+reference: experiment=S-039, knowledge=AK-019
+evidence:
+================================================================================
+A-008: Target Encoding vs OHE for 8 Categorical Features
+Numeric base: StandardScaler + PolynomialFeatures(degree=2) on all 11 numerics
+Model: LogisticRegression C=1.0 balanced
+================================================================================
+
+Dataset: 630000 rows, 19 features
+Categorical features (8): ['Soil_Type', 'Crop_Type', 'Crop_Growth_Stage', 'Season', 'Irrigation_Type', 'Water_Source', 'Mulching_Used', 'Region']
+Numeric features (11): ['Soil_pH', 'Soil_Moisture', 'Organic_Carbon', 'Electrical_Conductivity', 'Temperature_C', 'Humidity', 'Rainfall_mm', 'Sunlight_Hours', 'Wind_Speed_kmh', 'Field_Area_hectare', 'Previous_Irrigation_mm']
+Classes: ('High', 'Low', 'Medium')
+
+Target encoding columns: 8 × 3 = 24 TE columns
+
+================================================================================
+APPROACH A: OHE (replicates S-039 at 0.893756)
+================================================================================
+Running 5-fold CV with OHE...
+
+OHE fold scores:
+  Fold 0: 0.891146
+  Fold 1: 0.893526
+  Fold 2: 0.895223
+  Fold 3: 0.894664
+  Fold 4: 0.894473
+  Mean: 0.893806  Std: 0.001438
+  Reference S-039 CV: 0.893756 (from scientist results)
+  Delta from S-039: +0.000050
+
+================================================================================
+APPROACH B: Target Encoding (fold-safe, 3 classes × 8 cats = 24 TE cols)
+================================================================================
+Running 5-fold CV with target encoding...
+
+TE fold scores:
+  Fold 0: 0.890624
+  Fold 1: 0.893253
+  Fold 2: 0.894691
+  Fold 3: 0.893945
+  Fold 4: 0.894409
+  Mean: 0.893384  Std: 0.001463
+
+================================================================================
+COMPARISON: TE vs OHE
+================================================================================
+
+  Method                                 Mean CV        Std
+  -------------------------------------------------------
+  OHE (replicated)                      0.893806   0.001438
+  Target Encoding (fold-safe)           0.893384   0.001463
+  -------------------------------------------------------
+  Delta (TE - OHE replicated):          -0.000422
+  Delta (TE - S-039 0.893756):          -0.000372
+  Threshold for material improvement:       0.001
+
+  Verdict: NO — TE is worse than or equal to OHE (-0.000422)
+
+================================================================================
+PER-FOLD COMPARISON
+================================================================================
+
+  Fold            OHE         TE      Delta
+  ------------------------------------------
+  0          0.891146   0.890624  -0.000522
+  1          0.893526   0.893253  -0.000273
+  2          0.895223   0.894691  -0.000532
+  3          0.894664   0.893945  -0.000719
+  4          0.894473   0.894409  -0.000064
+  Mean       0.893806   0.893384  -0.000422
+
+================================================================================
+END OF ANALYSIS
+================================================================================
+
+follow_up:
+- Does adding SM², log(Rainfall), and the I(SM<20) bin on top of the full degree-2 poly (S-039 OHE) push LR CV above 0.895?
+- Do the 8 categorical features add any measurable signal beyond the polynomial numeric features alone (i.e., does dropping OHE from S-039 cost > 0.001 CV)?
+- Would a degree-3 polynomial on the top-4 numerics (SM, Temp, Wind, Rainfall) outperform S-039's degree-2 on all 11?
+
+
+## A-009
+at: 2026-04-03T06:45Z
+q: Does the MLPClassifier (2-layer shallow neural net, hidden layers 64 and 32) have a structural advantage over Logistic Regression on the S-040 feature set — specifically, does it produce meaningfully different OOF predictions from LR (correlation < 0.97), suggesting it would add diversity value for ensembling even if CV score is similar?
+verdict: supported
+conf: high
+reference: experiment=S-040, knowledge=AK-013
+evidence:
+================================================================================
+A-009: MLP vs LR OOF Diversity on S-040 Feature Set
+Feature set: poly2(11 numerics) + log1p(Rainfall) + I_SM_low + OHE(8 cats)
+Model A: LogisticRegression(C=1.0, balanced, lbfgs, max_iter=2000)
+Model B: MLPClassifier(hidden=(64,32), relu, max_iter=500, early_stopping=True)
+================================================================================
+
+Dataset: 630000 rows
+Numeric features: 11
+  After poly2: 77 features + log1p(Rainfall) + I_SM_low = 79 numeric features
+Categorical features: 8 → OHE
+Classes: ('High', 'Low', 'Medium') (0=High, 1=Low, 2=Medium)
+
+Running 5-fold CV...
+  Fold 0: LR=0.893122, MLP=0.955191
+  Fold 1: LR=0.895732, MLP=0.948371
+  Fold 2: LR=0.895627, MLP=0.955106
+  Fold 3: LR=0.896154, MLP=0.955279
+  Fold 4: LR=0.896401, MLP=0.955642
+
+================================================================================
+BALANCED ACCURACY (5-fold CV)
+================================================================================
+
+  Model                                  Mean CV        Std
+  -------------------------------------------------------
+  LR (S-040 reference=0.895614)         0.895407   0.001176
+  MLP (64,32)                           0.953918   0.002779
+  Delta (MLP - LR): +0.058511
+
+  Per-fold scores:
+  Fold             LR        MLP      Delta
+  ------------------------------------------
+  0          0.893122   0.955191  +0.062069
+  1          0.895732   0.948371  +0.052639
+  2          0.895627   0.955106  +0.059479
+  3          0.896154   0.955279  +0.059125
+  4          0.896401   0.955642  +0.059241
+
+================================================================================
+PREDICTION AGREEMENT (OOF class predictions, argmax)
+================================================================================
+
+  Agreement rate:    0.894549 (89.45%)
+  Disagreement rate: 0.105451 (10.55%)
+  Disagreeing rows:  66,434 of 630,000
+
+  Disagreement breakdown (where models differ):
+  True class      LR pred      MLP pred        Count
+  --------------------------------------------------
+  High            High         Medium          1,063
+  High            Low          High                1
+  High            Low          Medium             15
+  High            Medium       High              494
+  Low             High         Low                62
+  Low             High         Medium             30
+  Low             Low          Medium          1,064
+  Low             Medium       Low            27,576
+  Medium          High         Low                14
+  Medium          High         Medium         21,453
+  Medium          Low          High                1
+  Medium          Low          Medium         12,231
+  Medium          Medium       High              180
+  Medium          Medium       Low             2,250
+
+================================================================================
+OOF PROBABILITY CORRELATION (class 0 = High)
+================================================================================
+
+  Class         Pearson r         p-value
+  ----------------------------------------
+  High (0)       0.730137       0.000e+00
+  Low (1)        0.905983       0.000e+00
+  Medium (2)     0.841969       0.000e+00
+
+  Diversity threshold: correlation < 0.97
+  High-class proba correlation: 0.730137
+  Verdict: YES — correlation 0.730137 < 0.97 threshold
+
+================================================================================
+HIGH-CLASS PROBA DISTRIBUTION COMPARISON
+================================================================================
+
+  LR High proba:  mean=0.077564, std=0.214870, min=0.000000, max=0.999961
+  MLP High proba: mean=0.033268, std=0.168831, min=0.000000, max=1.000000
+
+  High-class recall: LR=0.9281, MLP=0.9010
+  High-class total: 21,009
+  LR correct High: 19,498, MLP correct High: 18,930
+
+================================================================================
+SUMMARY
+================================================================================
+
+  LR CV:  0.895407 ± 0.001176
+  MLP CV: 0.953918 ± 0.002779
+  MLP - LR delta: +0.058511
+
+  OOF prediction agreement: 89.45%
+  OOF High-class proba Pearson r: 0.730137
+  OOF Low-class proba Pearson r: 0.905983
+  OOF Medium-class proba Pearson r: 0.841969
+
+  Diversity answer (corr_High < 0.97): YES — correlation 0.730137 < 0.97 threshold
+
+================================================================================
+END OF ANALYSIS
+================================================================================
+
+follow_up:
+- Does MLP(64,32) at 0.9539 CV hold up vs the XGBoost S-014 best (0.9709) when blended — does a simple mean ensemble of MLP+LR+XGB produce higher CV than XGB alone?
+- Does the MLP retain its 0.9539 CV when trained on a larger/more regularized configuration (e.g., hidden=(128,64,32), dropout, or higher early_stopping patience)?
+- Is the MLP OOF proba correlation with S-014 XGBoost also below 0.97, confirming diversity across all three model families?
+
+
+## A-010
+at: 2026-04-03T07:02Z
+q: Do the S-045 MLP OOF predictions (0.9618 CV) show meaningfully different High-class prediction patterns from S-014 XGBoost OOF predictions (0.9709), specifically: do the two models disagree on a material fraction of High-class samples in a way that suggests ensemble gains are possible?
+verdict: rejected
+conf: high
+reference: experiment=S-045, experiment=S-014
+evidence:
+================================================================================
+A-010: S-045 MLP vs S-014 XGBoost OOF High-class Diversity Analysis
+Method: Load existing OOF artifacts only — no model training
+S-045 path: /Users/hs/dev/AutoKaggle/artifacts/S-045/oof-preds.npy
+S-014 path: /Users/hs/dev/AutoKaggle/artifacts/S-014/oof-preds.npy
+================================================================================
+
+S-045 OOF shape: (630000, 3)
+S-014 OOF shape: (630000, 3)
+
+Dataset: 630,000 rows
+Classes: ('High', 'Low', 'Medium') (0=High, 1=Low, 2=Medium)
+True High-class count: 21,009 (3.33%)
+
+================================================================================
+1. OVERALL PREDICTION AGREEMENT
+================================================================================
+
+  Agreement rate:    0.988021 (98.80%)
+  Disagreement rate: 0.011979 (1.20%)
+  Disagreeing rows:  7,546 of 630,000
+
+================================================================================
+2. HIGH-CLASS DISAGREEMENT (among true High-class samples)
+================================================================================
+
+  True High-class samples: 21,009
+
+  S-045 High recall: 0.9382 (19,710/21,009 correct)
+  S-014 High recall: 0.9500 (19,959/21,009 correct)
+
+  Disagreement breakdown (among 21,009 true High samples):
+  Category                                         Count   Fraction
+  -----------------------------------------------------------------
+  Both correct (both TP)                          19,606     0.9332
+  S-045 correct, S-014 wrong (S-045 unique TP)       104     0.0050
+  S-014 correct, S-045 wrong (S-014 unique TP)       353     0.0168
+  Both wrong (both FN)                               946     0.0450
+  TOTAL                                           21,009     1.0000
+
+  S-045 wrong predictions on S-014's unique TPs:
+    S-045 predicted Medium: 353 (100.0%)
+
+  S-014 wrong predictions on S-045's unique TPs:
+    S-014 predicted Medium: 104 (100.0%)
+
+================================================================================
+3. OOF PROBABILITY CORRELATION
+================================================================================
+
+  Class           Pearson r         p-value
+  ------------------------------------------
+  High (0)         0.960683       0.000e+00
+  Low (1)          0.993842
+  Medium (2)       0.987003
+
+  S-045 High proba: mean=0.046443, std=0.186350, min=0.000000, max=1.000000
+  S-014 High proba: mean=0.046160, std=0.181481, min=0.000000, max=0.999985
+
+  Among true High samples only:
+    S-045 mean High proba: 0.935640
+    S-014 mean High proba: 0.944432
+    Pearson r (High-only samples): 0.919484
+
+================================================================================
+4. SIMPLE AVERAGE ENSEMBLE BALANCED ACCURACY
+================================================================================
+
+  Model                                Balanced Accuracy
+  -------------------------------------------------------
+  S-045 MLP (standalone)                        0.961844
+  S-014 XGBoost (standalone)                    0.970856
+  Simple avg ensemble (S-045+S-014)             0.967859
+
+  Ensemble lift vs S-045: +0.006015
+  Ensemble lift vs S-014: -0.002997
+  Ensemble lift vs best:  -0.002997
+
+  Ensemble High-class recall: 0.9426
+  S-045 High-class recall:    0.9382
+  S-014 High-class recall:    0.9500
+
+================================================================================
+SUMMARY AND VERDICT
+================================================================================
+
+  Agreement rate (all classes):    98.80%
+  High-class proba Pearson r:      0.960683 (threshold < 0.97)
+  High-class complementary TPs:    457 (2.18% of true High)
+  S-045-only unique TPs:           104 (0.50%)
+  S-014-only unique TPs:           353 (1.68%)
+  Avg ensemble vs best model lift: -0.002997
+
+  Correlation below diversity threshold (0.97): True
+  Meaningful complementary High-class TPs: True
+
+  VERDICT: NO — Correlation is low but ensemble does not lift above best single model.
+
+================================================================================
+END OF ANALYSIS
+================================================================================
+
+follow_up:
+- Does a weighted blend (higher weight to S-014) recover the BA gap and beat S-014 standalone on High-class recall?
+- Is there a model with High-class proba correlation < 0.90 vs S-014 that still achieves CV > 0.955 (e.g., CatBoost, LightGBM with different hyperparameters)?
+- Does the simple average of three models (S-014 XGBoost + best LR + S-045 MLP) beat S-014 standalone BA?

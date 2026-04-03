@@ -38,3 +38,15 @@
 | S-035 | 0.892708 | 0.001235 | +0.004557 | LR degree-2 poly on top-4 numeric (14 features) + remaining 7 numeric, StandardScaler+OHE, balanced |
 | S-036 | 0.705966 | 0.001609 | -0.186742 | LinearSVC C=1.0 max_iter=5000 balanced, same poly2 feature set as S-035, CalibratedClassifierCV cv=3 |
 | S-037 | 0.892753 | 0.001233 | -0.078103 | LR C=10 degree-2 poly on top-4 numeric + remaining 7 numeric, StandardScaler+OHE, balanced |
+| S-038 | 0.892644 | 0.001177 | -0.000109 | LR C=0.1 degree-2 poly on top-4 numeric + remaining 7 numeric, StandardScaler+OHE, balanced |
+| S-039 | 0.893756 | 0.001323 | -0.077100 | LR C=1.0 degree-2 poly on ALL 11 numerics (77 features), StandardScaler+OHE, balanced |
+| S-040 | 0.895614 | 0.001295 | -0.075242 | LR C=1.0 poly2 all 11 numerics + log1p(Rainfall) + I_SM_low (79 numeric features), StandardScaler+OHE, balanced |
+| S-041 | - | - | - | LR L1 saga C=1.0 poly2 all 11 numerics + extras (79 numeric), StandardScaler+OHE, balanced — timed out (0/5 folds, saga too slow on this feature size) |
+| S-042 | 0.794584 | 0.001687 | -0.176272 | RidgeClassifier alpha=1.0 balanced + CalibratedClassifierCV cv=3 sigmoid, poly2 all 11 numerics + log1p(Rainfall) + I_SM_low (79 numeric), StandardScaler+OHE |
+| S-043 | 0.916437 | 0.000948 | -0.054419 | LR C=1.0 degree-3 poly on top-4 numerics (34 features) + 7 raw + log1p(Rainfall) + I_SM_low (43 numeric total), StandardScaler+OHE, balanced |
+| S-044 | 0.917093 | 0.000709 | -0.053763 | LR C=10 degree-3 poly on top-4 numerics (34 features) + 7 raw + log1p(Rainfall) + I_SM_low (43 numeric total), StandardScaler+OHE, balanced |
+| S-045 | 0.961844 | 0.001195 | -0.009012 | MLPClassifier (64,32) relu early_stopping poly2 all 11 numerics + log1p(Rainfall) + I_SM_low (79 numeric), StandardScaler+OHE, sample_weight balanced |
+| S-046 | 0.961321 | 0.001368 | -0.009535 | MLPClassifier (128,64,32) relu early_stopping poly2 all 11 numerics + log1p(Rainfall) + I_SM_low (79 numeric), StandardScaler+OHE, sample_weight balanced |
+| S-047 | 0.962405 | 0.001095 | -0.008451 | MLPClassifier (64,32) relu early_stopping degree-3 poly top-4 numerics (34 features) + 7 raw + log1p(Rainfall) + I_SM_low (43 numeric), StandardScaler+OHE, sample_weight balanced |
+| S-048 | 0.917505 | 0.001109 | +0.000412 | LR C=10 degree-3 poly top-4 (34) + degree-2 poly rem-7 (35) + log1p(Rainfall) + I_SM_low (71 numeric total), StandardScaler+OHE, balanced |
+| S-049 | 0.920901 | 0.001293 | +0.003396 | LR C=10 degree-4 poly top-3 (34) + 8 raw numerics + log1p(Rainfall) + I_SM_low (44 numeric total), StandardScaler+OHE, balanced; lbfgs did not converge (2000 iter) |

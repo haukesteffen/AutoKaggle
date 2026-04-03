@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """
-A-007: Do the three A-006 candidate threshold indicators — I(Temperature<25),
-I(SM>=35), and I(SM>=25 AND Temperature<33) — have sufficient selectivity
-(High-class enrichment above the 3.3% baseline) within the out-of-subgroup zone
-to justify adding them to the S-035 feature set in a logistic regression?
+A-010: Do S-045 MLP OOF predictions show meaningfully different High-class
+patterns from S-014 XGBoost OOF predictions, suggesting ensemble gains?
 
 Strategy:
-- Load S-032 OOF predictions and training data
-- For each candidate indicator zone, compute:
-  1. Total High-class prevalence vs baseline (3.3%)
-  2. High-class sample count vs total samples in zone
-  3. FN rate within zone (from S-032 OOF)
-  4. Whether indicator is selective (enrichment above baseline)
-- Also check: I(Temp<25 AND SM>=35) combined indicator
-- All computations are WITHIN the out-of-subgroup zone (SM>=20 OR Rainfall>=1000)
-  as well as globally (full dataset), to correctly assess indicator selectivity
+- Load existing OOF artifacts (no model training):
+    S-045: artifacts/S-045/oof-preds.npy  (N x 3, High=0/Low=1/Medium=2)
+    S-014: artifacts/S-014/oof-preds.npy  (N x 3, same class order)
+- Load true labels via harness.dataset.load_train_with_folds()
+- Compute:
+    1. Overall prediction agreement rate (argmax comparison)
+    2. High-class disagreement: among true High samples, fraction S-045 correct
+       but S-014 misses, and vice versa
+    3. Pearson correlation of High-class probabilities between the two models
+    4. Simple average ensemble balanced accuracy vs. individual model BAs
+- Answer yes/no: do models disagree on High-class in a way that suggests
+  ensemble gains?
 """
 
 import sys
@@ -25,283 +26,253 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np
-import pandas as pd
 import warnings
 warnings.filterwarnings('ignore')
 
+from scipy.stats import pearsonr
+from sklearn.metrics import balanced_accuracy_score
+
 from harness.dataset import (
-    load_train_with_folds, split_xy,
-    CLASS_LABELS, TARGET_COLUMN, FOLD_COLUMN,
-    class_probabilities_to_indices,
+    load_train_with_folds,
+    split_xy,
+    CLASS_LABELS,
 )
 
-OOF_PATH = REPO_ROOT / "artifacts" / "S-032" / "oof-preds.npy"
-
 # CLASS_LABELS = ("High", "Low", "Medium") → 0=High, 1=Low, 2=Medium
-HIGH_IDX = 0
-LOW_IDX = 1
-MED_IDX = 2
+HIGH_IDX = 0  # column index for High class in OOF preds
 
-
-def pct(num, denom):
-    return 100.0 * num / denom if denom > 0 else 0.0
-
-
-def enrich_ratio(prev, baseline):
-    return prev / baseline if baseline > 0 else float('nan')
-
-
-def indicator_stats(name, zone_mask, all_high_mask, oof_preds_argmax, y, baseline_pct, label=""):
-    """Compute prevalence, FN rate, and enrichment for an indicator zone."""
-    n_zone = int(zone_mask.sum())
-    n_zone_high = int((zone_mask & all_high_mask).sum())
-    # FNs: High-class in zone, predicted as not-High by S-032
-    n_zone_fn = int((zone_mask & all_high_mask & (oof_preds_argmax != HIGH_IDX)).sum())
-    n_zone_tp = int((zone_mask & all_high_mask & (oof_preds_argmax == HIGH_IDX)).sum())
-
-    prev_pct = pct(n_zone_high, n_zone)
-    fn_rate = pct(n_zone_fn, n_zone_fn + n_zone_tp) if (n_zone_fn + n_zone_tp) > 0 else float('nan')
-    enrichment = prev_pct / baseline_pct if baseline_pct > 0 else float('nan')
-
-    return {
-        'name': name,
-        'label': label,
-        'n_zone': n_zone,
-        'n_high': n_zone_high,
-        'prev_pct': prev_pct,
-        'enrichment': enrichment,
-        'n_fn': n_zone_fn,
-        'n_tp': n_zone_tp,
-        'fn_rate': fn_rate,
-    }
-
-
-def print_stats_table(rows, title, baseline_pct):
-    print(f"\n{title}")
-    print("-" * 110)
-    print(f"  {'Indicator':<35} {'n_zone':>9} {'n_High':>8} {'High%':>7} {'Enrichment':>11} {'n_FN':>6} {'n_TP':>6} {'FN rate':>8}")
-    print(f"  {'Baseline (3.3%)':<35} {'':>9} {'':>8} {baseline_pct:>6.2f}% {'1.00×':>11}")
-    print("-" * 110)
-    for r in rows:
-        enrichment_str = f"{r['enrichment']:.2f}×" if not np.isnan(r['enrichment']) else "N/A"
-        fn_rate_str = f"{r['fn_rate']:.1f}%" if not np.isnan(r['fn_rate']) else "N/A"
-        print(f"  {r['name']:<35} {r['n_zone']:>9} {r['n_high']:>8} {r['prev_pct']:>6.2f}% {enrichment_str:>11} "
-              f"{r['n_fn']:>6} {r['n_tp']:>6} {fn_rate_str:>8}")
-    print("-" * 110)
+ARTIFACT_ROOT = REPO_ROOT / "artifacts"
+S045_OOF_PATH = ARTIFACT_ROOT / "S-045" / "oof-preds.npy"
+S014_OOF_PATH = ARTIFACT_ROOT / "S-014" / "oof-preds.npy"
 
 
 def main():
     print("=" * 80)
-    print("A-007: Selectivity of candidate threshold indicators for S-035 LR feature set")
+    print("A-010: S-045 MLP vs S-014 XGBoost OOF High-class Diversity Analysis")
+    print("Method: Load existing OOF artifacts only — no model training")
+    print(f"S-045 path: {S045_OOF_PATH}")
+    print(f"S-014 path: {S014_OOF_PATH}")
     print("=" * 80)
 
-    # -----------------------------------------------------------------------
-    # Load data and OOF predictions
-    # -----------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Load artifacts
+    # ------------------------------------------------------------------
+    oof_045 = np.load(S045_OOF_PATH)  # N x 3
+    oof_014 = np.load(S014_OOF_PATH)  # N x 3
+
+    print(f"\nS-045 OOF shape: {oof_045.shape}")
+    print(f"S-014 OOF shape: {oof_014.shape}")
+
+    if oof_045.shape != oof_014.shape:
+        raise ValueError(
+            f"OOF shape mismatch: S-045={oof_045.shape}, S-014={oof_014.shape}"
+        )
+
+    n = oof_045.shape[0]
+
+    # ------------------------------------------------------------------
+    # Load true labels
+    # ------------------------------------------------------------------
     train_df = load_train_with_folds()
-    raw_X, y = split_xy(train_df)
+    _, y = split_xy(train_df)
+    y = y.reset_index(drop=True).to_numpy() if hasattr(y, 'reset_index') else np.asarray(y)
 
-    oof_preds = np.load(OOF_PATH)
-    assert oof_preds.shape == (len(train_df), 3), \
-        f"Unexpected OOF shape: {oof_preds.shape}"
+    if len(y) != n:
+        raise ValueError(
+            f"True label count ({len(y)}) does not match OOF row count ({n})"
+        )
 
-    y_pred = class_probabilities_to_indices(oof_preds)
+    print(f"\nDataset: {n:,} rows")
+    print(f"Classes: {CLASS_LABELS} (0=High, 1=Low, 2=Medium)")
+    print(f"True High-class count: {(y == HIGH_IDX).sum():,} ({(y == HIGH_IDX).mean()*100:.2f}%)")
 
-    sm = raw_X["Soil_Moisture"].values
-    rainfall = raw_X["Rainfall_mm"].values
-    temp = raw_X["Temperature_C"].values
+    # ------------------------------------------------------------------
+    # Argmax predictions
+    # ------------------------------------------------------------------
+    pred_045 = np.argmax(oof_045, axis=1)
+    pred_014 = np.argmax(oof_014, axis=1)
 
-    n_total = len(y)
-    n_total_high = int((y == HIGH_IDX).sum())
-    baseline_pct = pct(n_total_high, n_total)  # ~3.3%
+    # ------------------------------------------------------------------
+    # 1. Overall prediction agreement
+    # ------------------------------------------------------------------
+    agreement = np.mean(pred_045 == pred_014)
+    disagreement = 1.0 - agreement
+    n_disagree = int(disagreement * n)
 
-    print(f"\nDataset: {n_total} rows, {n_total_high} High-class ({baseline_pct:.2f}% baseline)")
-
-    # -----------------------------------------------------------------------
-    # Define zones
-    # -----------------------------------------------------------------------
-    in_subgroup = (sm < 20) & (rainfall < 1000)
-    out_subgroup = ~in_subgroup   # out-of-subgroup: SM>=20 OR Rainfall>=1000
-
-    n_out_subgroup = int(out_subgroup.sum())
-    n_out_high = int((out_subgroup & (y == HIGH_IDX)).sum())
-    out_baseline_pct = pct(n_out_high, n_out_subgroup)
-    print(f"Out-of-subgroup zone: {n_out_subgroup} rows, {n_out_high} High-class ({out_baseline_pct:.2f}% baseline in zone)")
-    print(f"Full dataset baseline: {baseline_pct:.2f}%")
-
-    all_high_mask = (y == HIGH_IDX)
-
-    # -----------------------------------------------------------------------
-    # SECTION 1: Indicator selectivity on FULL dataset
-    # -----------------------------------------------------------------------
     print("\n" + "=" * 80)
-    print("SECTION 1: INDICATOR SELECTIVITY — FULL DATASET")
+    print("1. OVERALL PREDICTION AGREEMENT")
     print("=" * 80)
+    print(f"\n  Agreement rate:    {agreement:.6f} ({agreement*100:.2f}%)")
+    print(f"  Disagreement rate: {disagreement:.6f} ({disagreement*100:.2f}%)")
+    print(f"  Disagreeing rows:  {n_disagree:,} of {n:,}")
 
-    # The three candidate indicators from AK-024
-    indicator_masks_full = [
-        ("I(Temp<25)",             temp < 25),
-        ("I(SM>=35)",              sm >= 35),
-        ("I(SM>=25 AND Temp<33)",  (sm >= 25) & (temp < 33)),
-        ("I(Temp<25 AND SM>=35)",  (temp < 25) & (sm >= 35)),   # bonus combined
-    ]
+    # ------------------------------------------------------------------
+    # 2. High-class disagreement analysis
+    # ------------------------------------------------------------------
+    high_mask = (y == HIGH_IDX)
+    n_high = high_mask.sum()
 
-    rows_full = []
-    for name, mask in indicator_masks_full:
-        r = indicator_stats(name, mask, all_high_mask, y_pred, y, baseline_pct)
-        rows_full.append(r)
+    # Among true High samples
+    pred_045_high = pred_045[high_mask]
+    pred_014_high = pred_014[high_mask]
 
-    print_stats_table(rows_full, "Indicator selectivity on full dataset", baseline_pct)
+    # S-045 correct, S-014 wrong (S-045 unique TP)
+    s045_correct_014_wrong = (pred_045_high == HIGH_IDX) & (pred_014_high != HIGH_IDX)
+    # S-014 correct, S-045 wrong (S-014 unique TP)
+    s014_correct_045_wrong = (pred_014_high == HIGH_IDX) & (pred_045_high != HIGH_IDX)
+    # Both correct
+    both_correct = (pred_045_high == HIGH_IDX) & (pred_014_high == HIGH_IDX)
+    # Both wrong
+    both_wrong = (pred_045_high != HIGH_IDX) & (pred_014_high != HIGH_IDX)
 
-    # -----------------------------------------------------------------------
-    # SECTION 2: Indicator selectivity WITHIN OUT-OF-SUBGROUP zone only
-    # -----------------------------------------------------------------------
+    n_s045_unique_tp = s045_correct_014_wrong.sum()
+    n_s014_unique_tp = s014_correct_045_wrong.sum()
+    n_both_correct = both_correct.sum()
+    n_both_wrong = both_wrong.sum()
+
+    frac_s045_unique = n_s045_unique_tp / n_high
+    frac_s014_unique = n_s014_unique_tp / n_high
+    frac_both_correct = n_both_correct / n_high
+    frac_both_wrong = n_both_wrong / n_high
+
+    s045_high_recall = (pred_045_high == HIGH_IDX).mean()
+    s014_high_recall = (pred_014_high == HIGH_IDX).mean()
+
     print("\n" + "=" * 80)
-    print("SECTION 2: INDICATOR SELECTIVITY — OUT-OF-SUBGROUP ZONE ONLY")
-    print("(restricted to rows where SM>=20 OR Rainfall>=1000)")
+    print("2. HIGH-CLASS DISAGREEMENT (among true High-class samples)")
     print("=" * 80)
+    print(f"\n  True High-class samples: {n_high:,}")
+    print(f"\n  S-045 High recall: {s045_high_recall:.4f} ({int(s045_high_recall*n_high):,}/{n_high:,} correct)")
+    print(f"  S-014 High recall: {s014_high_recall:.4f} ({int(s014_high_recall*n_high):,}/{n_high:,} correct)")
+    print(f"\n  Disagreement breakdown (among {n_high:,} true High samples):")
+    print(f"  {'Category':<45} {'Count':>8} {'Fraction':>10}")
+    print(f"  {'-'*65}")
+    print(f"  {'Both correct (both TP)':<45} {n_both_correct:>8,} {frac_both_correct:>10.4f}")
+    print(f"  {'S-045 correct, S-014 wrong (S-045 unique TP)':<45} {n_s045_unique_tp:>8,} {frac_s045_unique:>10.4f}")
+    print(f"  {'S-014 correct, S-045 wrong (S-014 unique TP)':<45} {n_s014_unique_tp:>8,} {frac_s014_unique:>10.4f}")
+    print(f"  {'Both wrong (both FN)':<45} {n_both_wrong:>8,} {frac_both_wrong:>10.4f}")
+    print(f"  {'TOTAL':<45} {n_high:>8,} {'1.0000':>10}")
 
-    indicator_masks_out = [
-        ("I(Temp<25) in OOS",             out_subgroup & (temp < 25)),
-        ("I(SM>=35) in OOS",              out_subgroup & (sm >= 35)),
-        ("I(SM>=25&Temp<33) in OOS",      out_subgroup & (sm >= 25) & (temp < 33)),
-        ("I(Temp<25&SM>=35) in OOS",      out_subgroup & (temp < 25) & (sm >= 35)),
-    ]
+    # Where S-045 is wrong but S-014 is right: what does S-045 predict?
+    if n_s014_unique_tp > 0:
+        s045_wrong_preds = pred_045_high[s014_correct_045_wrong]
+        print(f"\n  S-045 wrong predictions on S-014's unique TPs:")
+        for cls_idx, cls_name in enumerate(CLASS_LABELS):
+            cnt = (s045_wrong_preds == cls_idx).sum()
+            if cnt > 0:
+                print(f"    S-045 predicted {cls_name}: {cnt:,} ({cnt/n_s014_unique_tp*100:.1f}%)")
 
-    rows_out = []
-    for name, mask in indicator_masks_out:
-        r = indicator_stats(name, mask, all_high_mask, y_pred, y, baseline_pct)
-        rows_out.append(r)
+    # Where S-014 is wrong but S-045 is right: what does S-014 predict?
+    if n_s045_unique_tp > 0:
+        s014_wrong_preds = pred_014_high[s045_correct_014_wrong]
+        print(f"\n  S-014 wrong predictions on S-045's unique TPs:")
+        for cls_idx, cls_name in enumerate(CLASS_LABELS):
+            cnt = (s014_wrong_preds == cls_idx).sum()
+            if cnt > 0:
+                print(f"    S-014 predicted {cls_name}: {cnt:,} ({cnt/n_s045_unique_tp*100:.1f}%)")
 
-    print_stats_table(rows_out, "Indicator selectivity within out-of-subgroup zone", baseline_pct)
+    # ------------------------------------------------------------------
+    # 3. Pearson correlation of High-class probabilities
+    # ------------------------------------------------------------------
+    high_proba_045 = oof_045[:, HIGH_IDX]
+    high_proba_014 = oof_014[:, HIGH_IDX]
 
-    # -----------------------------------------------------------------------
-    # SECTION 3: Prevalence comparison — IN indicator vs NOT in indicator
-    #            (within out-of-subgroup zone) — key enrichment signal
-    # -----------------------------------------------------------------------
+    corr_high, pval_high = pearsonr(high_proba_045, high_proba_014)
+
+    # Also compute for other classes
+    low_proba_045 = oof_045[:, 1]
+    low_proba_014 = oof_014[:, 1]
+    corr_low, _ = pearsonr(low_proba_045, low_proba_014)
+
+    med_proba_045 = oof_045[:, 2]
+    med_proba_014 = oof_014[:, 2]
+    corr_med, _ = pearsonr(med_proba_045, med_proba_014)
+
     print("\n" + "=" * 80)
-    print("SECTION 3: IN-INDICATOR vs NOT-IN-INDICATOR PREVALENCE")
-    print("(within out-of-subgroup zone; compares High% in zone vs complement)")
+    print("3. OOF PROBABILITY CORRELATION")
     print("=" * 80)
+    print(f"\n  {'Class':<12} {'Pearson r':>12} {'p-value':>15}")
+    print(f"  {'-'*42}")
+    print(f"  {'High (0)':<12} {corr_high:>12.6f} {pval_high:>15.3e}")
+    print(f"  {'Low (1)':<12} {corr_low:>12.6f}")
+    print(f"  {'Medium (2)':<12} {corr_med:>12.6f}")
 
-    candidate_names = [
-        "I(Temp<25)",
-        "I(SM>=35)",
-        "I(SM>=25 AND Temp<33)",
-        "I(Temp<25 AND SM>=35)",
-    ]
-    candidate_masks_raw = [
-        temp < 25,
-        sm >= 35,
-        (sm >= 25) & (temp < 33),
-        (temp < 25) & (sm >= 35),
-    ]
+    print(f"\n  S-045 High proba: mean={high_proba_045.mean():.6f}, "
+          f"std={high_proba_045.std():.6f}, "
+          f"min={high_proba_045.min():.6f}, max={high_proba_045.max():.6f}")
+    print(f"  S-014 High proba: mean={high_proba_014.mean():.6f}, "
+          f"std={high_proba_014.std():.6f}, "
+          f"min={high_proba_014.min():.6f}, max={high_proba_014.max():.6f}")
 
-    print(f"\n  {'Indicator':<35} {'In-zone':>10} {'High% IN':>10} {'High% OUT':>11} {'Enrichment IN':>14} {'Signal useful?':>15}")
-    print(f"  {'':35} {'n_rows':>10}")
-    print(f"  " + "-" * 100)
+    # Among true High samples specifically
+    hp_045_high_samples = high_proba_045[high_mask]
+    hp_014_high_samples = high_proba_014[high_mask]
+    corr_high_only, _ = pearsonr(hp_045_high_samples, hp_014_high_samples)
+    print(f"\n  Among true High samples only:")
+    print(f"    S-045 mean High proba: {hp_045_high_samples.mean():.6f}")
+    print(f"    S-014 mean High proba: {hp_014_high_samples.mean():.6f}")
+    print(f"    Pearson r (High-only samples): {corr_high_only:.6f}")
 
-    for name, raw_mask in zip(candidate_names, candidate_masks_raw):
-        # IN indicator & out-of-subgroup
-        in_ind_oos = out_subgroup & raw_mask
-        # NOT in indicator & out-of-subgroup
-        not_in_ind_oos = out_subgroup & ~raw_mask
+    # ------------------------------------------------------------------
+    # 4. Simple average ensemble balanced accuracy
+    # ------------------------------------------------------------------
+    oof_avg = (oof_045 + oof_014) / 2.0
+    pred_avg = np.argmax(oof_avg, axis=1)
 
-        n_in = int(in_ind_oos.sum())
-        n_in_high = int((in_ind_oos & all_high_mask).sum())
-        n_out_ind = int(not_in_ind_oos.sum())
-        n_out_ind_high = int((not_in_ind_oos & all_high_mask).sum())
+    ba_045 = balanced_accuracy_score(y, pred_045)
+    ba_014 = balanced_accuracy_score(y, pred_014)
+    ba_avg = balanced_accuracy_score(y, pred_avg)
 
-        prev_in = pct(n_in_high, n_in)
-        prev_out_ind = pct(n_out_ind_high, n_out_ind)
-        enrichment = prev_in / baseline_pct if baseline_pct > 0 else float('nan')
-
-        # For LR: signal is useful if prev_in > baseline AND there's contrast with complement
-        # Also useful if prev_in < baseline (negative signal — indicators of LOW prevalence also help)
-        if prev_in > baseline_pct * 1.1:
-            signal = "YES (enriched)"
-        elif prev_in < baseline_pct * 0.9:
-            signal = "YES (depleted)"
-        else:
-            signal = "NO (near baseline)"
-
-        print(f"  {name:<35} {n_in:>10} {prev_in:>9.3f}% {prev_out_ind:>10.3f}% {enrichment:>13.2f}× {signal:>15}")
-
-    # -----------------------------------------------------------------------
-    # SECTION 4: Detailed per-indicator FN breakdown
-    # -----------------------------------------------------------------------
     print("\n" + "=" * 80)
-    print("SECTION 4: PER-INDICATOR FN/TP BREAKDOWN (S-032 OOF)")
+    print("4. SIMPLE AVERAGE ENSEMBLE BALANCED ACCURACY")
     print("=" * 80)
+    print(f"\n  {'Model':<35} {'Balanced Accuracy':>18}")
+    print(f"  {'-'*55}")
+    print(f"  {'S-045 MLP (standalone)':<35} {ba_045:>18.6f}")
+    print(f"  {'S-014 XGBoost (standalone)':<35} {ba_014:>18.6f}")
+    print(f"  {'Simple avg ensemble (S-045+S-014)':<35} {ba_avg:>18.6f}")
+    print(f"\n  Ensemble lift vs S-045: {ba_avg - ba_045:+.6f}")
+    print(f"  Ensemble lift vs S-014: {ba_avg - ba_014:+.6f}")
+    print(f"  Ensemble lift vs best:  {ba_avg - max(ba_045, ba_014):+.6f}")
 
-    out_high_mask = out_subgroup & all_high_mask
-    total_out_fn = int((out_high_mask & (y_pred != HIGH_IDX)).sum())
+    # High-class recall for ensemble
+    ensemble_high_recall = (pred_avg[high_mask] == HIGH_IDX).mean()
+    print(f"\n  Ensemble High-class recall: {ensemble_high_recall:.4f}")
+    print(f"  S-045 High-class recall:    {s045_high_recall:.4f}")
+    print(f"  S-014 High-class recall:    {s014_high_recall:.4f}")
 
-    print(f"\n  Total out-of-subgroup High-class FNs (S-032): {total_out_fn}")
-    print(f"  Total out-of-subgroup High-class TPs (S-032): {int((out_high_mask & (y_pred == HIGH_IDX)).sum())}")
-    print()
+    # ------------------------------------------------------------------
+    # Summary and verdict
+    # ------------------------------------------------------------------
+    DIVERSITY_THRESHOLD = 0.97
+    has_complementary_high = min(n_s045_unique_tp, n_s014_unique_tp) > 0
+    high_frac_complementary = (n_s045_unique_tp + n_s014_unique_tp) / n_high
+    has_low_corr = corr_high < DIVERSITY_THRESHOLD
+    ensemble_lifts = ba_avg - max(ba_045, ba_014)
 
-    for name, raw_mask in zip(candidate_names, candidate_masks_raw):
-        # Within out-of-subgroup
-        zone_mask = out_subgroup & raw_mask
-        n_zone = int(zone_mask.sum())
-        n_zone_high = int((zone_mask & all_high_mask).sum())
-        n_zone_fn = int((zone_mask & all_high_mask & (y_pred != HIGH_IDX)).sum())
-        n_zone_tp = int((zone_mask & all_high_mask & (y_pred == HIGH_IDX)).sum())
-        prev = pct(n_zone_high, n_zone)
-        fn_rate = pct(n_zone_fn, n_zone_fn + n_zone_tp) if (n_zone_fn + n_zone_tp) > 0 else 0.0
-        fn_capture = pct(n_zone_fn, total_out_fn)
-        enrichment = prev / baseline_pct
-
-        print(f"  Indicator: {name}")
-        print(f"    Zone size (out-of-subgroup): {n_zone:>8} rows ({pct(n_zone, n_out_subgroup):.1f}% of out-of-subgroup)")
-        print(f"    High-class in zone:          {n_zone_high:>8} ({prev:.3f}% prevalence)")
-        print(f"    Enrichment vs 3.3% baseline: {enrichment:.2f}×")
-        print(f"    FNs in zone (S-032):         {n_zone_fn:>8} ({fn_capture:.1f}% of all out-subgroup FNs)")
-        print(f"    TPs in zone (S-032):         {n_zone_tp:>8}")
-        print(f"    FN rate in zone:             {fn_rate:.1f}%")
-        print(f"    Net info for LR: prev {'ABOVE' if prev > baseline_pct else 'BELOW/AT'} baseline "
-              f"({'enriched' if prev > baseline_pct else 'depleted'}) → "
-              f"{'useful indicator' if abs(prev - baseline_pct) / baseline_pct > 0.1 else 'weak signal'}")
-        print()
-
-    # -----------------------------------------------------------------------
-    # SECTION 5: Summary verdict table
-    # -----------------------------------------------------------------------
     print("\n" + "=" * 80)
-    print("SECTION 5: VERDICT SUMMARY TABLE")
+    print("SUMMARY AND VERDICT")
     print("=" * 80)
-    print(f"\n  Baseline High%: {baseline_pct:.2f}%")
-    print(f"  Out-of-subgroup baseline High%: {out_baseline_pct:.2f}%")
-    print()
-    print(f"  {'Indicator':<35} {'High% in zone':>14} {'Enrichment':>11} {'FN rate':>9} {'Justify adding?':>16}")
-    print("  " + "-" * 90)
+    print(f"\n  Agreement rate (all classes):    {agreement*100:.2f}%")
+    print(f"  High-class proba Pearson r:      {corr_high:.6f} (threshold < {DIVERSITY_THRESHOLD})")
+    print(f"  High-class complementary TPs:    {n_s045_unique_tp + n_s014_unique_tp:,} "
+          f"({high_frac_complementary*100:.2f}% of true High)")
+    print(f"  S-045-only unique TPs:           {n_s045_unique_tp:,} ({frac_s045_unique*100:.2f}%)")
+    print(f"  S-014-only unique TPs:           {n_s014_unique_tp:,} ({frac_s014_unique*100:.2f}%)")
+    print(f"  Avg ensemble vs best model lift: {ensemble_lifts:+.6f}")
+    print(f"\n  Correlation below diversity threshold ({DIVERSITY_THRESHOLD}): {has_low_corr}")
+    print(f"  Meaningful complementary High-class TPs: {has_complementary_high}")
 
-    for name, raw_mask in zip(candidate_names, candidate_masks_raw):
-        zone_mask = out_subgroup & raw_mask
-        n_zone = int(zone_mask.sum())
-        n_zone_high = int((zone_mask & all_high_mask).sum())
-        n_zone_fn = int((zone_mask & all_high_mask & (y_pred != HIGH_IDX)).sum())
-        n_zone_tp = int((zone_mask & all_high_mask & (y_pred == HIGH_IDX)).sum())
-        prev = pct(n_zone_high, n_zone)
-        fn_rate = pct(n_zone_fn, n_zone_fn + n_zone_tp) if (n_zone_fn + n_zone_tp) > 0 else 0.0
-        enrichment = prev / baseline_pct
+    if has_low_corr and has_complementary_high and ensemble_lifts >= 0:
+        verdict = "YES — S-045 and S-014 disagree on High-class in a way that suggests ensemble gains."
+    elif has_low_corr and ensemble_lifts >= 0:
+        verdict = "YES (partial) — Low correlation supports ensemble, but High-class complementarity is weak."
+    elif not has_low_corr:
+        verdict = "NO — High-class probability correlation is above diversity threshold."
+    else:
+        verdict = "NO — Correlation is low but ensemble does not lift above best single model."
 
-        # Justify: enrichment must be meaningfully above 1.0 AND zone is large enough
-        if enrichment > 1.5 and n_zone_high >= 50:
-            justify = "YES"
-        elif enrichment < 0.7:
-            justify = "MAYBE (depleted)"
-        else:
-            justify = "NO"
-
-        print(f"  {name:<35} {prev:>13.3f}% {enrichment:>10.2f}× {fn_rate:>8.1f}% {justify:>16}")
-
-    print()
-    print(f"  NOTE: 'FN rate' is not the same as selectivity. An indicator can have a high FN rate")
-    print(f"  but LOW High-class prevalence (e.g., SM>=35). High FN rate means the model fails there,")
-    print(f"  but it does NOT mean the indicator zone is enriched for High-class samples.")
-    print(f"  For a new indicator to help LR, its zone must have HIGH prevalence (enrichment > 1.0).")
+    print(f"\n  VERDICT: {verdict}")
 
     print("\n" + "=" * 80)
     print("END OF ANALYSIS")

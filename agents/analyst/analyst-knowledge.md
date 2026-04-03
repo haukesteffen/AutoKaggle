@@ -279,6 +279,20 @@ Best candidate threshold indicators ranked by FN-rate purity:
 
 NOTE (A-007): High FN rate does NOT equal High-class enrichment. See AK-025 for selectivity analysis.
 
+## AK-026 — Target Encoding Does Not Beat OHE for Categoricals in LR with Degree-2 Poly
+source: A-008
+at: 2026-04-02
+
+Fold-safe target encoding (3 columns per categorical, 24 TE columns total) was compared
+to OHE on the same feature set (S-039: degree-2 poly on all 11 numerics, LR C=1.0 balanced).
+
+Result: TE CV = 0.893384 vs OHE CV = 0.893806 → delta = −0.000422 (TE is WORSE).
+All 5 folds showed TE ≤ OHE (range: −0.000719 to −0.000064).
+Neither approach exceeds the +0.001 materiality threshold above OHE.
+
+OHE CV (0.893806) closely matches S-039 reference (0.893756), confirming faithful replication.
+OHE remains the preferred categorical encoding for logistic regression on this dataset.
+
 ## AK-025 — Candidate Threshold Indicators from A-006 Are DEPLETED Zones (Not Enriched)
 source: A-007
 at: 2026-04-02
@@ -298,3 +312,40 @@ the model struggles in low-prevalence zones — not that the zones are enriched 
 Adding these indicators as binary features to LR would encode negative signal (depletion, not enrichment).
 Whether that negative signal is already captured by SM² and Temperature terms needs investigation
 (see A-007 follow_up hypotheses).
+
+## AK-027 — MLP(64,32) is Strongly Diverse from LR on S-040 Feature Set
+source: A-009
+at: 2026-04-03
+
+MLPClassifier(hidden=(64,32), relu, max_iter=500, early_stopping=True) on the S-040 feature set:
+- MLP CV: 0.9539 ± 0.0028 (vs LR CV: 0.8954 ± 0.0012; delta: +0.0585)
+- MLP substantially outperforms LR on balanced accuracy — it is not a weak diversity source.
+- OOF High-class proba Pearson r (LR vs MLP): 0.730 (well below 0.97 threshold)
+- OOF Low-class proba Pearson r: 0.906
+- OOF Medium-class proba Pearson r: 0.842
+- OOF prediction agreement: 89.45% (10.55% disagreement = 66,434 rows differ)
+- High-class recall: LR=0.928, MLP=0.901 (LR edges MLP here; MLP has higher overall CV due to Low/Medium)
+- MLP calibrates probabilities differently: mean High proba LR=0.078 vs MLP=0.033
+
+Diversity verdict: YES. MLP adds meaningful diversity for ensembling. Low cross-model correlation
+(0.73) makes it a strong candidate for a 3-way blend with LR and XGBoost.
+
+## AK-028 — S-045 MLP is Too Correlated with S-014 XGBoost to Ensemble Beneficially
+source: A-010
+at: 2026-04-03
+
+S-045 MLP (CV=0.9618) vs S-014 XGBoost (CV=0.9709) — OOF artifact comparison:
+- OOF prediction agreement: 98.80% (only 7,546 of 630,000 rows differ)
+- High-class proba Pearson r: 0.961 (below 0.97 diversity threshold, but barely)
+- High-class Pearson r among true High samples only: 0.919
+- High-class recall: S-014=0.9500, S-045=0.9382 (S-014 is superior)
+- Complementary TPs: S-045 has 104 unique TPs, S-014 has 353 unique TPs (S-014 covers more)
+- Simple average ensemble BA: 0.9679 — which is WORSE than S-014 standalone (0.9709)
+- Ensemble lift vs best: −0.0030 (negative lift)
+
+Both models predict wrong High samples as Medium (100% of wrong predictions in that direction).
+The models are too similar in prediction space despite different architectures — S-045 does not
+recover the cases S-014 misses in a way that compensates for S-045's lower overall accuracy.
+
+Conclusion: Simple average of S-045 + S-014 is not recommended. Weighted blending favoring S-014,
+or finding a model with corr < 0.90 vs S-014, are better paths.
