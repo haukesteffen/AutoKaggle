@@ -349,3 +349,21 @@ recover the cases S-014 misses in a way that compensates for S-045's lower overa
 
 Conclusion: Simple average of S-045 + S-014 is not recommended. Weighted blending favoring S-014,
 or finding a model with corr < 0.90 vs S-014, are better paths.
+
+## AK-029 — S-052 LR is More Diverse from S-014 XGBoost Than S-045 MLP Was
+source: A-011
+at: 2026-04-03
+
+S-052 LR (CV=0.9286) vs S-014 XGBoost (CV=0.9709) — OOF artifact comparison:
+- OOF prediction agreement: 93.23% (vs 98.80% for S-045 MLP — meaningfully more diverse)
+- High-class proba Pearson r: 0.883 (vs 0.961 for S-045 MLP — well below 0.97 threshold)
+- High-class Pearson r among true High samples only: 0.816
+- High-class recall: S-014=0.9500, S-052=0.9474 (S-014 marginally superior)
+- Complementary TPs: S-052 has 284 unique TPs (vs 104 for S-045 MLP), S-014 has 340 unique TPs
+- Simple average ensemble BA: 0.9647 — WORSE than S-014 standalone (0.9709), lift = −0.0062
+- Both models' errors are almost entirely High→Medium confusions (S-052: 99.4% FNs to Medium)
+
+S-052 LR is more diverse than S-045 MLP in prediction space (higher disagreement, lower proba corr,
+more complementary High TPs). However, simple averaging still yields negative lift (−0.0062) because
+the LR's lower overall accuracy drags the ensemble down. Weighted blending (e.g., 0.8×XGB + 0.2×LR)
+or threshold-tuning may recover positive lift. Do not use 50-50 simple average.

@@ -50,3 +50,12 @@
 | S-047 | 0.962405 | 0.001095 | -0.008451 | MLPClassifier (64,32) relu early_stopping degree-3 poly top-4 numerics (34 features) + 7 raw + log1p(Rainfall) + I_SM_low (43 numeric), StandardScaler+OHE, sample_weight balanced |
 | S-048 | 0.917505 | 0.001109 | +0.000412 | LR C=10 degree-3 poly top-4 (34) + degree-2 poly rem-7 (35) + log1p(Rainfall) + I_SM_low (71 numeric total), StandardScaler+OHE, balanced |
 | S-049 | 0.920901 | 0.001293 | +0.003396 | LR C=10 degree-4 poly top-3 (34) + 8 raw numerics + log1p(Rainfall) + I_SM_low (44 numeric total), StandardScaler+OHE, balanced; lbfgs did not converge (2000 iter) |
+| S-050 | 0.920898 | 0.001290 | -0.000003 | LR C=10 degree-4 poly top-3 (34) + 8 raw numerics + log1p(Rainfall) + I_SM_low (44 numeric total), StandardScaler+OHE, balanced; max_iter=5000 (converged) |
+| S-051 | 0.961914 | 0.001108 | -0.008942 | MLPClassifier (64,32) relu early_stopping degree-4 poly top-3 (34) + 8 raw + log1p(Rainfall) + I_SM_low (44 numeric), StandardScaler+OHE, sample_weight balanced |
+| S-052 | 0.928573 | 0.001062 | +0.007675 | LR C=10 degree-4 poly top-4 (69) + 7 raw numerics + log1p(Rainfall) + I_SM_low (78 numeric total), StandardScaler+OHE, balanced; lbfgs max_iter=5000 |
+| S-053 | 0.961876 | 0.001435 | -0.000529 | MLPClassifier (64,32) relu early_stopping degree-4 poly top-4 (69) + 7 raw + log1p(Rainfall) + I_SM_low (78 numeric), StandardScaler+OHE, sample_weight balanced |
+| S-054 | 0.929671 | 0.001159 | +0.001098 | LR C=100 degree-4 poly top-4 (69) + 7 raw numerics + log1p(Rainfall) + I_SM_low (78 numeric total), StandardScaler+OHE, balanced; lbfgs max_iter=5000 |
+| S-055 | 0.922570 | 0.000942 | -0.007101 | LR C=100 degree-5 poly top-3 (55) + 8 raw numerics + log1p(Rainfall) + I_SM_low (65 numeric total), StandardScaler+OHE, balanced; lbfgs max_iter=5000 |
+| S-056 | 0.930248 | 0.001574 | +0.000577 | LR C=100 degree-4 poly top-4 (69) + degree-2 poly rem-7 (35) + log1p(Rainfall) + I_SM_low (106 numeric total), StandardScaler+OHE, balanced; lbfgs max_iter=5000 |
+| S-057 | - | - | - | LR C=1000 same 106-feature set as S-056, lbfgs max_iter=5000 — timed out (4/5 folds, 1200s) |
+| S-058 | 0.917223 | 0.000877 | -0.013025 | LR C=100 degree-3 poly top-4 (34) + 7 raw + log1p(Rainfall) + I_SM_low (43 numeric total), StandardScaler+OHE, balanced; lbfgs max_iter=5000 |

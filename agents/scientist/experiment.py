@@ -13,18 +13,19 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder, PolynomialFeatu
 from harness.dataset import RANDOM_STATE
 
 
-EXPERIMENT_NAME = "lr_s049_poly4_top3_raw8_extras"
+EXPERIMENT_NAME = "lr_c100_poly5_top4_s059"
 
-# Top-3 numeric features for degree-4 polynomial expansion
-TOP3_NUMERIC_FEATURES = [
+# Top-4 numeric features for degree-5 polynomial expansion
+# With 4 features and degree=5: C(4+5, 5) - 1 = 126 - 1 = 125 poly features (no bias)
+TOP4_NUMERIC_FEATURES = [
     "Soil_Moisture",
     "Temperature_C",
     "Rainfall_mm",
+    "Wind_Speed_kmh",
 ]
 
-# Remaining 8 raw numeric features (no polynomial expansion)
-REMAINING_NUMERIC_FEATURES = [
-    "Wind_Speed_kmh",
+# Remaining 7 numeric features (used as raw)
+REM7_NUMERIC_FEATURES = [
     "Soil_pH",
     "Organic_Carbon",
     "Electrical_Conductivity",
@@ -47,34 +48,35 @@ CATEGORICAL_FEATURES = [
 ]
 
 
-class LRPoly4Top3Wrapper:
+class LRPoly5Top4C100Wrapper:
     """
-    LogisticRegression with degree-4 polynomial expansion on top-3 numerics.
+    LogisticRegression with degree-5 polynomial expansion on top-4 numerics,
+    remaining 7 raw numerics, plus log1p(Rainfall_mm) and I_SM_low.
 
     Pipeline:
-    1. PolynomialFeatures(degree=4, include_bias=False) on top-3 numerics
-       (Soil_Moisture, Temperature_C, Rainfall_mm)
-       -> 34 poly features  [C(3+4,4) - 1 = 35 - 1 = 34]
-    2. Remaining 8 raw numeric features (no poly expansion)
+    1. PolynomialFeatures(degree=5, include_bias=False) on top-4 numerics
+       (Soil_Moisture, Temperature_C, Rainfall_mm, Wind_Speed_kmh)
+       -> 125 poly features (C(4+5,5) - 1 = 126 - 1 = 125)
+    2. Remaining 7 raw numerics (no poly expansion)
     3. Extra features:
        - log1p(Rainfall_mm)
        - I_SM_low = (Soil_Moisture < 20).astype(float)
-       Total numeric: 34 + 8 + 2 = 44 features
-    4. StandardScaler on all 44 numeric features
+       Total numeric: 125 + 7 + 2 = 134 features
+    4. StandardScaler on all 134 numeric features
     5. OneHotEncoder on all 8 categorical features
-    6. LogisticRegression(C=10, class_weight='balanced', solver='lbfgs',
-                          max_iter=2000, random_state=42)
+    6. LogisticRegression(C=100, class_weight='balanced', solver='lbfgs',
+                          max_iter=5000, random_state=42)
     """
 
     def __init__(self):
-        self.poly_top3 = PolynomialFeatures(degree=4, include_bias=False)
+        self.poly_top4 = PolynomialFeatures(degree=5, include_bias=False)
         self.scaler = StandardScaler()
         self.ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
         self.model = LogisticRegression(
-            C=10,
+            C=100,
             class_weight="balanced",
             solver="lbfgs",
-            max_iter=2000,
+            max_iter=5000,
             random_state=RANDOM_STATE,
         )
         self.classes_ = None
@@ -85,23 +87,23 @@ class LRPoly4Top3Wrapper:
         return np.hstack([log_rainfall, i_sm_low])
 
     def _transform(self, X: pd.DataFrame, fit: bool) -> np.ndarray:
-        # 1. Degree-4 polynomial expansion on top-3 numerics (-> 34 features)
-        X_top3_input = X[TOP3_NUMERIC_FEATURES].values
+        # 1. Degree-5 polynomial expansion on top-4 numerics (-> 125 features)
+        X_top4_input = X[TOP4_NUMERIC_FEATURES].values
         if fit:
-            X_poly_top3 = self.poly_top3.fit_transform(X_top3_input)
+            X_poly_top4 = self.poly_top4.fit_transform(X_top4_input)
         else:
-            X_poly_top3 = self.poly_top3.transform(X_top3_input)
+            X_poly_top4 = self.poly_top4.transform(X_top4_input)
 
-        # 2. Remaining 8 raw numeric features
-        X_raw_rem = X[REMAINING_NUMERIC_FEATURES].values
+        # 2. Remaining 7 raw numerics
+        X_rem7 = X[REM7_NUMERIC_FEATURES].values
 
         # 3. Extra features: log1p(Rainfall_mm) and I_SM_low
         X_extra = self._build_extra(X)
 
-        # 4. Concatenate all numeric features: 34 + 8 + 2 = 44
-        X_all_numeric = np.hstack([X_poly_top3, X_raw_rem, X_extra])
+        # 4. Concatenate all numeric features: 125 + 7 + 2 = 134
+        X_all_numeric = np.hstack([X_poly_top4, X_rem7, X_extra])
 
-        # 5. Scale all 44 numeric features
+        # 5. Scale all 134 numeric features
         if fit:
             X_numeric = self.scaler.fit_transform(X_all_numeric)
         else:
@@ -132,16 +134,18 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     return df.copy()
 
 
-def build_model(schema: pd.DataFrame) -> LRPoly4Top3Wrapper:
+def build_model(schema: pd.DataFrame) -> LRPoly5Top4C100Wrapper:
     """
-    Build LogisticRegression with degree-4 polynomial expansion on top-3 numerics.
+    Build LogisticRegression with degree-5 poly on top-4 numerics,
+    7 raw remaining numerics, log1p(Rainfall_mm), and I_SM_low.
 
     Configuration:
-    - PolynomialFeatures(degree=4, include_bias=False) on top-3 numerics (-> 34 features)
-    - 8 raw remaining numeric features
-    - log1p(Rainfall_mm) + I_SM_low (2 more) -> 44 total numeric features
-    - StandardScaler on all 44 numeric features
+    - PolynomialFeatures(degree=5, include_bias=False) on top-4 numerics (-> 125 features)
+    - 7 raw remaining numerics (-> 7 features)
+    - log1p(Rainfall_mm) + I_SM_low (2 more) -> 134 total numeric features
+    - StandardScaler on all 134 numeric features
     - OneHotEncoder on 8 categorical features
-    - LogisticRegression(C=10, class_weight='balanced', solver='lbfgs', max_iter=2000)
+    - LogisticRegression(C=100, class_weight='balanced', solver='lbfgs',
+                         max_iter=5000, random_state=42)
     """
-    return LRPoly4Top3Wrapper()
+    return LRPoly5Top4C100Wrapper()

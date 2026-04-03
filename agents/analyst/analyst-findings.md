@@ -1287,3 +1287,135 @@ follow_up:
 - Does a weighted blend (higher weight to S-014) recover the BA gap and beat S-014 standalone on High-class recall?
 - Is there a model with High-class proba correlation < 0.90 vs S-014 that still achieves CV > 0.955 (e.g., CatBoost, LightGBM with different hyperparameters)?
 - Does the simple average of three models (S-014 XGBoost + best LR + S-045 MLP) beat S-014 standalone BA?
+
+
+## A-011
+at: 2026-04-03T12:18Z
+q: Do the S-052 LR OOF predictions (0.9286 CV) show meaningfully different High-class prediction patterns from S-014 XGBoost OOF predictions (0.9709), specifically: does S-052 recover a meaningful fraction of High-class TPs that S-014 misses, suggesting ensemble value?
+verdict: supported
+conf: high
+reference: experiment=S-052, experiment=S-014, knowledge=AK-028
+evidence:
+================================================================================
+A-011: S-052 LR vs S-014 XGBoost OOF High-class Diversity Analysis
+Method: Load existing OOF artifacts only — no model training
+S-052 path: /Users/hs/dev/AutoKaggle/artifacts/S-052/oof-preds.npy
+S-014 path: /Users/hs/dev/AutoKaggle/artifacts/S-014/oof-preds.npy
+================================================================================
+
+S-052 OOF shape: (630000, 3)
+S-014 OOF shape: (630000, 3)
+
+Dataset: 630,000 rows
+Classes: ('High', 'Low', 'Medium') (0=High, 1=Low, 2=Medium)
+True High-class count: 21,009 (3.33%)
+
+================================================================================
+1. OVERALL PREDICTION AGREEMENT
+================================================================================
+
+  Agreement rate:    0.932313 (93.23%)
+  Disagreement rate: 0.067687 (6.77%)
+  Disagreeing rows:  42,643 of 630,000
+
+  Context (A-010): S-045 MLP had 98.80% agreement with S-014
+  S-052 LR agreement: 93.23%  (more diverse than S-045 MLP)
+
+================================================================================
+2. HIGH-CLASS DISAGREEMENT (among true High-class samples)
+================================================================================
+
+  True High-class samples: 21,009
+
+  S-052 High recall: 0.9474 (19,903/21,009 correct)
+  S-014 High recall: 0.9500 (19,959/21,009 correct)
+
+  Disagreement breakdown (among 21,009 true High samples):
+  Category                                         Count   Fraction
+  -----------------------------------------------------------------
+  Both correct (both TP)                          19,619     0.9338
+  S-052 correct, S-014 wrong (S-052 unique TP)       284     0.0135
+  S-014 correct, S-052 wrong (S-014 unique TP)       340     0.0162
+  Both wrong (both FN)                               766     0.0365
+  TOTAL                                           21,009     1.0000
+
+  Context (A-010): S-045 MLP had 104 unique TPs vs S-014's 353 unique TPs
+  S-052 LR unique TPs: 284 (S-014's unique TPs: 340)
+
+  S-052 wrong predictions on S-014's unique TPs:
+    S-052 predicted Low: 2 (0.6%)
+    S-052 predicted Medium: 338 (99.4%)
+
+  S-014 wrong predictions on S-052's unique TPs:
+    S-014 predicted Medium: 284 (100.0%)
+
+================================================================================
+3. OOF PROBABILITY CORRELATION
+================================================================================
+
+  Class           Pearson r         p-value
+  ------------------------------------------
+  High (0)         0.883404       0.000e+00
+  Low (1)          0.936797
+  Medium (2)       0.907629
+
+  S-052 High proba: mean=0.062265, std=0.202211, min=0.000000, max=0.999998
+  S-014 High proba: mean=0.046160, std=0.181481, min=0.000000, max=0.999985
+
+  Among true High samples only:
+    S-052 mean High proba: 0.916139
+    S-014 mean High proba: 0.944432
+    Pearson r (High-only samples): 0.816248
+
+  Context (A-010): S-045 MLP had High proba Pearson r = 0.961 vs S-014
+  S-052 LR High proba Pearson r: 0.883404 (more diverse than S-045 MLP)
+
+================================================================================
+4. SIMPLE AVERAGE ENSEMBLE BALANCED ACCURACY
+================================================================================
+
+  Model                                Balanced Accuracy
+  -------------------------------------------------------
+  S-052 LR (standalone)                         0.928573
+  S-014 XGBoost (standalone)                    0.970856
+  Simple avg ensemble (S-052+S-014)             0.964698
+
+  Ensemble lift vs S-052: +0.036125
+  Ensemble lift vs S-014: -0.006158
+  Ensemble lift vs best:  -0.006158
+
+  Ensemble High-class recall: 0.9505
+  S-052 High-class recall:    0.9474
+  S-014 High-class recall:    0.9500
+
+  Context (A-010): S-045 MLP ensemble had lift vs S-014: -0.003000 (negative)
+
+================================================================================
+SUMMARY AND VERDICT
+================================================================================
+
+  Agreement rate (all classes):    93.23%
+    vs S-045 MLP baseline:          98.80%
+  High-class proba Pearson r:      0.883404 (threshold < 0.97)
+    vs S-045 MLP baseline:          0.961000
+  S-052 unique High TPs:           284
+    vs S-045 MLP baseline:          104
+  S-014 unique High TPs:           340
+    vs S-045 MLP baseline:          353
+  Avg ensemble vs best model lift: -0.006158
+    vs S-045 MLP baseline:          -0.003000
+
+  Correlation below diversity threshold (0.97): True
+  Meaningful complementary High-class TPs: True
+  More unique TPs than S-045 MLP (104): True
+
+  VERDICT: PARTIAL YES — S-052 LR recovers more unique High TPs than S-045 MLP and has lower correlation with S-014, but simple average ensemble does not lift above best. Weighted blend or threshold optimization needed.
+
+================================================================================
+END OF ANALYSIS
+================================================================================
+
+follow_up:
+- Does a weighted blend (e.g., 0.8×S-014 + 0.2×S-052) outperform S-014 standalone on OOF balanced accuracy?
+- Does threshold-tuning the S-052+S-014 ensemble (optimizing the High-class decision boundary jointly) recover positive lift vs S-014?
+- Is there a third model family (e.g., LightGBM, CatBoost, or a stronger MLP) with High-class proba Pearson r < 0.85 vs S-014 AND positive simple-average ensemble lift?
