@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T18:25Z
+generated_at: 2026-04-04T18:26Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -54,9 +54,9 @@ Compact restart context for Codex supervisor sessions. Read this before any full
   - A-013 | verdict=rejected | conf=high | q=Does S-052 remain a plausible additional diversity source after S-093, specifically: are S-052's OOF probabilities still materially less correlated with S-093 than the S-014/S-082 tree pair are with each other, and does a simple average over S-093 and S-052 avoid a large regression versus S-093 alone?
 
 ## Leaderboard
-- submissions_total: 4
-- best_lb: 0.97087 (S-089) | rank 165
-- latest_submission: S-089 | 2026-04-04T17:50Z | 0.97087 | Diagnostic leaderboard probe for multinomial LR stacker on S-014+S-082 probabilities
+- submissions_total: 5
+- best_lb: 0.97144 (S-094) | rank 157
+- latest_submission: S-094 | 2026-04-04T18:25Z | 0.97144 | Promote the strongest 4-way logit LR stacker after the S-093/S-094 third-leg and fourth-leg gains held locally
 
 ## Reset Policy
 - After any durable state change, run `uv run python -m harness.supervisor_snapshot`.
