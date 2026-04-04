@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 
 
-TASK_ID = "S-096"
+TASK_ID = "S-097"
 SOURCE_IDS = ("S-014", "S-082", "S-073", "S-052")
 CLASSES = ["High", "Low", "Medium"]
 CLASS_TO_INT = {label: idx for idx, label in enumerate(CLASSES)}
@@ -106,12 +106,9 @@ def _extract_probs(df: pd.DataFrame, source_id: str) -> pd.DataFrame:
     return probs.rename(columns=rename)
 
 
-def _logit_features(df: pd.DataFrame, source_id: str) -> pd.DataFrame:
+def _raw_prob_features(df: pd.DataFrame, source_id: str) -> pd.DataFrame:
     cols = [f"{source_id}_{cls}" for cls in CLASSES]
-    probs = df[cols].clip(EPS, 1 - EPS)
-    logits = np.log(probs / (1 - probs))
-    logits.columns = [f"{col}_logit" for col in cols]
-    return logits
+    return df[cols].copy()
 
 
 def _prepare_split(split: str) -> pd.DataFrame:
@@ -127,7 +124,7 @@ def _prepare_split(split: str) -> pd.DataFrame:
                 merged = pd.concat([merged.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
     if merged is None:
         raise RuntimeError(f"Failed to prepare {split} split")
-    feature_blocks = [_logit_features(merged, source_id) for source_id in SOURCE_IDS]
+    feature_blocks = [_raw_prob_features(merged, source_id) for source_id in SOURCE_IDS]
     features = pd.concat(feature_blocks, axis=1)
     if "id" in merged.columns:
         features.index = merged["id"].to_numpy()
@@ -149,7 +146,7 @@ def _row_keys(x: pd.DataFrame | np.ndarray) -> np.ndarray:
 class ExternalStacker(BaseEstimator, ClassifierMixin):
     def __init__(self) -> None:
         self.model = LogisticRegression(
-            C=2.0,
+            C=4.0,
             class_weight="balanced",
             max_iter=2000,
             solver="lbfgs",
