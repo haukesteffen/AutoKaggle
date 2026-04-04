@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-EXPERIMENT_NAME = "stack_s089_lr_meta_s014_s082"
+EXPERIMENT_NAME = "stack_s090_lr_meta_s014_s082"
 
 ARTIFACTS_ROOT = REPO_ROOT / "artifacts"
 XGB_TASK_ID = "S-014"
@@ -43,7 +43,7 @@ class LogisticMetaStacker:
     def __init__(self) -> None:
         self.model_ = LogisticRegression(
             solver="lbfgs",
-            C=1.0,
+            C=4.0,
             max_iter=1000,
             class_weight="balanced",
             random_state=42,
