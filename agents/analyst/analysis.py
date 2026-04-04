@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-A-015: Attribute the S-094 over S-093 lift on changed rows.
+A-016: Test whether S-102 preserves the practical behavior of S-094.
 
 This script:
 - loads existing OOF probability artifacts only
-- isolates rows where S-093 and S-094 disagree in argmax prediction
-- compares S-052 alignment with beneficial Medium corrections vs High recoveries
-- reports whether the changed-row evidence favors a Medium-signal explanation
+- compares S-094 and S-102 on balanced accuracy and classwise recall
+- isolates rows whose argmax prediction changes
+- measures whether changed-row differences are mostly Medium reallocations rather
+  than new High regressions
 
 No model training is performed.
 """
@@ -27,15 +28,15 @@ from harness.dataset import CLASS_LABELS, load_train_with_folds, split_xy
 
 ARTIFACT_ROOT = REPO_ROOT / "artifacts"
 MODEL_PATHS = {
-    "S-052": ARTIFACT_ROOT / "S-052" / "oof-preds.npy",
-    "S-093": ARTIFACT_ROOT / "S-093" / "oof-preds.npy",
     "S-094": ARTIFACT_ROOT / "S-094" / "oof-preds.npy",
+    "S-102": ARTIFACT_ROOT / "S-102" / "oof-preds.npy",
 }
 
 CLASS_TO_IDX = {label: idx for idx, label in enumerate(CLASS_LABELS)}
 HIGH = CLASS_TO_IDX["High"]
 LOW = CLASS_TO_IDX["Low"]
 MEDIUM = CLASS_TO_IDX["Medium"]
+BA_TOL = 1e-5
 
 
 def load_labels() -> np.ndarray:
@@ -73,99 +74,47 @@ def fmt_recall_triplet(values: list[float]) -> str:
     return ", ".join(f"{label}={value:.6f}" for label, value in zip(CLASS_LABELS, values))
 
 
-def support_stats(
-    mask: np.ndarray,
-    s052_probs: np.ndarray,
-    target_class: int,
-    old_pred: np.ndarray,
-    new_pred: np.ndarray,
-) -> dict[str, float]:
-    count = int(mask.sum())
-    if count == 0:
-        return {
-            "count": 0,
-            "argmax_support": 0,
-            "target_gt_old": 0,
-            "target_gt_new": 0,
-            "mean_target_prob": float("nan"),
-            "mean_old_prob": float("nan"),
-            "mean_new_prob": float("nan"),
-            "mean_margin_vs_old": float("nan"),
-            "mean_margin_vs_new": float("nan"),
-        }
-
-    rows = np.flatnonzero(mask)
-    probs = s052_probs[rows]
-    old = old_pred[rows]
-    new = new_pred[rows]
-    target_probs = probs[:, target_class]
-    old_probs = probs[np.arange(count), old]
-    new_probs = probs[np.arange(count), new]
-
-    return {
-        "count": count,
-        "argmax_support": int(np.sum(np.argmax(probs, axis=1) == target_class)),
-        "target_gt_old": int(np.sum(target_probs > old_probs)),
-        "target_gt_new": int(np.sum(target_probs > new_probs)),
-        "mean_target_prob": float(np.mean(target_probs)),
-        "mean_old_prob": float(np.mean(old_probs)),
-        "mean_new_prob": float(np.mean(new_probs)),
-        "mean_margin_vs_old": float(np.mean(target_probs - old_probs)),
-        "mean_margin_vs_new": float(np.mean(target_probs - new_probs)),
-    }
-
-
-def fmt_support(label: str, stats: dict[str, float]) -> None:
-    print(f"- {label}: count={stats['count']}")
-    print(
-        f"  argmax_support={stats['argmax_support']} | "
-        f"target_prob>old_pred_prob={stats['target_gt_old']} | "
-        f"target_prob>new_pred_prob={stats['target_gt_new']}"
-    )
-    print(
-        f"  mean_target_prob={stats['mean_target_prob']:.6f} | "
-        f"mean_old_pred_prob={stats['mean_old_prob']:.6f} | "
-        f"mean_new_pred_prob={stats['mean_new_prob']:.6f}"
-    )
-    print(
-        f"  mean_margin_vs_old={stats['mean_margin_vs_old']:+.6f} | "
-        f"mean_margin_vs_new={stats['mean_margin_vs_new']:+.6f}"
-    )
-
-
 def main() -> None:
     y = load_labels()
     oof = load_oof()
-    pred_052 = np.argmax(oof["S-052"], axis=1)
-    pred_093 = np.argmax(oof["S-093"], axis=1)
     pred_094 = np.argmax(oof["S-094"], axis=1)
+    pred_102 = np.argmax(oof["S-102"], axis=1)
 
-    changed = pred_093 != pred_094
+    changed = pred_094 != pred_102
     changed_idx = np.flatnonzero(changed)
 
-    beneficial_medium = changed & (y == MEDIUM) & (pred_093 != MEDIUM) & (pred_094 == MEDIUM)
-    harmful_medium = changed & (y == MEDIUM) & (pred_093 == MEDIUM) & (pred_094 != MEDIUM)
-    high_recovery = changed & (y == HIGH) & (pred_093 != HIGH) & (pred_094 == HIGH)
-    high_loss = changed & (y == HIGH) & (pred_093 == HIGH) & (pred_094 != HIGH)
-
-    medium_stats = support_stats(beneficial_medium, oof["S-052"], MEDIUM, pred_093, pred_094)
-    medium_harm_stats = support_stats(harmful_medium, oof["S-052"], MEDIUM, pred_093, pred_094)
-    high_stats = support_stats(high_recovery, oof["S-052"], HIGH, pred_093, pred_094)
-    high_loss_stats = support_stats(high_loss, oof["S-052"], HIGH, pred_093, pred_094)
-
-    recall_093 = classwise_recalls(y, pred_093)
     recall_094 = classwise_recalls(y, pred_094)
-    recall_delta = [b - a for a, b in zip(recall_093, recall_094)]
+    recall_102 = classwise_recalls(y, pred_102)
+    recall_delta = [b - a for a, b in zip(recall_094, recall_102)]
+
+    improved = (pred_094 != y) & (pred_102 == y)
+    regressed = (pred_094 == y) & (pred_102 != y)
+    changed_wrong = changed & ~improved & ~regressed
+
+    high_recovered = improved & (y == HIGH)
+    high_regressed = regressed & (y == HIGH)
+    medium_recovered = improved & (y == MEDIUM)
+    medium_regressed = regressed & (y == MEDIUM)
+    low_recovered = improved & (y == LOW)
+    low_regressed = regressed & (y == LOW)
+
+    changed_true_medium = changed & (y == MEDIUM)
+    changed_true_high = changed & (y == HIGH)
+    changed_true_low = changed & (y == LOW)
 
     delta_cases = Counter()
-    for yt, old_pred, new_pred in zip(y[changed], pred_093[changed], pred_094[changed]):
+    for yt, old_pred, new_pred in zip(y[changed], pred_094[changed], pred_102[changed]):
         delta_cases[(CLASS_LABELS[yt], CLASS_LABELS[old_pred], CLASS_LABELS[new_pred])] += 1
 
+    ba_094 = ba(y, pred_094)
+    ba_102 = ba(y, pred_102)
+    ba_delta = ba_102 - ba_094
+
     print("=" * 80)
-    print("A-015: S-052 attribution on S-094 vs S-093 changed rows")
+    print("A-016: S-102 preservation check versus S-094")
     print("Method: existing OOF probability artifacts only; no training")
     print(f"Rows: {len(y):,}")
-    print(f"Changed rows: {len(changed_idx):,}")
+    print(f"Classes: {CLASS_LABELS}")
     print("=" * 80)
 
     print("\nArtifacts")
@@ -173,26 +122,43 @@ def main() -> None:
         print(f"- {name}: {path.relative_to(REPO_ROOT)}")
 
     print("\nBalanced Accuracy")
-    print(f"- S-093: {ba(y, pred_093):.6f}")
-    print(f"- S-094: {ba(y, pred_094):.6f}")
-    print(f"- Delta (S-094 - S-093): {ba(y, pred_094) - ba(y, pred_093):+.6f}")
+    print(f"- S-094: {ba_094:.6f}")
+    print(f"- S-102: {ba_102:.6f}")
+    print(f"- Delta (S-102 - S-094): {ba_delta:+.6f}")
+    print(f"- Within 0.00001 tolerance: {'yes' if abs(ba_delta) <= BA_TOL else 'no'}")
 
     print("\nClasswise Recall")
-    print(f"- S-093: {fmt_recall_triplet(recall_093)}")
     print(f"- S-094: {fmt_recall_triplet(recall_094)}")
+    print(f"- S-102: {fmt_recall_triplet(recall_102)}")
     print(f"- Delta: {fmt_recall_triplet(recall_delta)}")
+    print(f"- High recall unchanged: {'yes' if recall_delta[HIGH] == 0.0 else 'no'}")
 
-    print("\nChanged-Row Outcome Buckets")
-    print(f"- Beneficial Medium corrections: {int(beneficial_medium.sum())}")
-    print(f"- Harmful Medium flips: {int(harmful_medium.sum())}")
-    print(f"- High recoveries: {int(high_recovery.sum())}")
-    print(f"- High losses: {int(high_loss.sum())}")
+    print("\nChanged Argmax Rows")
+    print(f"- Changed rows: {len(changed_idx)} / {len(y)} ({len(changed_idx) / len(y):.6%})")
+    print(f"- Wrong -> right: {int(improved.sum())}")
+    print(f"- Right -> wrong: {int(regressed.sum())}")
+    print(f"- Wrong -> wrong: {int(changed_wrong.sum())}")
+    print(
+        "- True-label mix among changed rows: "
+        + ", ".join(
+            f"{label}={int(np.sum(y[changed] == cls))}"
+            for cls, label in enumerate(CLASS_LABELS)
+        )
+    )
 
-    print("\nS-052 Support for Changed-Row Buckets")
-    fmt_support("beneficial Medium corrections", medium_stats)
-    fmt_support("harmful Medium flips", medium_harm_stats)
-    fmt_support("High recoveries", high_stats)
-    fmt_support("High losses", high_loss_stats)
+    print("\nChanged Rows by True Class")
+    print(
+        f"- High: total={int(changed_true_high.sum())}, improved={int(high_recovered.sum())}, "
+        f"regressed={int(high_regressed.sum())}, net={int(high_recovered.sum()) - int(high_regressed.sum()):+d}"
+    )
+    print(
+        f"- Low: total={int(changed_true_low.sum())}, improved={int(low_recovered.sum())}, "
+        f"regressed={int(low_regressed.sum())}, net={int(low_recovered.sum()) - int(low_regressed.sum()):+d}"
+    )
+    print(
+        f"- Medium: total={int(changed_true_medium.sum())}, improved={int(medium_recovered.sum())}, "
+        f"regressed={int(medium_regressed.sum())}, net={int(medium_recovered.sum()) - int(medium_regressed.sum()):+d}"
+    )
 
     print("\nLargest Changed-Case Flows")
     for (true_label, old_pred, new_pred), count in delta_cases.most_common(8):
@@ -200,24 +166,25 @@ def main() -> None:
 
     print("\nDecision Facts")
     print(
-        "- S-052 aligns more with beneficial Medium corrections than with High recoveries by argmax: "
-        f"{'yes' if medium_stats['argmax_support'] > high_stats['argmax_support'] else 'no'}"
+        "- Balanced accuracy preserved within threshold: "
+        f"{'yes' if abs(ba_delta) <= BA_TOL else 'no'}"
+    )
+    print(f"- High recall preserved exactly: {'yes' if recall_delta[HIGH] == 0.0 else 'no'}")
+    print(
+        "- Changed rows are mainly true Medium rows: "
+        f"{'yes' if int(changed_true_medium.sum()) > int(changed_true_high.sum()) + int(changed_true_low.sum()) else 'no'}"
     )
     print(
-        "- S-052 target-class probability beats the old prediction more often on beneficial Medium corrections than on High recoveries: "
-        f"{'yes' if medium_stats['target_gt_old'] > high_stats['target_gt_old'] else 'no'}"
+        "- New High regressions exceed zero: "
+        f"{'yes' if int(high_regressed.sum()) > 0 else 'no'}"
     )
     print(
-        "- S-052 mean target-class margin vs old prediction is larger for beneficial Medium corrections than for High recoveries: "
-        f"{'yes' if medium_stats['mean_margin_vs_old'] > high_stats['mean_margin_vs_old'] else 'no'}"
+        "- Net changed-row effect is larger in Medium than in High: "
+        f"{'yes' if abs(int(medium_recovered.sum()) - int(medium_regressed.sum())) > abs(int(high_recovered.sum()) - int(high_regressed.sum())) else 'no'}"
     )
     print(
-        "- S-052 gives any direct argmax support to High recoveries: "
-        f"{'yes' if high_stats['argmax_support'] > 0 else 'no'}"
-    )
-    print(
-        "- Changed-row evidence favors a Medium-signal explanation over a High-signal explanation: "
-        f"{'yes' if (medium_stats['argmax_support'] > high_stats['argmax_support']) and (medium_stats['target_gt_old'] > high_stats['target_gt_old']) and (medium_stats['mean_margin_vs_old'] > high_stats['mean_margin_vs_old']) else 'no'}"
+        "- Practical behavior preserved under the hypothesis criteria: "
+        f"{'yes' if abs(ba_delta) <= BA_TOL and recall_delta[HIGH] == 0.0 and int(changed_true_medium.sum()) > int(changed_true_high.sum()) + int(changed_true_low.sum()) and int(high_regressed.sum()) == 0 else 'no'}"
     )
 
 

@@ -1690,3 +1690,69 @@ follow_up:
 - On the 254 true-Medium changed rows, is the net S-094 gain explained mostly by one upstream member other than `S-052` shifting the final stacker boundary?
 - Does `S-052` improve changed-row log-loss for true `Medium` cases even though it also supports many harmful `Medium` flips?
 - Are the 31 beneficial `Medium` corrections where `S-052` aligns concentrated in one fold or spread across all fixed folds?
+
+
+## A-016
+at: 2026-04-04T20:13Z
+q: Does S-102 preserve the practical behavior of S-094 closely enough to count as a credible simplified incumbent, specifically: compared with S-094, does S-102 keep balanced accuracy within 0.00001, leave High recall unchanged, and keep any changed-row differences concentrated mainly in Medium-class reallocations rather than new High-class regressions?
+verdict: rejected
+conf: high
+reference: Use the OOF artifacts for S-094 and S-102, with S-093 only if needed as a baseline anchor.
+evidence:
+================================================================================
+A-016: S-102 preservation check versus S-094
+Method: existing OOF probability artifacts only; no training
+Rows: 630,000
+Classes: ('High', 'Low', 'Medium')
+================================================================================
+
+Artifacts
+- S-094: artifacts/S-094/oof-preds.npy
+- S-102: artifacts/S-102/oof-preds.npy
+
+Balanced Accuracy
+- S-094: 0.972299
+- S-102: 0.972297
+- Delta (S-102 - S-094): -0.000002
+- Within 0.00001 tolerance: yes
+
+Classwise Recall
+- S-094: High=0.962683, Low=0.995031, Medium=0.959184
+- S-102: High=0.962778, Low=0.995034, Medium=0.959080
+- Delta: High=0.000095, Low=0.000003, Medium=-0.000105
+- High recall unchanged: no
+
+Changed Argmax Rows
+- Changed rows: 170 / 630000 (0.026984%)
+- Wrong -> right: 74
+- Right -> wrong: 96
+- Wrong -> wrong: 0
+- True-label mix among changed rows: High=10, Low=21, Medium=139
+
+Changed Rows by True Class
+- High: total=10, improved=6, regressed=4, net=+2
+- Low: total=21, improved=11, regressed=10, net=+1
+- Medium: total=139, improved=57, regressed=82, net=-25
+
+Largest Changed-Case Flows
+- true=Medium: Medium -> High: 77
+- true=Medium: High -> Medium: 52
+- true=Low: Medium -> Low: 11
+- true=Low: Low -> Medium: 10
+- true=High: Medium -> High: 6
+- true=Medium: Low -> Medium: 5
+- true=Medium: Medium -> Low: 5
+- true=High: High -> Medium: 4
+
+Decision Facts
+- Balanced accuracy preserved within threshold: yes
+- High recall preserved exactly: no
+- Changed rows are mainly true Medium rows: yes
+- New High regressions exceed zero: yes
+- Net changed-row effect is larger in Medium than in High: yes
+- Practical behavior preserved under the hypothesis criteria: no
+
+follow_up:
+- Are the 77 true-Medium `Medium -> High` flips in `S-102` concentrated in one fold or spread across all fixed folds?
+- Does `S-102` improve any probability-space metric such as log-loss despite failing the exact changed-row preservation criteria against `S-094`?
+- Is the `S-102` versus `S-094` difference explained mostly by the substituted `S-052 Medium` leg rather than by the `S-101` simplification itself?

@@ -426,3 +426,16 @@ Within the 300 rows where S-094 and S-093 disagree:
 - S-052's Medium signal is noisy rather than uniformly helpful: it also predicts Medium on 99 of the 120 harmful Medium flips
 
 Durable conclusion: relative to the exact S-094 over S-093 delta, S-052 contributes Medium-oriented signal and no direct High-recovery signal; the observed Medium alignment is real but mixed with substantial noisy Medium preference.
+
+## AK-034 — S-102 Matches S-094 in CV but Not in Exact High/Changed-Row Behavior
+source: A-016
+at: 2026-04-04
+
+OOF comparison of S-102 (multinomial LR on S-101 OVR logits + S-052 Medium OVR) vs S-094:
+- Balanced accuracy is effectively tied: 0.972297 vs 0.972299 (delta -0.000002)
+- But High recall is not unchanged: S-102 is 0.962778 vs S-094 0.962683 (+0.000095)
+- Only 170 of 630,000 argmax predictions change, and those changed rows are mostly true Medium (139), not High (10)
+- The changed-row drift is not purely benign Medium reallocation: S-102 creates 4 new High regressions and a net loss of 25 Medium corrections
+- Largest changed-case flow is true Medium: Medium -> High (77 rows), followed by true Medium: High -> Medium (52 rows)
+
+Durable conclusion: S-102 is a near-tie in balanced accuracy but does not preserve S-094's practical behavior under an exact changed-row check because it introduces some new High regressions and a net negative Medium reallocation.
