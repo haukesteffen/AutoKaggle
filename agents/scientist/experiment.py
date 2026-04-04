@@ -9,8 +9,9 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 
 
-TASK_ID = "S-101"
+TASK_ID = "S-102"
 SOURCE_IDS = ("S-014", "S-082", "S-073")
+MEDIUM_ONLY_SOURCE_ID = "S-052"
 CLASSES = ["High", "Low", "Medium"]
 EPS = 1e-6
 EXPERIMENT_NAME = TASK_ID
@@ -127,6 +128,18 @@ def _prepare_split(split: str) -> pd.DataFrame:
     if merged is None:
         raise RuntimeError(f"Failed to prepare {split} split")
     feature_blocks = [_ovr_logit_features(merged, source_id) for source_id in SOURCE_IDS]
+    medium_only = _extract_probs(_load_best_frame(MEDIUM_ONLY_SOURCE_ID, split), MEDIUM_ONLY_SOURCE_ID)
+    if "id" in merged.columns and "id" in medium_only.columns:
+        merged = merged.merge(medium_only, on="id", how="inner")
+    else:
+        merged = pd.concat([merged.reset_index(drop=True), medium_only.reset_index(drop=True)], axis=1)
+    medium_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Medium"].clip(EPS, 1.0 - EPS)
+    feature_blocks.append(
+        pd.DataFrame(
+            {f"{MEDIUM_ONLY_SOURCE_ID}_Medium_ovr_logit": np.log(medium_prob / (1.0 - medium_prob))},
+            index=merged.index,
+        )
+    )
     features = pd.concat(feature_blocks, axis=1)
     if "id" in merged.columns:
         features.index = merged["id"].to_numpy()
