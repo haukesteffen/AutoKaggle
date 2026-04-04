@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 
 
-TASK_ID = "S-095"
+TASK_ID = "S-096"
 SOURCE_IDS = ("S-014", "S-082", "S-073", "S-052")
 CLASSES = ["High", "Low", "Medium"]
 CLASS_TO_INT = {label: idx for idx, label in enumerate(CLASSES)}
@@ -149,7 +149,7 @@ def _row_keys(x: pd.DataFrame | np.ndarray) -> np.ndarray:
 class ExternalStacker(BaseEstimator, ClassifierMixin):
     def __init__(self) -> None:
         self.model = LogisticRegression(
-            C=8.0,
+            C=2.0,
             class_weight="balanced",
             max_iter=2000,
             solver="lbfgs",
