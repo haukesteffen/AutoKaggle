@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T19:04Z
+generated_at: 2026-04-04T19:06Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -14,14 +14,14 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 - current_date: April 4, 2026
 - deadline_assumption: April 30, 2026, assuming the competition deadline has not changed.
 - days_remaining: 26
-- primary: Exploit the validated `S-094` stacker lane with small, hypothesis-driven composition and calibration adjustments around the proven `S-091`/`S-093`/`S-094` recipe.
-- secondary: Preserve leaderboard discipline by treating `S-094` as the submission-quality reference and requiring clear local evidence before spending additional April 2026 submission slots.
-- background: Maintain light analyst-style scrutiny on why recovered members such as `S-073` and `S-052` add value, so future stack revisions stay selective instead of expanding blindly.
-- hold: Broad base-model diversification, aggressive hyperparameter sweeps, and further `C`-increase probing on the current 4-way stacker unless new evidence contradicts `S-095`.
+- primary: Selective member-level ablations and composition checks around the exact `S-094` recipe.
+- secondary: One adjacent low-variance refinement family that keeps logit features and multinomial LR as the core structure.
+- background: Analyst scrutiny on why `S-073` and `S-052` help only under selective stacking and not under naive averaging.
+- hold: Further local `C` sweeps and raw-probability variants of the same stacker.
 - guidance:
-  1. For the next few checkpoints after April 4, 2026, keep the main lane tightly focused on variants that are one edit away from `S-094`: member inclusion/exclusion tests, modest calibration changes, or equivalent low-variance stacker refinements.
-  2. Use `S-094` as the decision bar. If a candidate does not beat `0.972299` CV cleanly or does so only within noise, treat it as non-promotable and avoid leaderboard use.
-  3. Keep quiet lanes quiet until the current stacker lane is exhausted. The wake already produced enough signal to justify depth over breadth, and `S-095` argues against spending near-term checkpoints on larger-`C` retries.
+  1. Use the next checkpoint budget on composition evidence, not more regularization tuning. Treat `S-094` as the control and test whether each of `S-073` and `S-052` is still additive under the exact logit-plus-LR recipe before trying broader member changes.
+  2. In parallel with those ablations, open one refinement lane that is structurally close to `S-094` and low variance, such as controlled feature-space or class-weight handling within the same multinomial logit stacker family. Do not branch into high-churn blend families until this lane is checked.
+  3. If the first ablation pass shows both marginal members are genuinely useful, then keep the 4-member stacker as the mainline and ask the analyst for a tightly scoped explanation of the diversity pattern before spending more scientist budget on wider ensemble composition.
 
 ## Control Files
 - strategy_request: none
