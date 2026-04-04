@@ -92,3 +92,4 @@
 | S-090 | 0.971946 | 0.000662 | +0.000019 | Multinomial LR stacker C=4.0 on S-014+S-082 probs |
 | S-091 | 0.972013 | 0.000756 | +0.000067 | Multinomial LR stacker C=4.0 on logit S-014+S-082 probs |
 | S-092 | 0.963836 | 0.000548 | -0.008177 | Logit S-014+S-082 LR stacker with class_weight=None |
+| S-093 | 0.972282 | 0.000704 | +0.000269 | Multinomial LR stacker C=4.0 on logit S-014+S-082+S-073 probs |
