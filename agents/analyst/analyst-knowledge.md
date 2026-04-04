@@ -367,3 +367,22 @@ S-052 LR is more diverse than S-045 MLP in prediction space (higher disagreement
 more complementary High TPs). However, simple averaging still yields negative lift (−0.0062) because
 the LR's lower overall accuracy drags the ensemble down. Weighted blending (e.g., 0.8×XGB + 0.2×LR)
 or threshold-tuning may recover positive lift. Do not use 50-50 simple average.
+
+## AK-030 — S-073 Adds Diversity vs S-014/S-082 but Hurts Simple 3-Way Averaging
+source: A-012
+at: 2026-04-04
+
+OOF artifact comparison across S-014 XGBoost, S-082 LightGBM, S-073 MLP ensemble, and S-083 weighted blend:
+- S-014 vs S-082 are extremely correlated: High=0.9942, Low=0.9984, Medium=0.9975; argmax agreement=99.62%
+- S-073 is less correlated with both tree models on every class:
+  S-073 vs S-014: High=0.9755, Low=0.9962, Medium=0.9919; agreement=99.18%
+  S-073 vs S-082: High=0.9735, Low=0.9965, Medium=0.9920; agreement=99.20%
+- Despite that diversity, simple averaging degrades performance:
+  S-014+S-082 avg BA = 0.971153
+  S-014+S-082+S-073 avg BA = 0.969687
+  S-083 weighted blend BA = 0.971177
+  3-way avg vs S-083 delta = -0.001490
+
+Durable conclusion: lower OOF probability correlation alone was not sufficient here. S-073 provides
+real diversity relative to the XGB/LGBM pair, but naive 3-way averaging is worse than both the 2-way
+tree average and the current S-083 weighted blend.

@@ -1419,3 +1419,67 @@ follow_up:
 - Does a weighted blend (e.g., 0.8×S-014 + 0.2×S-052) outperform S-014 standalone on OOF balanced accuracy?
 - Does threshold-tuning the S-052+S-014 ensemble (optimizing the High-class decision boundary jointly) recover positive lift vs S-014?
 - Is there a third model family (e.g., LightGBM, CatBoost, or a stronger MLP) with High-class proba Pearson r < 0.85 vs S-014 AND positive simple-average ensemble lift?
+
+
+## A-012
+at: 2026-04-04T18:05Z
+q: Do the S-073 MLP ensemble OOF predictions provide enough complementary signal relative to both S-014 XGBoost and S-082 LightGBM to justify one 3-way stacker checkpoint now, specifically: are its class probabilities materially less correlated with at least one of those models than the XGB/LGBM pair are with each other, and does a simple average over S-014+S-082+S-073 avoid a meaningful regression versus the current S-083 weighted blend baseline?
+verdict: rejected
+conf: high
+reference: Use the OOF probability artifacts for S-014, S-082, S-073, and S-083; answer factually and update knowledge only if the result is durable.
+evidence:
+================================================================================
+A-012: S-073 complementarity vs S-014 XGBoost and S-082 LightGBM
+Method: existing OOF probability artifacts only; no training
+Rows: 630,000
+Classes: ('High', 'Low', 'Medium')
+================================================================================
+
+Artifacts
+- S-014: artifacts/S-014/oof-preds.npy
+- S-073: artifacts/S-073/oof-preds.npy
+- S-082: artifacts/S-082/oof-preds.npy
+- S-083: artifacts/S-083/oof-preds.npy
+
+Balanced Accuracy
+- S-014: 0.970856
+- S-073: 0.964422
+- S-082: 0.970657
+- S-083: 0.971177
+
+Pairwise Probability Correlations
+- S-014 vs S-082: High=0.994219, Low=0.998442, Medium=0.997453
+- S-073 vs S-014: High=0.975485, Low=0.996188, Medium=0.991938
+- S-073 vs S-082: High=0.973513, Low=0.996483, Medium=0.991981
+
+Pairwise Argmax Agreement
+- S-014 vs S-082: 0.996248
+- S-073 vs S-014: 0.991835
+- S-073 vs S-082: 0.991983
+
+Correlation Delta vs S-014/S-082 Baseline for S-073 vs S-014
+- High: +0.018734
+- Low: +0.002254
+- Medium: +0.005515
+
+Correlation Delta vs S-014/S-082 Baseline for S-073 vs S-082
+- High: +0.020706
+- Low: +0.001959
+- Medium: +0.005472
+
+Ensemble Checks
+- Simple average S-014 + S-082: 0.971153
+- Simple average S-014 + S-082 + S-073: 0.969687
+- Current S-083 weighted blend: 0.971177
+- Delta (3-way avg - S-083): -0.001490
+- Delta (3-way avg - 2-way avg): -0.001466
+
+Decision Facts
+- Minimum classwise correlation for S-014 vs S-082: 0.994219
+- Minimum classwise correlation involving S-073: 0.973513
+- 3-way average regresses vs S-083: yes
+
+follow_up:
+- Does any weighted blend that includes S-073 outperform S-083 on OOF balanced accuracy without lowering High-class recall?
+- Does a learned stacker on S-014, S-082, and S-073 OOF probabilities beat S-083 after calibration control?
+- Is S-073's diversity concentrated mainly in the High class rather than the Low/Medium classes?

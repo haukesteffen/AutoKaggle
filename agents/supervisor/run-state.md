@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T18:03Z
+generated_at: 2026-04-04T18:06Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -41,17 +41,17 @@ Compact restart context for Codex supervisor sessions. Read this before any full
   - S-090 | 0.971946 | Multinomial LR stacker C=4.0 on S-014+S-082 probs
 
 ## Analysis Summary
-- knowledge_entries: 29
-- findings_entries: 11
+- knowledge_entries: 30
+- findings_entries: 12
 - recent_knowledge:
-  - AK-025 | Candidate Threshold Indicators from A-006 Are DEPLETED Zones (Not Enriched) | The three A-006 candidate indicators are in heavily depleted High-class zones, not enriched ones:
   - AK-027 | MLP(64,32) is Strongly Diverse from LR on S-040 Feature Set | MLPClassifier(hidden=(64,32), relu, max_iter=500, early_stopping=True) on the S-040 feature set:
   - AK-028 | S-045 MLP is Too Correlated with S-014 XGBoost to Ensemble Beneficially | S-045 MLP (CV=0.9618) vs S-014 XGBoost (CV=0.9709) — OOF artifact comparison:
   - AK-029 | S-052 LR is More Diverse from S-014 XGBoost Than S-045 MLP Was | S-052 LR (CV=0.9286) vs S-014 XGBoost (CV=0.9709) — OOF artifact comparison:
+  - AK-030 | S-073 Adds Diversity vs S-014/S-082 but Hurts Simple 3-Way Averaging | OOF artifact comparison across S-014 XGBoost, S-082 LightGBM, S-073 MLP ensemble, and S-083 weighted blend:
 - recent_findings:
-  - A-009 | verdict=supported | conf=high | q=Does the MLPClassifier (2-layer shallow neural net, hidden layers 64 and 32) have a structural advantage over Logistic Regression on the S-040 feature set — specifically, does it produce meaningfully different OOF predictions from LR (correlation < 0.97), suggesting it would add diversity value for ensembling even if CV score is similar?
   - A-010 | verdict=rejected | conf=high | q=Do the S-045 MLP OOF predictions (0.9618 CV) show meaningfully different High-class prediction patterns from S-014 XGBoost OOF predictions (0.9709), specifically: do the two models disagree on a material fraction of High-class samples in a way that suggests ensemble gains are possible?
   - A-011 | verdict=supported | conf=high | q=Do the S-052 LR OOF predictions (0.9286 CV) show meaningfully different High-class prediction patterns from S-014 XGBoost OOF predictions (0.9709), specifically: does S-052 recover a meaningful fraction of High-class TPs that S-014 misses, suggesting ensemble value?
+  - A-012 | verdict=rejected | conf=high | q=Do the S-073 MLP ensemble OOF predictions provide enough complementary signal relative to both S-014 XGBoost and S-082 LightGBM to justify one 3-way stacker checkpoint now, specifically: are its class probabilities materially less correlated with at least one of those models than the XGB/LGBM pair are with each other, and does a simple average over S-014+S-082+S-073 avoid a meaningful regression versus the current S-083 weighted blend baseline?
 
 ## Leaderboard
 - submissions_total: 4
