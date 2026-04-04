@@ -1756,3 +1756,53 @@ follow_up:
 - Are the 77 true-Medium `Medium -> High` flips in `S-102` concentrated in one fold or spread across all fixed folds?
 - Does `S-102` improve any probability-space metric such as log-loss despite failing the exact changed-row preservation criteria against `S-094`?
 - Is the `S-102` versus `S-094` difference explained mostly by the substituted `S-052 Medium` leg rather than by the `S-101` simplification itself?
+
+
+## A-017
+at: 2026-04-04T20:15Z
+q: Are the harmful true-Medium changes in S-102 versus S-094 concentrated in a single fixed fold rather than spread across the cross-validation split, specifically: among the true-Medium rows that flip from Medium under S-094 to another class under S-102, does any one fold account for a clear majority of those regressions?
+verdict: rejected
+conf: high
+reference: Use the OOF artifacts for S-094 and S-102 plus the fixed fold assignments from the harness only as needed.
+evidence:
+================================================================================
+A-017: Fold concentration of harmful true-Medium S-102 regressions
+Method: existing OOF probability artifacts plus fixed fold assignments; no training
+Rows: 630,000
+Classes: ('High', 'Low', 'Medium')
+================================================================================
+
+Artifacts
+- S-094: artifacts/S-094/oof-preds.npy
+- S-102: artifacts/S-102/oof-preds.npy
+- Folds: harness.dataset.load_train_with_folds()
+
+Target Regression Slice
+- Harmful true-Medium regressions: 82 rows where truth=Medium, S-094=Medium, S-102!=Medium
+- S-102 destination classes within this slice: High=77, Low=5
+
+Fold Distribution
+- Fold 0: 18 (21.95%)
+- Fold 1: 21 (25.61%)
+- Fold 2: 14 (17.07%)
+- Fold 3: 21 (25.61%)
+- Fold 4: 8 (9.76%)
+
+Largest Within-Slice Flows
+- Fold 3: Medium -> High: 21
+- Fold 1: Medium -> High: 20
+- Fold 0: Medium -> High: 18
+- Fold 2: Medium -> High: 10
+- Fold 4: Medium -> High: 8
+- Fold 2: Medium -> Low: 4
+- Fold 1: Medium -> Low: 1
+
+Decision Facts
+- Largest fold by count: fold 3 with 21 rows (25.61%)
+- Any one fold accounts for a strict majority (>50%) of harmful true-Medium regressions: no
+- Distribution is spread across multiple folds rather than dominated by one: yes
+
+follow_up:
+- Are the 82 harmful true-`Medium` regressions associated with any shared feature subregion rather than any one fold?
+- Do the harmful true-`Medium` regressions cluster in low-margin cases where `S-094` and `S-102` have near-tied class probabilities?
+- Is the `Medium -> High` drift in `S-102` similarly spread across folds on the broader set of true-`Medium` changed rows, not just the harmful subset?

@@ -439,3 +439,14 @@ OOF comparison of S-102 (multinomial LR on S-101 OVR logits + S-052 Medium OVR) 
 - Largest changed-case flow is true Medium: Medium -> High (77 rows), followed by true Medium: High -> Medium (52 rows)
 
 Durable conclusion: S-102 is a near-tie in balanced accuracy but does not preserve S-094's practical behavior under an exact changed-row check because it introduces some new High regressions and a net negative Medium reallocation.
+
+## AK-035 — S-102's Harmful True-Medium Regressions Are Spread Across Folds, Not Driven by One Split
+source: A-017
+at: 2026-04-04
+
+For the 82 rows where the truth is Medium, S-094 predicts Medium, and S-102 regresses to another class:
+- Fold counts are 18, 21, 14, 21, and 8 across folds 0-4
+- The largest single-fold share is only 25.61% (folds 1 and 3 tie at 21 rows each)
+- Most of these regressions are Medium -> High (77 of 82); only 5 are Medium -> Low
+
+Durable conclusion: the harmful true-Medium behavior in S-102 is not a one-fold artifact. It is spread across the fixed cross-validation split.
