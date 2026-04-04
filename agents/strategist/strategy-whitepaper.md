@@ -4,36 +4,26 @@
 April 4, 2026
 
 ## Deadline Assumption
-April 30, 2026 - last calendar day of the competition month (S6E4 default assumption).
+April 30, 2026, assuming the S6E4 competition closes on April 30, 2026 and the current run should optimize for the remaining 26-day window.
 
 ## Days Remaining
 26
 
 ## Read
-
-- 87 scientist runs are logged, with 83 scored and enough coverage to treat the current decision as an ensemble-selection problem, not a model-family discovery problem.
-- `S-089` is the new local best at 0.971927 CV, beating the `S-083` anchor by +0.000750 CV through multinomial logistic regression stacking over `S-014` and `S-082` probabilities.
-- `S-083` remains the best submitted run at 0.971177 CV / 0.96867 LB, so the current gap between local optimum and submitted optimum is now actionable.
-- Recent refinement around the `S-083` blend has stalled: `S-087` scored 0.971124 and `S-088` scored 0.971161, which argues against more time on the current HistGBM third-leg path.
-- CV/LB calibration is still acceptable; `S-005`, `S-014`, and `S-083` all stayed within a sub-0.003 CV/LB gap band, so the main risk is not calibration drift but failing to convert the new stacker gain into a stable submission.
+The run has a stronger local leader in S-090 at 0.971946 CV, but the only fresh public anchor is S-089 at 0.97087 LB and rank 165 from a closely related stacker at 0.971927 CV. That combination says the multinomial LR stacker lane remains the best validated path, but the gain from S-090 is too small to assume a meaningful leaderboard lift without either a sharper stacker-family extension or a differentiated third leg. Pace pressure is low today because all control files are idle, so the next checkpoints should maximize information value rather than volume.
 
 ## Emphasis
-
-Primary: Exploit the stacking lane around `S-089` and verify whether the gain survives on the leaderboard
-Secondary: Search for one more complementary base prediction source or stacker variant that can improve over the current two-model stack
-Background: Maintain calibration checks and submission discipline so the next probe is informative
-Hold: More work on the current HistGBM third-leg branch and manual feature engineering without a clear path to ensemble gain
+Primary: Extend the multinomial LR stacker family in a narrow, high-signal way that preserves comparability with S-089 and S-090.
+Secondary: Run one complementary third-leg search to test whether the stacker lane is missing an orthogonal source of lift.
+Background: Keep submission discipline tight and use leaderboard slots only for changes that beat the current stacker reference by a credible margin.
+Hold: Broad baseline rework, diffuse model-family exploration, and any work that breaks comparability with the current stacker evidence.
 
 ## Guidance For The Supervisor
-
-1. Treat `S-089` as the current research anchor and `S-083` as the submission baseline. The near-term question is whether the multinomial stacker can be reproduced cleanly enough to justify a leaderboard probe, not whether the old weighted blend can be nudged higher.
-2. Put the next scientist effort into one of two lanes only: a controlled stacker-family variant on the existing OOF/test probabilities, or one new complementary prediction source that is structurally different enough to change the stack. Do not extend the current HistGBM third leg unless it first shows a meaningful standalone improvement.
-3. Keep submissions tight. Submit only when the next candidate is either clearly above `0.971927` CV, or when the purpose is to test whether the stacking gain transfers to LB with acceptable calibration. Small cosmetic changes are not worth a slot.
-4. Preserve one low-volume diversity lane, but require a credible ensemble path before investing more. Weak models are only useful now if they expose a gap in the current stack or provide a new basis for stacking.
+1. Through April 6, 2026, prioritize one or two tightly scoped stacker-family checkpoints around the S-090 recipe so the run can determine whether the 0.971946 CV edge is reproducible and large enough to justify a submission.
+2. In parallel or immediately after, allocate exactly one scientist checkpoint to a complementary third-leg search that is explicitly judged on incremental value relative to the current stacker family, not on standalone novelty.
+3. Do not spend a leaderboard submission on S-090-class movement alone unless a follow-up checkpoint shows clearer separation above 0.971946 CV or the candidate adds a distinct ensemble leg that changes portfolio risk versus S-089.
 
 ## Refresh Triggers
-
-- `S-089` is not reproducible on a fresh run or loses most of its advantage versus `S-083`.
-- A new stacker or complementary model beats `0.971927` CV by a meaningful margin, or a submission proves the gain does not transfer.
-- CV/LB divergence worsens beyond the established sub-0.003 band.
-- The date changes again without a new leaderboard signal.
+- Refresh after the next completed scientist result that either exceeds 0.971946 CV or materially underperforms S-090, because that will decide whether the stacker lane is still compounding.
+- Refresh after any new Kaggle submission, especially if the public score moves meaningfully away from 0.97087, because that will update the calibration between local CV and leaderboard reality.
+- Refresh by April 8, 2026 if no decisive result appears, because idle control files and a flat evidence base would then argue for a lane rebalance.

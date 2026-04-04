@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T17:54Z
+generated_at: 2026-04-04T18:03Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -12,16 +12,16 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 
 ## Current Strategy
 - current_date: April 4, 2026
-- deadline_assumption: April 30, 2026 - last calendar day of the competition month (S6E4 default assumption).
+- deadline_assumption: April 30, 2026, assuming the S6E4 competition closes on April 30, 2026 and the current run should optimize for the remaining 26-day window.
 - days_remaining: 26
-- primary: Exploit the stacking lane around `S-089` and verify whether the gain survives on the leaderboard
-- secondary: Search for one more complementary base prediction source or stacker variant that can improve over the current two-model stack
-- background: Maintain calibration checks and submission discipline so the next probe is informative
-- hold: More work on the current HistGBM third-leg branch and manual feature engineering without a clear path to ensemble gain
+- primary: Extend the multinomial LR stacker family in a narrow, high-signal way that preserves comparability with S-089 and S-090.
+- secondary: Run one complementary third-leg search to test whether the stacker lane is missing an orthogonal source of lift.
+- background: Keep submission discipline tight and use leaderboard slots only for changes that beat the current stacker reference by a credible margin.
+- hold: Broad baseline rework, diffuse model-family exploration, and any work that breaks comparability with the current stacker evidence.
 - guidance:
-  1. Treat `S-089` as the current research anchor and `S-083` as the submission baseline. The near-term question is whether the multinomial stacker can be reproduced cleanly enough to justify a leaderboard probe, not whether the old weighted blend can be nudged higher.
-  2. Put the next scientist effort into one of two lanes only: a controlled stacker-family variant on the existing OOF/test probabilities, or one new complementary prediction source that is structurally different enough to change the stack. Do not extend the current HistGBM third leg unless it first shows a meaningful standalone improvement.
-  3. Keep submissions tight. Submit only when the next candidate is either clearly above `0.971927` CV, or when the purpose is to test whether the stacking gain transfers to LB with acceptable calibration. Small cosmetic changes are not worth a slot.
+  1. Through April 6, 2026, prioritize one or two tightly scoped stacker-family checkpoints around the S-090 recipe so the run can determine whether the 0.971946 CV edge is reproducible and large enough to justify a submission.
+  2. In parallel or immediately after, allocate exactly one scientist checkpoint to a complementary third-leg search that is explicitly judged on incremental value relative to the current stacker family, not on standalone novelty.
+  3. Do not spend a leaderboard submission on S-090-class movement alone unless a follow-up checkpoint shows clearer separation above 0.971946 CV or the candidate adds a distinct ensemble leg that changes portfolio risk versus S-089.
 
 ## Control Files
 - strategy_request: none
