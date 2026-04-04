@@ -27,8 +27,16 @@ XGB_TEST = _load_preds(XGB_TASK_ID, "test-preds.npy")
 LGBM_TEST = _load_preds(LGBM_TASK_ID, "test-preds.npy")
 
 
+def _logit_transform(probs: np.ndarray) -> np.ndarray:
+    clipped = np.clip(probs, 1e-6, 1 - 1e-6)
+    return np.log(clipped) - np.log1p(-clipped)
+
+
 def _stack_features(first: np.ndarray, second: np.ndarray) -> np.ndarray:
-    return np.concatenate([first, second], axis=1)
+    return np.concatenate(
+        [_logit_transform(first), _logit_transform(second)],
+        axis=1,
+    )
 
 
 OOF_FEATURES = _stack_features(XGB_OOF, LGBM_OOF)
