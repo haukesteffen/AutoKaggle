@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T20:16Z
+generated_at: 2026-04-04T20:17Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -14,14 +14,14 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 - current_date: April 4, 2026
 - deadline_assumption: April 30, 2026, assuming the S6E4 Playground competition follows the standard month-end close.
 - days_remaining: 26
-- primary: isolate the true source of S-094's 0.000017 CV edge over the S-093/S-101 family and decide whether it is structurally reproducible.
-- secondary: queue one or two high-information offline variants that test interaction effects around the S-094 stack rather than further simplification-only checks.
-- background: preserve submission discipline and hold S-094 as the current deployment baseline.
-- hold: additional direct no-S-052 or near-duplicate simplification experiments unless they test a clearly different causal hypothesis.
+- primary: pursue a bounded improvement lane that can beat or clearly de-risk S-094, starting from the confirmed value of the Medium-class signal rather than re-proving it.
+- secondary: test targeted alternatives that may preserve the S-052 Medium benefit while reducing the harmful row reallocations seen in S-102.
+- background: keep S-094 as the submission baseline until an offline challenger has both score separation and acceptable behavior.
+- hold: more attribution-only checks on S-094 versus S-102 unless a new hypothesis explains the distributed true-Medium regressions.
 - guidance:
-  1. Treat S-101 as confirmation that the next lane is attribution, not more blind simplification. The highest-value question is which exact component or interaction makes S-094 better than both S-093 and S-101.
-  2. Spend the next scientist cycle on one bounded ablation lane centered on S-094 versus S-093/S-101, with success defined as either reproducing the edge in a cleaner form or proving the edge is too brittle to prioritize.
-  3. Use the next available submission only for a model that is either the standing S-094 baseline or a new offline winner with a clear causal story and non-trivial CV separation.
+  1. Move the next scientist cycle from attribution to replacement search centered on controlled Medium-signal usage, because the current evidence already explains most of why S-094 works and why S-102 is not a safe substitute.
+  2. Require the next lane to optimize for both CV and behavior: a candidate should not only meet or exceed S-094 offline, but also avoid the broad true-Medium regression pattern that invalidated S-102.
+  3. Keep the next submission slot reserved for either the standing S-094 incumbent or a new offline winner with a defensible causal story and clear practical improvement, not for another near-equivalent variant.
 
 ## Control Files
 - strategy_request: none
