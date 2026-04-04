@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 
 
-TASK_ID = "S-102"
+TASK_ID = "S-103"
 SOURCE_IDS = ("S-014", "S-082", "S-073")
 MEDIUM_ONLY_SOURCE_ID = "S-052"
 CLASSES = ["High", "Low", "Medium"]
@@ -133,10 +133,15 @@ def _prepare_split(split: str) -> pd.DataFrame:
         merged = merged.merge(medium_only, on="id", how="inner")
     else:
         merged = pd.concat([merged.reset_index(drop=True), medium_only.reset_index(drop=True)], axis=1)
-    medium_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Medium"].clip(EPS, 1.0 - EPS)
+    medium_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Medium"].clip(EPS, 1.0)
+    high_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_High"].clip(EPS, 1.0)
+    low_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Low"].clip(EPS, 1.0)
     feature_blocks.append(
         pd.DataFrame(
-            {f"{MEDIUM_ONLY_SOURCE_ID}_Medium_ovr_logit": np.log(medium_prob / (1.0 - medium_prob))},
+            {
+                f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_High_logit": np.log(medium_prob / high_prob),
+                f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_Low_logit": np.log(medium_prob / low_prob),
+            },
             index=merged.index,
         )
     )

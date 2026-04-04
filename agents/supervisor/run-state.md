@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T20:07Z
+generated_at: 2026-04-04T20:09Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -29,16 +29,16 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 - analyst_hypothesis: none
 
 ## Experiment Summary
-- total_results: 99
-- scored_results: 95
+- total_results: 100
+- scored_results: 96
 - terminal_non_scored_results: 4
 - best_cv: 0.972299 (S-094) | Multinomial LR stacker C=4.0 on logit S-014+S-082+S-073+S-052 probs
 - recent_results:
-  - S-097 | 0.971843 | Multinomial LR stacker C=4.0 on raw S-014+S-082+S-073+S-052 probs
   - S-098 | 0.972097 | Multinomial LR stacker C=4.0 on logit S-014+S-082+S-052 probs
   - S-099 | 0.963954 | Multinomial LR stacker C=4.0 class_weight=None on logit S-014+S-082+S-073 probs
   - S-100 | 0.972208 | Multinomial LR stacker C=4.0 balanced on HM/LM log-odds S-014+S-082+S-073
   - S-101 | 0.972282 | Multinomial LR C=4.0 balanced on full OVR logits S-014+S-082+S-073
+  - S-102 | 0.972297 | Multinomial LR C=4.0 balanced on S-101 OVR logits + S-052 Medium OVR
 
 ## Analysis Summary
 - knowledge_entries: 33
