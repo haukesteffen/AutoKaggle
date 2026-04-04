@@ -1483,3 +1483,56 @@ follow_up:
 - Does any weighted blend that includes S-073 outperform S-083 on OOF balanced accuracy without lowering High-class recall?
 - Does a learned stacker on S-014, S-082, and S-073 OOF probabilities beat S-083 after calibration control?
 - Is S-073's diversity concentrated mainly in the High class rather than the Low/Medium classes?
+
+
+## A-013
+at: 2026-04-04T18:19Z
+q: Does S-052 remain a plausible additional diversity source after S-093, specifically: are S-052's OOF probabilities still materially less correlated with S-093 than the S-014/S-082 tree pair are with each other, and does a simple average over S-093 and S-052 avoid a large regression versus S-093 alone?
+verdict: rejected
+conf: high
+reference: Use OOF probability artifacts for S-052, S-093, S-014, and S-082. The point is to decide whether a 4-way learned stacker checkpoint is worth spending next, not to recommend submission strategy.
+evidence:
+================================================================================
+A-013: S-052 diversity check after S-093
+Method: existing OOF probability artifacts only; no training
+Rows: 630,000
+Classes: ('High', 'Low', 'Medium')
+================================================================================
+
+Artifacts
+- S-014: artifacts/S-014/oof-preds.npy
+- S-052: artifacts/S-052/oof-preds.npy
+- S-082: artifacts/S-082/oof-preds.npy
+- S-093: artifacts/S-093/oof-preds.npy
+
+Balanced Accuracy
+- S-014: 0.970856
+- S-052: 0.928573
+- S-082: 0.970657
+- S-093: 0.972282
+- Simple average S-093 + S-052: 0.966404
+- Delta (avg - S-093): -0.005877
+
+Pairwise Probability Correlations
+- S-014 vs S-082: High=0.994219, Low=0.998442, Medium=0.997453
+- S-093 vs S-052: High=0.878109, Low=0.935278, Medium=0.904854
+
+Pairwise Argmax Agreement
+- S-014 vs S-082: 0.996248
+- S-093 vs S-052: 0.931716
+
+Correlation Delta vs S-014/S-082 Baseline
+- High: +0.116111
+- Low: +0.063164
+- Medium: +0.092598
+
+Decision Facts
+- Minimum classwise correlation for S-014 vs S-082: 0.994219
+- Minimum classwise correlation for S-093 vs S-052: 0.878109
+- S-093 vs S-052 less correlated than S-014 vs S-082: yes
+- Simple average S-093 + S-052 regresses vs S-093: yes
+
+follow_up:
+- Does a learned 4-way stacker on S-014, S-082, S-073, and S-052 recover S-052's lower-correlation signal without the -0.005877 simple-average regression seen in S-093 + S-052?
+- Is S-052's residual complementarity against S-093 concentrated mostly on High-class misses rather than across all classes?
+- Do S-093 and S-052 disagree primarily on low-confidence samples where a meta-model could separate useful diversity from S-052 noise?

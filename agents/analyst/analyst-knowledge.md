@@ -386,3 +386,17 @@ OOF artifact comparison across S-014 XGBoost, S-082 LightGBM, S-073 MLP ensemble
 Durable conclusion: lower OOF probability correlation alone was not sufficient here. S-073 provides
 real diversity relative to the XGB/LGBM pair, but naive 3-way averaging is worse than both the 2-way
 tree average and the current S-083 weighted blend.
+
+## AK-031 — S-052 Remains Diverse Against S-093, but Naive Averaging Regresses Sharply
+source: A-013
+at: 2026-04-04
+
+OOF artifact comparison across S-093 stacker, S-052 logistic regression, and the
+S-014/S-082 tree baseline:
+- S-014 vs S-082 remain extremely correlated: High=0.9942, Low=0.9984, Medium=0.9975; argmax agreement=99.62%
+- S-093 vs S-052 are materially less correlated: High=0.8781, Low=0.9353, Medium=0.9049; argmax agreement=93.17%
+- Correlation gap vs tree pair is large on every class: High -0.1161, Low -0.0632, Medium -0.0926
+- But simple average S-093+S-052 BA = 0.966404, which is -0.005877 below S-093 alone (0.972282)
+
+Durable conclusion: S-052 still carries distinct signal even after S-093, but that signal is too noisy
+for naive averaging. Any further use of S-052 should rely on a learned combiner rather than a plain average.
