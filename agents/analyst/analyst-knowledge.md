@@ -414,3 +414,15 @@ OOF comparison of S-094 (logit LR stacker with S-052 added) vs S-093:
 
 Durable conclusion: the S-094 over S-093 improvement is a tiny Medium-class reallocation, not a
 concentrated High-class recovery pattern attributable to S-052.
+
+## AK-033 — On S-094 vs S-093 Changed Rows, S-052 Aligns with Some Beneficial Medium Corrections but with No High Recoveries
+source: A-015
+at: 2026-04-04
+
+Within the 300 rows where S-094 and S-093 disagree:
+- Beneficial Medium corrections: 134 rows; S-052 also predicts Medium on 31 of them
+- High recoveries: 10 rows; S-052 predicts High on 0 of them
+- By the same changed-row test, S-052's target-class support is stronger for beneficial Medium corrections than for High recoveries on all three checks used in A-015: argmax support (31 vs 0), target prob > old-pred prob (31 vs 0), and mean target-vs-old margin (-0.3789 vs -0.5885; less negative for Medium)
+- S-052's Medium signal is noisy rather than uniformly helpful: it also predicts Medium on 99 of the 120 harmful Medium flips
+
+Durable conclusion: relative to the exact S-094 over S-093 delta, S-052 contributes Medium-oriented signal and no direct High-recovery signal; the observed Medium alignment is real but mixed with substantial noisy Medium preference.

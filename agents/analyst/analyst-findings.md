@@ -1614,3 +1614,79 @@ follow_up:
 - If `S-094`'s tiny lift is driven almost entirely by Medium recall, does removing `S-052` but re-tuning the 3-way stacker recover the same Medium gain without the extra member?
 - On the 300 rows where `S-094` and `S-093` differ, are the beneficial `Medium` corrections associated with any single base member other than `S-052`?
 - Does `S-052` add value to `S-094` only through probability calibration margin shifts rather than argmax-case recovery, as measured by log-loss on the changed rows?
+
+
+## A-015
+at: 2026-04-04T20:06Z
+q: Is the tiny S-094 over S-093 lift primarily explained by S-052's Medium-class probability signal rather than its High-class probability signal, specifically: on the rows where S-094 and S-093 disagree, does S-052 align more with the beneficial Medium corrections than with any recoveries in High?
+verdict: supported
+conf: high
+reference: Use the existing OOF artifacts for S-052, S-093, and S-094; reuse prior changed-row context only as needed to answer this attribution question.
+evidence:
+================================================================================
+A-015: S-052 attribution on S-094 vs S-093 changed rows
+Method: existing OOF probability artifacts only; no training
+Rows: 630,000
+Changed rows: 300
+================================================================================
+
+Artifacts
+- S-052: artifacts/S-052/oof-preds.npy
+- S-093: artifacts/S-093/oof-preds.npy
+- S-094: artifacts/S-094/oof-preds.npy
+
+Balanced Accuracy
+- S-093: 0.972282
+- S-094: 0.972299
+- Delta (S-094 - S-093): +0.000018
+
+Classwise Recall
+- S-093: High=0.962683, Low=0.995037, Medium=0.959126
+- S-094: High=0.962683, Low=0.995031, Medium=0.959184
+- Delta: High=0.000000, Low=-0.000005, Medium=0.000059
+
+Changed-Row Outcome Buckets
+- Beneficial Medium corrections: 134
+- Harmful Medium flips: 120
+- High recoveries: 10
+- High losses: 10
+
+S-052 Support for Changed-Row Buckets
+- beneficial Medium corrections: count=134
+  argmax_support=31 | target_prob>old_pred_prob=31 | target_prob>new_pred_prob=0
+  mean_target_prob=0.309201 | mean_old_pred_prob=0.688146 | mean_new_pred_prob=0.309201
+  mean_margin_vs_old=-0.378944 | mean_margin_vs_new=+0.000000
+- harmful Medium flips: count=120
+  argmax_support=99 | target_prob>old_pred_prob=0 | target_prob>new_pred_prob=112
+  mean_target_prob=0.716391 | mean_old_pred_prob=0.716391 | mean_new_pred_prob=0.159156
+  mean_margin_vs_old=+0.000000 | mean_margin_vs_new=+0.557235
+- High recoveries: count=10
+  argmax_support=0 | target_prob>old_pred_prob=0 | target_prob>new_pred_prob=0
+  mean_target_prob=0.154338 | mean_old_pred_prob=0.742844 | mean_new_pred_prob=0.154338
+  mean_margin_vs_old=-0.588505 | mean_margin_vs_new=+0.000000
+- High losses: count=10
+  argmax_support=9 | target_prob>old_pred_prob=0 | target_prob>new_pred_prob=9
+  mean_target_prob=0.735512 | mean_old_pred_prob=0.735512 | mean_new_pred_prob=0.264430
+  mean_margin_vs_old=+0.000000 | mean_margin_vs_new=+0.471081
+
+Largest Changed-Case Flows
+- true=Medium: High -> Medium: 125
+- true=Medium: Medium -> High: 112
+- true=Low: Low -> Medium: 14
+- true=Low: Medium -> Low: 12
+- true=High: High -> Medium: 10
+- true=High: Medium -> High: 10
+- true=Medium: Low -> Medium: 9
+- true=Medium: Medium -> Low: 8
+
+Decision Facts
+- S-052 aligns more with beneficial Medium corrections than with High recoveries by argmax: yes
+- S-052 target-class probability beats the old prediction more often on beneficial Medium corrections than on High recoveries: yes
+- S-052 mean target-class margin vs old prediction is larger for beneficial Medium corrections than for High recoveries: yes
+- S-052 gives any direct argmax support to High recoveries: no
+- Changed-row evidence favors a Medium-signal explanation over a High-signal explanation: yes
+
+follow_up:
+- On the 254 true-Medium changed rows, is the net S-094 gain explained mostly by one upstream member other than `S-052` shifting the final stacker boundary?
+- Does `S-052` improve changed-row log-loss for true `Medium` cases even though it also supports many harmful `Medium` flips?
+- Are the 31 beneficial `Medium` corrections where `S-052` aligns concentrated in one fold or spread across all fixed folds?

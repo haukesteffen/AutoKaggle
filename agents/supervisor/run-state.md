@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T20:03Z
+generated_at: 2026-04-04T20:04Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -14,14 +14,14 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 - current_date: April 4, 2026
 - deadline_assumption: April 30, 2026, assuming the S6E4 Playground competition follows the standard month-end close.
 - days_remaining: 26
-- primary: Re-anchor the mainline around the `S-093` structure and test whether `S-073` can be retained without relying on `S-052`.
-- secondary: Preserve `S-094` as the incumbent reference until a cleaner 3-way-plus-`S-073` variant either matches or fails clearly.
-- background: Keep a small amount of attention on submission readiness and tie-break logic if multiple variants stay within roughly `0.00002` CV.
-- hold: Additional local `C` tuning, no-logit variants, and further effort to justify `S-052` as a required durable member.
+- primary: isolate the true source of S-094's 0.000017 CV edge over the S-093/S-101 family and decide whether it is structurally reproducible.
+- secondary: queue one or two high-information offline variants that test interaction effects around the S-094 stack rather than further simplification-only checks.
+- background: preserve submission discipline and hold S-094 as the current deployment baseline.
+- hold: additional direct no-S-052 or near-duplicate simplification experiments unless they test a clearly different causal hypothesis.
 - guidance:
-  1. Make the next checkpoint a narrow structural refinement family centered on `S-093` plus `S-073`, with the explicit goal of separating the value of `S-073` from the now-weakened `S-052` story.
-  2. Treat `S-093` as the practical mainline for decision-making unless a low-variance follow-up reproduces the `S-094` edge without needing `S-052`; the current `0.000017` gap is too small to justify complexity by itself.
-  3. Use the following checkpoint after that to decide promotion policy: if a simplified variant lands at or above the `S-093`/`S-094` band, promote simplicity; if not, retain `S-094` as the leaderboard-facing incumbent while freezing further family-local tweaks.
+  1. Treat S-101 as confirmation that the next lane is attribution, not more blind simplification. The highest-value question is which exact component or interaction makes S-094 better than both S-093 and S-101.
+  2. Spend the next scientist cycle on one bounded ablation lane centered on S-094 versus S-093/S-101, with success defined as either reproducing the edge in a cleaner form or proving the edge is too brittle to prioritize.
+  3. Use the next available submission only for a model that is either the standing S-094 baseline or a new offline winner with a clear causal story and non-trivial CV separation.
 
 ## Control Files
 - strategy_request: none
