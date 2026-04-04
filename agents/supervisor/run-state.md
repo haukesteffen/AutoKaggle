@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T18:08Z
+generated_at: 2026-04-04T18:14Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -29,16 +29,16 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 - analyst_hypothesis: none
 
 ## Experiment Summary
-- total_results: 89
-- scored_results: 85
+- total_results: 90
+- scored_results: 86
 - terminal_non_scored_results: 4
 - best_cv: 0.972013 (S-091) | Multinomial LR stacker C=4.0 on logit S-014+S-082 probs
 - recent_results:
-  - S-087 | 0.971124 | Weighted blend XGB+LGBM+HistGBM: sweep [(0.6,0.3,0.1),(0.6,0.25,0.15),(0.5,0.35,0.15),(0.55,0.3,0.15),(0.65,0.25,0.10)] on S-014/S-082/S-086 OOF; best at (0.55,0.30,0.15), slightly below S-083 (0.971177)
   - S-088 | 0.971161 | Fine XGB+LGBM blend sweep on S-014/S-082 OOF over alpha=[0.64,0.66,0.68,0.69,0.70,0.71,0.72,0.74,0.76]; near-anchor search stayed just below S-083
   - S-089 | 0.971927 | Multinomial LR stacker on S-014+S-082 OOF/test probs
   - S-090 | 0.971946 | Multinomial LR stacker C=4.0 on S-014+S-082 probs
   - S-091 | 0.972013 | Multinomial LR stacker C=4.0 on logit S-014+S-082 probs
+  - S-092 | 0.963836 | Logit S-014+S-082 LR stacker with class_weight=None
 
 ## Analysis Summary
 - knowledge_entries: 30
