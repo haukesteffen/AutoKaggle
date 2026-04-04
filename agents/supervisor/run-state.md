@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T17:49Z
+generated_at: 2026-04-04T17:50Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -54,9 +54,9 @@ Compact restart context for Codex supervisor sessions. Read this before any full
   - A-011 | verdict=supported | conf=high | q=Do the S-052 LR OOF predictions (0.9286 CV) show meaningfully different High-class prediction patterns from S-014 XGBoost OOF predictions (0.9709), specifically: does S-052 recover a meaningful fraction of High-class TPs that S-014 misses, suggesting ensemble value?
 
 ## Leaderboard
-- submissions_total: 3
-- best_lb: 0.96867 (S-083) | rank 233
-- latest_submission: S-083 | 2026-04-04T16:54Z | 0.96867 | First positive ensemble signal; validate 0.70×S-014 XGB + 0.30×S-082 LGBM against the S-014 anchor
+- submissions_total: 4
+- best_lb: 0.97087 (S-089) | rank 165
+- latest_submission: S-089 | 2026-04-04T17:50Z | 0.97087 | Diagnostic leaderboard probe for multinomial LR stacker on S-014+S-082 probabilities
 
 ## Reset Policy
 - After any durable state change, run `uv run python -m harness.supervisor_snapshot`.
