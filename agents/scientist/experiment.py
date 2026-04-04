@@ -9,7 +9,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 
 
-TASK_ID = "S-099"
+TASK_ID = "S-100"
 SOURCE_IDS = ("S-014", "S-082", "S-073")
 CLASSES = ["High", "Low", "Medium"]
 CLASS_TO_INT = {label: idx for idx, label in enumerate(CLASSES)}
@@ -106,11 +106,17 @@ def _extract_probs(df: pd.DataFrame, source_id: str) -> pd.DataFrame:
     return probs.rename(columns=rename)
 
 
-def _logit_prob_features(df: pd.DataFrame, source_id: str) -> pd.DataFrame:
-    cols = [f"{source_id}_{cls}" for cls in CLASSES]
-    probs = df[cols].clip(EPS, 1.0 - EPS)
-    logits = np.log(probs / (1.0 - probs))
-    return logits
+def _medium_log_odds_features(df: pd.DataFrame, source_id: str) -> pd.DataFrame:
+    high = df[f"{source_id}_High"].clip(EPS, 1.0)
+    low = df[f"{source_id}_Low"].clip(EPS, 1.0)
+    medium = df[f"{source_id}_Medium"].clip(EPS, 1.0)
+    return pd.DataFrame(
+        {
+            f"{source_id}_high_vs_medium": np.log(high / medium),
+            f"{source_id}_low_vs_medium": np.log(low / medium),
+        },
+        index=df.index,
+    )
 
 
 def _prepare_split(split: str) -> pd.DataFrame:
@@ -126,7 +132,7 @@ def _prepare_split(split: str) -> pd.DataFrame:
                 merged = pd.concat([merged.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
     if merged is None:
         raise RuntimeError(f"Failed to prepare {split} split")
-    feature_blocks = [_logit_prob_features(merged, source_id) for source_id in SOURCE_IDS]
+    feature_blocks = [_medium_log_odds_features(merged, source_id) for source_id in SOURCE_IDS]
     features = pd.concat(feature_blocks, axis=1)
     if "id" in merged.columns:
         features.index = merged["id"].to_numpy()
@@ -149,7 +155,7 @@ class ExternalStacker(BaseEstimator, ClassifierMixin):
     def __init__(self) -> None:
         self.model = LogisticRegression(
             C=4.0,
-            class_weight=None,
+            class_weight="balanced",
             max_iter=2000,
             solver="lbfgs",
         )
