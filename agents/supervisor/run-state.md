@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T18:26Z
+generated_at: 2026-04-04T18:28Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -12,16 +12,16 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 
 ## Current Strategy
 - current_date: April 4, 2026
-- deadline_assumption: April 30, 2026, assuming the S6E4 competition closes on April 30, 2026 and the current run should optimize for the remaining 26-day window.
+- deadline_assumption: April 30, 2026, assuming the competition deadline has not changed.
 - days_remaining: 26
-- primary: Extend the multinomial LR stacker family in a narrow, high-signal way that preserves comparability with S-089 and S-090.
-- secondary: Run one complementary third-leg search to test whether the stacker lane is missing an orthogonal source of lift.
-- background: Keep submission discipline tight and use leaderboard slots only for changes that beat the current stacker reference by a credible margin.
-- hold: Broad baseline rework, diffuse model-family exploration, and any work that breaks comparability with the current stacker evidence.
+- primary: Exploit the validated `S-094` stacker lane with small, hypothesis-driven composition and calibration adjustments around the proven `S-091`/`S-093`/`S-094` recipe.
+- secondary: Preserve leaderboard discipline by treating `S-094` as the submission-quality reference and requiring clear local evidence before spending additional April 2026 submission slots.
+- background: Maintain light analyst-style scrutiny on why recovered members such as `S-073` and `S-052` add value, so future stack revisions stay selective instead of expanding blindly.
+- hold: Broad base-model diversification, aggressive hyperparameter sweeps, and further `C`-increase probing on the current 4-way stacker unless new evidence contradicts `S-095`.
 - guidance:
-  1. Through April 6, 2026, prioritize one or two tightly scoped stacker-family checkpoints around the S-090 recipe so the run can determine whether the 0.971946 CV edge is reproducible and large enough to justify a submission.
-  2. In parallel or immediately after, allocate exactly one scientist checkpoint to a complementary third-leg search that is explicitly judged on incremental value relative to the current stacker family, not on standalone novelty.
-  3. Do not spend a leaderboard submission on S-090-class movement alone unless a follow-up checkpoint shows clearer separation above 0.971946 CV or the candidate adds a distinct ensemble leg that changes portfolio risk versus S-089.
+  1. For the next few checkpoints after April 4, 2026, keep the main lane tightly focused on variants that are one edit away from `S-094`: member inclusion/exclusion tests, modest calibration changes, or equivalent low-variance stacker refinements.
+  2. Use `S-094` as the decision bar. If a candidate does not beat `0.972299` CV cleanly or does so only within noise, treat it as non-promotable and avoid leaderboard use.
+  3. Keep quiet lanes quiet until the current stacker lane is exhausted. The wake already produced enough signal to justify depth over breadth, and `S-095` argues against spending near-term checkpoints on larger-`C` retries.
 
 ## Control Files
 - strategy_request: none

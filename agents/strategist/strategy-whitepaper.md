@@ -4,26 +4,29 @@
 April 4, 2026
 
 ## Deadline Assumption
-April 30, 2026, assuming the S6E4 competition closes on April 30, 2026 and the current run should optimize for the remaining 26-day window.
+April 30, 2026, assuming the competition deadline has not changed.
 
 ## Days Remaining
 26
 
 ## Read
-The run has a stronger local leader in S-090 at 0.971946 CV, but the only fresh public anchor is S-089 at 0.97087 LB and rank 165 from a closely related stacker at 0.971927 CV. That combination says the multinomial LR stacker lane remains the best validated path, but the gain from S-090 is too small to assume a meaningful leaderboard lift without either a sharper stacker-family extension or a differentiated third leg. Pace pressure is low today because all control files are idle, so the next checkpoints should maximize information value rather than volume.
+The run is in a productive consolidation phase. `S-094` is now the strongest anchor on both axes, with `0.972299` CV and `0.97144` public LB at rank 157, improving on `S-089` at `0.97087` LB and rank 165. The wake sharpened the signal around ensemble composition rather than broad model churn: `S-091` established that logit features help, `S-093` showed `S-073` still contributes inside a learned stacker, and `S-094` extracted a further but smaller gain from adding `S-052`. The recent negatives are informative rather than alarming: `S-092` underperformed materially, and `S-095` indicates the 4-way stacker is near its useful regularization range because raising `C` to `8.0` did not improve on `S-094`.
 
 ## Emphasis
-Primary: Extend the multinomial LR stacker family in a narrow, high-signal way that preserves comparability with S-089 and S-090.
-Secondary: Run one complementary third-leg search to test whether the stacker lane is missing an orthogonal source of lift.
-Background: Keep submission discipline tight and use leaderboard slots only for changes that beat the current stacker reference by a credible margin.
-Hold: Broad baseline rework, diffuse model-family exploration, and any work that breaks comparability with the current stacker evidence.
+Primary: Exploit the validated `S-094` stacker lane with small, hypothesis-driven composition and calibration adjustments around the proven `S-091`/`S-093`/`S-094` recipe.
+
+Secondary: Preserve leaderboard discipline by treating `S-094` as the submission-quality reference and requiring clear local evidence before spending additional April 2026 submission slots.
+
+Background: Maintain light analyst-style scrutiny on why recovered members such as `S-073` and `S-052` add value, so future stack revisions stay selective instead of expanding blindly.
+
+Hold: Broad base-model diversification, aggressive hyperparameter sweeps, and further `C`-increase probing on the current 4-way stacker unless new evidence contradicts `S-095`.
 
 ## Guidance For The Supervisor
-1. Through April 6, 2026, prioritize one or two tightly scoped stacker-family checkpoints around the S-090 recipe so the run can determine whether the 0.971946 CV edge is reproducible and large enough to justify a submission.
-2. In parallel or immediately after, allocate exactly one scientist checkpoint to a complementary third-leg search that is explicitly judged on incremental value relative to the current stacker family, not on standalone novelty.
-3. Do not spend a leaderboard submission on S-090-class movement alone unless a follow-up checkpoint shows clearer separation above 0.971946 CV or the candidate adds a distinct ensemble leg that changes portfolio risk versus S-089.
+1. For the next few checkpoints after April 4, 2026, keep the main lane tightly focused on variants that are one edit away from `S-094`: member inclusion/exclusion tests, modest calibration changes, or equivalent low-variance stacker refinements.
+2. Use `S-094` as the decision bar. If a candidate does not beat `0.972299` CV cleanly or does so only within noise, treat it as non-promotable and avoid leaderboard use.
+3. Keep quiet lanes quiet until the current stacker lane is exhausted. The wake already produced enough signal to justify depth over breadth, and `S-095` argues against spending near-term checkpoints on larger-`C` retries.
 
 ## Refresh Triggers
-- Refresh after the next completed scientist result that either exceeds 0.971946 CV or materially underperforms S-090, because that will decide whether the stacker lane is still compounding.
-- Refresh after any new Kaggle submission, especially if the public score moves meaningfully away from 0.97087, because that will update the calibration between local CV and leaderboard reality.
-- Refresh by April 8, 2026 if no decisive result appears, because idle control files and a flat evidence base would then argue for a lane rebalance.
+- A new run exceeds `S-094` on CV by a meaningful margin or produces a materially better public LB result than `0.97144`.
+- Two consecutive near-`S-094` variants fail to improve, indicating the current stacker recipe is saturated.
+- Any new evidence shows the contribution from `S-073`, `S-052`, or logit features is fold-fragile rather than durable.
