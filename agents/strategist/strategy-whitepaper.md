@@ -10,20 +10,20 @@ April 30, 2026, assuming the S6E4 Playground competition follows the standard mo
 26
 
 ## Read
-The run is near a local optimum on the current stacker family. `S-094` remains the best CV at `0.972299`, but the new evidence materially changes how to treat its components: `S-073` now looks genuinely additive in the exact control recipe, while `S-052` no longer has a strong durability case. The practical read is that the team should stop spending budget on nearby parameter sweeps and treat the decision as a structure choice: either simplify to the nearly equivalent `S-093` 3-way anchor or keep `S-094` only as a thin incumbent while testing low-variance refinements around the `S-093`/`S-073` core.
+The run is in a narrow-margin regime. S-094 still leads both CV and LB, and the latest direct simplification check, S-101, reproduced S-093 rather than improving on it. That result reinforces the existing read that S-094's advantage is small but presently real, while the specific S-052 recovery story is not the durable source of that edge. Submission capacity is already exhausted for April 4, 2026, so the immediate value is in offline discrimination work rather than leaderboard probing.
 
 ## Emphasis
-Primary: Re-anchor the mainline around the `S-093` structure and test whether `S-073` can be retained without relying on `S-052`.
-Secondary: Preserve `S-094` as the incumbent reference until a cleaner 3-way-plus-`S-073` variant either matches or fails clearly.
-Background: Keep a small amount of attention on submission readiness and tie-break logic if multiple variants stay within roughly `0.00002` CV.
-Hold: Additional local `C` tuning, no-logit variants, and further effort to justify `S-052` as a required durable member.
+Primary: isolate the true source of S-094's 0.000017 CV edge over the S-093/S-101 family and decide whether it is structurally reproducible.
+Secondary: queue one or two high-information offline variants that test interaction effects around the S-094 stack rather than further simplification-only checks.
+Background: preserve submission discipline and hold S-094 as the current deployment baseline.
+Hold: additional direct no-S-052 or near-duplicate simplification experiments unless they test a clearly different causal hypothesis.
 
 ## Guidance For The Supervisor
-1. Make the next checkpoint a narrow structural refinement family centered on `S-093` plus `S-073`, with the explicit goal of separating the value of `S-073` from the now-weakened `S-052` story.
-2. Treat `S-093` as the practical mainline for decision-making unless a low-variance follow-up reproduces the `S-094` edge without needing `S-052`; the current `0.000017` gap is too small to justify complexity by itself.
-3. Use the following checkpoint after that to decide promotion policy: if a simplified variant lands at or above the `S-093`/`S-094` band, promote simplicity; if not, retain `S-094` as the leaderboard-facing incumbent while freezing further family-local tweaks.
+1. Treat S-101 as confirmation that the next lane is attribution, not more blind simplification. The highest-value question is which exact component or interaction makes S-094 better than both S-093 and S-101.
+2. Spend the next scientist cycle on one bounded ablation lane centered on S-094 versus S-093/S-101, with success defined as either reproducing the edge in a cleaner form or proving the edge is too brittle to prioritize.
+3. Use the next available submission only for a model that is either the standing S-094 baseline or a new offline winner with a clear causal story and non-trivial CV separation.
 
 ## Refresh Triggers
-- A new experiment directly tests a `S-093`-anchored variant that includes `S-073` without `S-052`.
-- Any result exceeds `0.972299` CV or produces a repeated gain of at least `0.00002` over both `S-093` and `S-094`.
-- Leaderboard evidence contradicts the current assumption that the `S-094` edge is too small and fragile to outweigh its added complexity.
+- A new offline result matches or exceeds S-094 with a simpler or better-attributed construction.
+- Evidence shows the S-094 edge is fold-noise-level and not reproducible across targeted ablations.
+- A submission slot opens after April 4, 2026 and there is a credible challenger to S-094.
