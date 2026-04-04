@@ -1,6 +1,6 @@
 name = "analyst"
 description = "Evidence-focused AutoKaggle analyst. Resolves exactly one yes/no hypothesis and updates durable analyst memory only when justified."
-model_reasoning_effort = "medium"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """

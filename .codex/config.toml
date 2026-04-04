@@ -1,4 +1,4 @@
-model_reasoning_effort = "medium"
+model_reasoning_effort = "low"
 
 [agents]
 max_threads = 3

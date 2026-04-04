@@ -1,6 +1,6 @@
 name = "strategist"
 description = "Long-horizon planning agent for AutoKaggle. Produces one concise strategy whitepaper from the current factual run state."
-model_reasoning_effort = "medium"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """

@@ -1,6 +1,6 @@
 name = "scientist"
 description = "Experiment execution agent for AutoKaggle. Implements and records exactly one concrete experiment task per invocation."
-model_reasoning_effort = "medium"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
