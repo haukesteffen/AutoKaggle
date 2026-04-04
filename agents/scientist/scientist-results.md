@@ -88,3 +88,4 @@
 | S-086 | 0.969934 | 0.000824 | -0.001243 | HistGBM max_iter=1500 lr=0.02 max_leaf_nodes=15 min_samples_leaf=50 l2_reg=0.1 class_weight=balanced, SM²+OrdinalEncoder — tuned toward LGBM params; 0.969934 close to S-018 (0.969459) but below XGB/LGBM best; note subsample not available in sklearn HistGBM, removed; marginal improvement over S-018 (+0.000475) insufficient for 3-way blend at current best 0.971177 |
 | S-087 | 0.971124 | 0.000808 | -0.000053 | Weighted blend XGB+LGBM+HistGBM: sweep [(0.6,0.3,0.1),(0.6,0.25,0.15),(0.5,0.35,0.15),(0.55,0.3,0.15),(0.65,0.25,0.10)] on S-014/S-082/S-086 OOF; best at (0.55,0.30,0.15), slightly below S-083 (0.971177) |
 | S-088 | 0.971161 | 0.000785 | -0.000016 | Fine XGB+LGBM blend sweep on S-014/S-082 OOF over alpha=[0.64,0.66,0.68,0.69,0.70,0.71,0.72,0.74,0.76]; near-anchor search stayed just below S-083 |
+| S-089 | 0.971927 | 0.000684 | +0.000750 | Multinomial LR stacker on S-014+S-082 OOF/test probs |

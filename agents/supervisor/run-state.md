@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T17:41Z
+generated_at: 2026-04-04T17:46Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -29,16 +29,16 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 - analyst_hypothesis: none
 
 ## Experiment Summary
-- total_results: 86
-- scored_results: 82
+- total_results: 87
+- scored_results: 83
 - terminal_non_scored_results: 4
-- best_cv: 0.971177 (S-083) | Weighted blend XGB+LGBM: alpha=0.7×XGB(S-014) + 0.3×LGBM(S-082) OOF; sweep over [0.9,0.8,0.7,0.6,0.5,0.4,0.3] — best at alpha=0.7, positive lift over S-014 XGB-only baseline (0.970856)
+- best_cv: 0.971927 (S-089) | Multinomial LR stacker on S-014+S-082 OOF/test probs
 - recent_results:
-  - S-084 | 0.954218 | LGBM n=2000 lr=0.02 num_leaves=7 min_child_samples=100 subsample=0.9 colsample_bytree=0.8 balanced, SM²+OrdinalEncoder — too aggressively regularized (num_leaves=7 underfits vs 15 in S-082: 0.970657, large regression -0.016638 vs S-014)
   - S-085 | 0.970782 | XGB n=1000 lr=0.025 depth=5 subsample=0.8 colsample_bytree=0.8 balanced, SM²+StandardScaler+OHE — slower learning with 2× trees does not improve over S-014 (0.970856); slightly below standalone XGB best
   - S-086 | 0.969934 | HistGBM max_iter=1500 lr=0.02 max_leaf_nodes=15 min_samples_leaf=50 l2_reg=0.1 class_weight=balanced, SM²+OrdinalEncoder — tuned toward LGBM params; 0.969934 close to S-018 (0.969459) but below XGB/LGBM best; note subsample not available in sklearn HistGBM, removed; marginal improvement over S-018 (+0.000475) insufficient for 3-way blend at current best 0.971177
   - S-087 | 0.971124 | Weighted blend XGB+LGBM+HistGBM: sweep [(0.6,0.3,0.1),(0.6,0.25,0.15),(0.5,0.35,0.15),(0.55,0.3,0.15),(0.65,0.25,0.10)] on S-014/S-082/S-086 OOF; best at (0.55,0.30,0.15), slightly below S-083 (0.971177)
   - S-088 | 0.971161 | Fine XGB+LGBM blend sweep on S-014/S-082 OOF over alpha=[0.64,0.66,0.68,0.69,0.70,0.71,0.72,0.74,0.76]; near-anchor search stayed just below S-083
+  - S-089 | 0.971927 | Multinomial LR stacker on S-014+S-082 OOF/test probs
 
 ## Analysis Summary
 - knowledge_entries: 29
