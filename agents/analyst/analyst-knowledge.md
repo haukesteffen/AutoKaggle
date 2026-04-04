@@ -400,3 +400,17 @@ S-014/S-082 tree baseline:
 
 Durable conclusion: S-052 still carries distinct signal even after S-093, but that signal is too noisy
 for naive averaging. Any further use of S-052 should rely on a learned combiner rather than a plain average.
+
+## AK-032 — S-094's Gain Over S-093 Is Not a Durable High-Recovery Pattern
+source: A-014
+at: 2026-04-04
+
+OOF comparison of S-094 (logit LR stacker with S-052 added) vs S-093:
+- Balanced accuracy gain is only +0.000018, with just 300 of 630,000 argmax predictions changed
+- High recall is unchanged at 0.962683; S-094 recovers 10 true High cases and loses 10 others
+- The lift comes from Medium recall (+0.000059) while Low recall slightly worsens (-0.000005)
+- S-052 does not explain the recovered Highs: on the 10 recovered High rows, S-052 predicts High 0 times; on the 10 lost High rows, S-052 predicts High 9 times
+- Across all changed rows, S-052 matches S-093 233 times and S-094 only 53 times
+
+Durable conclusion: the S-094 over S-093 improvement is a tiny Medium-class reallocation, not a
+concentrated High-class recovery pattern attributable to S-052.

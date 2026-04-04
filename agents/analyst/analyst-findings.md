@@ -1536,3 +1536,81 @@ follow_up:
 - Does a learned 4-way stacker on S-014, S-082, S-073, and S-052 recover S-052's lower-correlation signal without the -0.005877 simple-average regression seen in S-093 + S-052?
 - Is S-052's residual complementarity against S-093 concentrated mostly on High-class misses rather than across all classes?
 - Do S-093 and S-052 disagree primarily on low-confidence samples where a meta-model could separate useful diversity from S-052 noise?
+
+
+## A-014
+at: 2026-04-04T19:11Z
+q: Does adding S-052 to the S-093 stacker create a durable recovery pattern rather than noise, specifically: when comparing S-094 against S-093 on OOF predictions, does S-094 recover a meaningful number of true High cases or otherwise improve classwise correctness in a concentrated way that plausibly explains the +0.000017 balanced-accuracy lift?
+verdict: rejected
+conf: high
+reference: Use existing OOF prediction artifacts for S-093, S-094, S-052, and only any minimum supporting artifacts needed to interpret the delta. The goal is to decide whether S-052 is still earning its slot after the S-098 S-073 ablation showed S-073 is additive.
+evidence:
+================================================================================
+A-014: S-094 vs S-093 changed-case attribution
+Method: existing OOF probability artifacts only; no training
+Rows: 630,000
+Classes: ('High', 'Low', 'Medium')
+================================================================================
+
+Artifacts
+- S-052: artifacts/S-052/oof-preds.npy
+- S-093: artifacts/S-093/oof-preds.npy
+- S-094: artifacts/S-094/oof-preds.npy
+
+Balanced Accuracy
+- S-093: 0.972282
+- S-094: 0.972299
+- Delta (S-094 - S-093): +0.000018
+
+Classwise Recall
+- S-093: High=0.962683, Low=0.995037, Medium=0.959126
+- S-094: High=0.962683, Low=0.995031, Medium=0.959184
+- Delta: High=0.000000, Low=-0.000005, Medium=0.000059
+
+Changed Argmax Rows
+- Changed rows: 300 / 630000 (0.047619%)
+- Wrong -> right: 156
+- Right -> wrong: 144
+- Wrong -> wrong: 0
+- True-label mix among changed rows: High=20, Low=26, Medium=254
+
+Changed Rows by True Class
+- High: recovered=10, lost=10, net=+0
+- Low: recovered=12, lost=14, net=-2
+- Medium: recovered=134, lost=120, net=+14
+
+High-Class Attribution
+- High recovered by S-094: 10
+- High lost by S-094: 10
+- Recovered Highs where S-052 also predicted High: 0
+- Lost Highs where S-052 predicted non-High: 1
+- S-052 predictions on recovered Highs: High=0, Low=1, Medium=9
+- S-052 predictions on lost Highs: High=9, Low=0, Medium=1
+
+S-052 Alignment on Changed Rows
+- S-052 matches S-094 on changed rows: 53
+- S-052 matches S-093 on changed rows: 233
+- True High: S-052 matches S-094=1, S-052 matches S-093=18
+- True Low: S-052 matches S-094=13, S-052 matches S-093=13
+- True Medium: S-052 matches S-094=39, S-052 matches S-093=202
+
+Largest Changed-Case Flows
+- true=Medium: High -> Medium: 125
+- true=Medium: Medium -> High: 112
+- true=Low: Low -> Medium: 14
+- true=Low: Medium -> Low: 12
+- true=High: High -> Medium: 10
+- true=High: Medium -> High: 10
+- true=Medium: Low -> Medium: 9
+- true=Medium: Medium -> Low: 8
+
+Decision Facts
+- High recall changed: no
+- Net High recoveries > 0: no
+- Recovered Highs mostly supported by S-052: no
+- BA lift driven mainly by Medium recall: yes
+
+follow_up:
+- If `S-094`'s tiny lift is driven almost entirely by Medium recall, does removing `S-052` but re-tuning the 3-way stacker recover the same Medium gain without the extra member?
+- On the 300 rows where `S-094` and `S-093` differ, are the beneficial `Medium` corrections associated with any single base member other than `S-052`?
+- Does `S-052` add value to `S-094` only through probability calibration margin shifts rather than argmax-case recovery, as measured by log-loss on the changed rows?
