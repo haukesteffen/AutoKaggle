@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T17:46Z
+generated_at: 2026-04-04T17:49Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -12,16 +12,16 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 
 ## Current Strategy
 - current_date: April 4, 2026
-- deadline_assumption: April 30, 2026 — last calendar day of the competition month (S6E4 default assumption).
+- deadline_assumption: April 30, 2026 - last calendar day of the competition month (S6E4 default assumption).
 - days_remaining: 26
-- primary: Exploit the validated XGB+LGBM ensemble lane (55%)
-- secondary: Controlled diversity expansion around the ensemble anchor (25%)
-- background: Leaderboard calibration and submission discipline (15%)
-- hold: Further manual feature engineering and weak third-leg blends from current components (5%)
+- primary: Exploit the stacking lane around `S-089` and verify whether the gain survives on the leaderboard
+- secondary: Search for one more complementary base prediction source or stacker variant that can improve over the current two-model stack
+- background: Maintain calibration checks and submission discipline so the next probe is informative
+- hold: More work on the current HistGBM third-leg branch and manual feature engineering without a clear path to ensemble gain
 - guidance:
-  1. Treat `S-083` as the new anchor. The baseline to beat is no longer `S-014`; it is the `0.70 x S-014 + 0.30 x S-082` blend. Near-term scientist work should focus on bounded refinements around that pair: fine-grained weight search near 0.70/0.30, seed diversity, or a simple stacker using existing OOF artifacts.
-  2. Do not spend more runs on the current `HistGBM` third-leg path unless a new HistGBM variant closes most of the standalone gap first. `S-087` already answered the immediate question: the present 3-way blend does not improve the best 2-way blend.
-  3. Keep one diversity lane alive, but raise the bar. New standalone candidates should either reach roughly 0.9700 CV or show materially different OOF behavior relative to `S-083`. Weak-but-different models are no longer enough by themselves; they now need a clearer path to ensemble gain.
+  1. Treat `S-089` as the current research anchor and `S-083` as the submission baseline. The near-term question is whether the multinomial stacker can be reproduced cleanly enough to justify a leaderboard probe, not whether the old weighted blend can be nudged higher.
+  2. Put the next scientist effort into one of two lanes only: a controlled stacker-family variant on the existing OOF/test probabilities, or one new complementary prediction source that is structurally different enough to change the stack. Do not extend the current HistGBM third leg unless it first shows a meaningful standalone improvement.
+  3. Keep submissions tight. Submit only when the next candidate is either clearly above `0.971927` CV, or when the purpose is to test whether the stacking gain transfers to LB with acceptable calibration. Small cosmetic changes are not worth a slot.
 
 ## Control Files
 - strategy_request: none
