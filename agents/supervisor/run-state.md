@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-05T07:47Z
+generated_at: 2026-04-05T07:52Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -41,17 +41,17 @@ Compact restart context for Codex supervisor sessions. Read this before any full
   - S-104 | 0.972271 | Multinomial LR C=4.0 balanced on S-101 OVR logits + shrunk S-052 Medium pairwise
 
 ## Analysis Summary
-- knowledge_entries: 35
-- findings_entries: 17
+- knowledge_entries: 36
+- findings_entries: 18
 - recent_knowledge:
-  - AK-032 | S-094's Gain Over S-093 Is Not a Durable High-Recovery Pattern | OOF comparison of S-094 (logit LR stacker with S-052 added) vs S-093:
   - AK-033 | On S-094 vs S-093 Changed Rows, S-052 Aligns with Some Beneficial Medium Corrections but with No High Recoveries | Within the 300 rows where S-094 and S-093 disagree:
   - AK-034 | S-102 Matches S-094 in CV but Not in Exact High/Changed-Row Behavior | OOF comparison of S-102 (multinomial LR on S-101 OVR logits + S-052 Medium OVR) vs S-094:
   - AK-035 | S-102's Harmful True-Medium Regressions Are Spread Across Folds, Not Driven by One Split | For the 82 rows where the truth is Medium, S-094 predicts Medium, and S-102 regresses to another class:
+  - AK-036 | S-104 Shrinkage Stays Near S-094 in CV but Only Trims S-102's Medium Drift Marginally | OOF comparison of S-104 (shrunk S-052 Medium pairwise) against S-094 and S-102:
 - recent_findings:
-  - A-015 | verdict=supported | conf=high | q=Is the tiny S-094 over S-093 lift primarily explained by S-052's Medium-class probability signal rather than its High-class probability signal, specifically: on the rows where S-094 and S-093 disagree, does S-052 align more with the beneficial Medium corrections than with any recoveries in High?
   - A-016 | verdict=rejected | conf=high | q=Does S-102 preserve the practical behavior of S-094 closely enough to count as a credible simplified incumbent, specifically: compared with S-094, does S-102 keep balanced accuracy within 0.00001, leave High recall unchanged, and keep any changed-row differences concentrated mainly in Medium-class reallocations rather than new High-class regressions?
   - A-017 | verdict=rejected | conf=high | q=Are the harmful true-Medium changes in S-102 versus S-094 concentrated in a single fixed fold rather than spread across the cross-validation split, specifically: among the true-Medium rows that flip from Medium under S-094 to another class under S-102, does any one fold account for a clear majority of those regressions?
+  - A-018 | verdict=rejected | conf=high | q=Does the `S-104` shrinkage probe improve the practical Medium-class behavior enough to justify continuing this stabilization lane, specifically: compared with `S-102`, does `S-104` reduce harmful true-`Medium` regressions and the `Medium -> High` drift by a meaningful amount while staying within `0.00003` balanced accuracy of `S-094`?
 
 ## Leaderboard
 - submissions_total: 5

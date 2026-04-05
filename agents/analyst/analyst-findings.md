@@ -1806,3 +1806,64 @@ follow_up:
 - Are the 82 harmful true-`Medium` regressions associated with any shared feature subregion rather than any one fold?
 - Do the harmful true-`Medium` regressions cluster in low-margin cases where `S-094` and `S-102` have near-tied class probabilities?
 - Is the `Medium -> High` drift in `S-102` similarly spread across folds on the broader set of true-`Medium` changed rows, not just the harmful subset?
+
+
+## A-018
+at: 2026-04-05T07:51Z
+q: Does the `S-104` shrinkage probe improve the practical Medium-class behavior enough to justify continuing this stabilization lane, specifically: compared with `S-102`, does `S-104` reduce harmful true-`Medium` regressions and the `Medium -> High` drift by a meaningful amount while staying within `0.00003` balanced accuracy of `S-094`?
+verdict: rejected
+conf: high
+reference: Use the OOF artifacts for `S-094`, `S-102`, and `S-104`; include classwise recall and changed-row counts only as needed.
+evidence:
+================================================================================
+A-018: S-104 practical Medium-behavior check versus S-102
+Method: existing OOF probability artifacts only; no training
+Rows: 630,000
+Classes: ('High', 'Low', 'Medium')
+================================================================================
+
+Artifacts
+- S-094: artifacts/S-094/oof-preds.npy
+- S-102: artifacts/S-102/oof-preds.npy
+- S-104: artifacts/S-104/oof-preds.npy
+
+Balanced Accuracy
+- S-094: 0.972299
+- S-102: 0.972297
+- S-104: 0.972271
+- S-104 minus S-094: -0.000029
+- Within 0.00003 of S-094: yes
+
+Classwise Recall
+- High: S-094=0.962683, S-102=0.962778, S-104=0.962540
+- Low: S-094=0.995031, S-102=0.995034, S-104=0.995042
+- Medium: S-094=0.959184, S-102=0.959080, S-104=0.959230
+
+Changed-Row Comparison Against S-094 Benchmark
+- S-102 vs S-094: changed_rows=170, true_Medium_changed=139, harmful_true_Medium=82, true_Medium_Medium_to_High=77, beneficial_true_Medium=57, new_true_High_regressions=4
+- S-104 vs S-094: changed_rows=210, true_Medium_changed=171, harmful_true_Medium=80, true_Medium_Medium_to_High=73, beneficial_true_Medium=91, new_true_High_regressions=9
+
+S-104 Delta Relative to S-102
+- Harmful true-Medium regressions reduced versus S-102 (82 -> 80): yes
+- True-Medium Medium->High drift reduced versus S-102 (77 -> 73): yes
+- Medium recall improves over S-102: yes (0.959080 -> 0.959230)
+
+Largest S-094 -> S-104 Changed Flows
+- true=Medium: High -> Medium: 87
+- true=Medium: Medium -> High: 73
+- true=Low: Medium -> Low: 14
+- true=Low: Low -> Medium: 10
+- true=High: High -> Medium: 9
+- true=Medium: Medium -> Low: 7
+- true=High: Medium -> High: 6
+- true=Medium: Low -> Medium: 4
+
+Decision Facts
+- S-104 reduces harmful true-Medium regressions versus S-102: yes
+- S-104 reduces true-Medium Medium->High drift versus S-102: yes
+- S-104 stays within 0.00003 balanced accuracy of S-094: yes
+
+follow_up:
+- Does the `S-104` shrinkage change improve probability calibration or log-loss enough to offset its extra true-`High` regressions versus `S-102` and `S-094`?
+- Are the 87 true-`Medium` `High -> Medium` corrections in `S-104` concentrated in one feature region that can be isolated without adding the 9 new true-`High` regressions?
+- Is there any shrinkage setting between `S-102` and `S-104` that keeps the `S-104` Medium gains while reducing the added true-`High` regressions back toward `S-102`?

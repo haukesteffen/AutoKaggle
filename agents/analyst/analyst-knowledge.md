@@ -450,3 +450,15 @@ For the 82 rows where the truth is Medium, S-094 predicts Medium, and S-102 regr
 - Most of these regressions are Medium -> High (77 of 82); only 5 are Medium -> Low
 
 Durable conclusion: the harmful true-Medium behavior in S-102 is not a one-fold artifact. It is spread across the fixed cross-validation split.
+
+## AK-036 — S-104 Shrinkage Stays Near S-094 in CV but Only Trims S-102's Medium Drift Marginally
+source: A-018
+at: 2026-04-05
+
+OOF comparison of S-104 (shrunk S-052 Medium pairwise) against S-094 and S-102:
+- Balanced accuracy stays within the stated tolerance of S-094: 0.972271 vs 0.972299 (delta -0.000029)
+- Relative to S-102, Medium recall rises slightly: 0.959080 -> 0.959230
+- But the changed-row improvement is small: harmful true-Medium regressions only drop 82 -> 80, and true-Medium Medium -> High drift only drops 77 -> 73
+- The shrinkage probe also increases new true-High regressions versus both baselines: 9 for S-104 vs 4 for S-102
+
+Durable conclusion: S-104 preserves near-S-094 CV and slightly improves Medium recall, but its Medium-class error-shape improvement over S-102 is only marginal and comes with more new true-High regressions.
