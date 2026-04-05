@@ -104,3 +104,4 @@
 | S-102 | 0.972297 | 0.000690 | -0.000002 | Multinomial LR C=4.0 balanced on S-101 OVR logits + S-052 Medium OVR |
 | S-103 | 0.972279 | 0.000532 | -0.000020 | Multinomial LR C=4.0 balanced on S-101 OVR logits + S-052 Medium pairwise |
 | S-104 | 0.972271 | 0.000598 | -0.000028 | Multinomial LR C=4.0 balanced on S-101 OVR logits + shrunk S-052 Medium pairwise |
+| S-105 | 0.972308 | 0.000597 | +0.000009 | Multinomial LR C=4.0 balanced on S-094 OVR logits + shrunk S-052 High/Low |

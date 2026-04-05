@@ -11,12 +11,12 @@ from sklearn.linear_model import LogisticRegression
 from harness.dataset import FOLD_COLUMN, TARGET_COLUMN, encode_target_labels, load_train_with_folds
 
 
-TASK_ID = "S-104"
-SOURCE_IDS = ("S-014", "S-082", "S-073")
-MEDIUM_ONLY_SOURCE_ID = "S-052"
+TASK_ID = "S-105"
+SOURCE_IDS = ("S-014", "S-082", "S-073", "S-052")
+SHRUNK_SOURCE_ID = "S-052"
 CLASSES = ["High", "Low", "Medium"]
 EPS = 1e-6
-SHRINKAGE_GRID = (0.0, 0.25, 0.5, 0.75, 1.0)
+SHRINKAGE_GRID = (0.0, 0.1, 0.2, 0.35, 0.5, 0.65, 0.8, 1.0)
 EXPERIMENT_NAME = TASK_ID
 
 
@@ -131,35 +131,10 @@ def _prepare_split(split: str) -> pd.DataFrame:
     if merged is None:
         raise RuntimeError(f"Failed to prepare {split} split")
     feature_blocks = [_ovr_logit_features(merged, source_id) for source_id in SOURCE_IDS]
-    medium_only = _extract_probs(_load_best_frame(MEDIUM_ONLY_SOURCE_ID, split), MEDIUM_ONLY_SOURCE_ID)
-    if "id" in merged.columns and "id" in medium_only.columns:
-        merged = merged.merge(medium_only, on="id", how="inner")
-    else:
-        merged = pd.concat([merged.reset_index(drop=True), medium_only.reset_index(drop=True)], axis=1)
-    medium_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Medium"].clip(EPS, 1.0)
-    high_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_High"].clip(EPS, 1.0)
-    low_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Low"].clip(EPS, 1.0)
-    feature_blocks.append(_medium_feature_block(medium_prob, high_prob, low_prob, shrinkage=1.0, index=merged.index))
     features = pd.concat(feature_blocks, axis=1)
     if "id" in merged.columns:
         features.index = merged["id"].to_numpy()
     return features
-
-
-def _medium_feature_block(
-    medium_prob: pd.Series,
-    high_prob: pd.Series,
-    low_prob: pd.Series,
-    shrinkage: float,
-    index: pd.Index,
-) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_High_logit": shrinkage * np.log(medium_prob / high_prob),
-            f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_Low_logit": shrinkage * np.log(medium_prob / low_prob),
-        },
-        index=index,
-    )
 
 
 OOF_FEATURES = _prepare_split("oof")
@@ -167,8 +142,10 @@ TEST_FEATURES = _prepare_split("test")
 TRAIN_WITH_FOLDS = load_train_with_folds()
 TRAIN_FOLDS = TRAIN_WITH_FOLDS[FOLD_COLUMN].to_numpy()
 TRAIN_Y = encode_target_labels(TRAIN_WITH_FOLDS[TARGET_COLUMN])
-BASE_FEATURE_COLUMNS = [col for col in OOF_FEATURES.columns if not col.startswith(f"{MEDIUM_ONLY_SOURCE_ID}_")]
-MEDIUM_FEATURE_COLUMNS = [col for col in OOF_FEATURES.columns if col.startswith(f"{MEDIUM_ONLY_SOURCE_ID}_")]
+SHRUNK_COLUMNS = [
+    f"{SHRUNK_SOURCE_ID}_High_ovr_logit",
+    f"{SHRUNK_SOURCE_ID}_Low_ovr_logit",
+]
 
 
 def _row_keys(x: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -223,8 +200,7 @@ class ExternalStacker(BaseEstimator, ClassifierMixin):
 
     def _apply_shrinkage(self, features: pd.DataFrame, shrinkage: float) -> pd.DataFrame:
         out = features.copy()
-        out.loc[:, BASE_FEATURE_COLUMNS] = features.loc[:, BASE_FEATURE_COLUMNS].to_numpy()
-        out.loc[:, MEDIUM_FEATURE_COLUMNS] = shrinkage * features.loc[:, MEDIUM_FEATURE_COLUMNS].to_numpy()
+        out.loc[:, SHRUNK_COLUMNS] = shrinkage * features.loc[:, SHRUNK_COLUMNS].to_numpy()
         return out
 
 
@@ -262,7 +238,7 @@ def _select_offline_shrinkage() -> float:
 
 
 BEST_SHRINKAGE = _select_offline_shrinkage()
-EXPERIMENT_NAME = f"{TASK_ID}-shrink-{BEST_SHRINKAGE:.2f}"
+EXPERIMENT_NAME = f"{TASK_ID}-hl-shrink-{BEST_SHRINKAGE:.2f}"
 
 
 def build_model(_: pd.DataFrame | None = None) -> ExternalStacker:
