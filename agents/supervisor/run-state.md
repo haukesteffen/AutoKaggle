@@ -1,5 +1,5 @@
 # Supervisor Run State
-generated_at: 2026-04-04T20:17Z
+generated_at: 2026-04-05T07:32Z
 generated_by: harness.supervisor_snapshot
 
 Compact restart context for Codex supervisor sessions. Read this before any full histories.
@@ -11,17 +11,17 @@ Compact restart context for Codex supervisor sessions. Read this before any full
 - this file
 
 ## Current Strategy
-- current_date: April 4, 2026
+- current_date: April 5, 2026
 - deadline_assumption: April 30, 2026, assuming the S6E4 Playground competition follows the standard month-end close.
-- days_remaining: 26
-- primary: pursue a bounded improvement lane that can beat or clearly de-risk S-094, starting from the confirmed value of the Medium-class signal rather than re-proving it.
-- secondary: test targeted alternatives that may preserve the S-052 Medium benefit while reducing the harmful row reallocations seen in S-102.
-- background: keep S-094 as the submission baseline until an offline challenger has both score separation and acceptable behavior.
-- hold: more attribution-only checks on S-094 versus S-102 unless a new hypothesis explains the distributed true-Medium regressions.
+- days_remaining: 25
+- primary: Build a stronger `S-094` successor that preserves Medium lift while reducing fold-level instability and avoiding true-Medium regressions.
+- secondary: Run behavior-first comparisons against `S-094`, with acceptance based on both CV improvement and cleaner classwise error shape.
+- background: Keep a low-volume fallback lane for conservative de-risking variants that retain most of the `S-094` recipe.
+- hold: Further analyst attribution on `S-102` and near-tie simplification work without a credible path to better Medium behavior.
 - guidance:
-  1. Move the next scientist cycle from attribution to replacement search centered on controlled Medium-signal usage, because the current evidence already explains most of why S-094 works and why S-102 is not a safe substitute.
-  2. Require the next lane to optimize for both CV and behavior: a candidate should not only meet or exceed S-094 offline, but also avoid the broad true-Medium regression pattern that invalidated S-102.
-  3. Keep the next submission slot reserved for either the standing S-094 incumbent or a new offline winner with a defensible causal story and clear practical improvement, not for another near-equivalent variant.
+  1. Set the next scientist cycle around one bounded objective: replace or stabilize the noisy `S-052` contribution inside the `S-094` blend while keeping the rest of the stack close enough to isolate behavioral change.
+  2. Gate promotion on two conditions together: offline balanced accuracy must beat `0.972299` by a real margin or match it with clearly better true-Medium behavior, and the fold pattern must look safer than `S-102`.
+  3. Use analyst capacity only after a new candidate exists and only to answer a narrow promotion question about whether the new variant's Medium gains are robust enough to justify replacing `S-094`.
 
 ## Control Files
 - strategy_request: none
