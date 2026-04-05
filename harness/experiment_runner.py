@@ -15,8 +15,8 @@ os.environ.setdefault("LOKY_MAX_CPU_COUNT", str(os.cpu_count() or 1))
 from harness.dataset import METRIC_NAME, N_SPLITS, TIME_BUDGET_SECONDS, EvaluationResult, evaluate_model
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_EXPERIMENT_PATH = Path("agents/scientist/experiment.py")
-DEFAULT_TASK_PATH = Path("agents/scientist/scientist-task.md")
+DEFAULT_EXPERIMENT_PATH = Path("work/experiment.py")
+DEFAULT_TASK_PATH = Path("state/scientist-task.md")
 DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
 TASK_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 INVALID_EXIT_CODE = 2
@@ -199,12 +199,17 @@ def default_artifact_dir(task_id: str) -> Path:
 
 def read_task_metadata(task_path: Path = DEFAULT_TASK_PATH) -> TaskMetadata:
     fields = _parse_key_value_fields(normalize_repo_path(task_path).read_text())
+    status = fields.get("status", "none")
     task_id = fields.get("id") or "S-unknown"
-    _validate_task_id(task_id)
+    batch_goal = fields.get("batch_goal")
+    if status == "active":
+        _validate_task_id(task_id)
+        if not batch_goal or batch_goal == "none":
+            raise ValueError("active scientist task is missing batch_goal")
     return TaskMetadata(
-        status=fields.get("status", "none"),
+        status=status,
         task_id=task_id,
-        goal=fields.get("goal") or "Unspecified experiment goal",
+        goal=batch_goal or "Unspecified experiment goal",
         reference=fields.get("reference"),
     )
 
@@ -222,7 +227,16 @@ def _parse_key_value_fields(task_text: str) -> dict[str, str]:
             continue
         key, value = stripped.split(":", 1)
         normalized_key = key.strip().lower()
-        if normalized_key not in {"status", "id", "at", "goal", "reference"}:
+        if normalized_key not in {
+            "status",
+            "id",
+            "at",
+            "lane",
+            "batch_goal",
+            "compare_to",
+            "success_criterion",
+            "reference",
+        }:
             continue
         normalized_value = value.strip()
         if normalized_value and normalized_key not in fields:

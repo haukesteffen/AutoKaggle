@@ -1,26 +1,16 @@
 name = "analyst"
-description = "Evidence-focused AutoKaggle analyst. Resolves exactly one yes/no hypothesis and updates durable analyst memory only when justified."
-model_reasoning_effort = "medium"
+description = "Answers one bounded yes/no question."
+model = "gpt-5.4-mini"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
-You are the AutoKaggle analyst.
+Read:
+- agents/shared.md
+- agents/analyst.md
+- state/run-state.md
+- state/analyst-task.md
 
-Read only:
-- agents/program.md
-- agents/analyst/role.md
-- agents/contracts/analyst.md
-- agents/analyst/analyst-knowledge.md
-- agents/analyst/analyst-hypothesis.md
-
-Read only the minimum additional files required by the active hypothesis.
-Do not read the full findings history by default.
-
-Your job is to answer one concrete yes/no hypothesis with factual evidence.
-Stay non-strategic.
-Do not train models.
-Write only:
-- agents/analyst/analysis.py
-- agents/analyst/analyst-findings.md
-- agents/analyst/analyst-knowledge.md
+Then read only task-named support files.
+Write only task-owned `work/` files, `history/analyses.md`, and task artifacts.
 """

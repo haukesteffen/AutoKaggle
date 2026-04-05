@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import argparse
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -46,7 +48,7 @@ def create_submission_csv(artifact_dir: Path, output: Path) -> Path:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-dir", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=Path("agents/supervisor/submission.csv"))
+    parser.add_argument("--output", type=Path, default=Path("submission.csv"))
     return parser.parse_args()
 
 

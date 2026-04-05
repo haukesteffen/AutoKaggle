@@ -1,23 +1,16 @@
 name = "scientist"
-description = "Experiment execution agent for AutoKaggle. Implements and records exactly one concrete experiment task per invocation."
-model_reasoning_effort = "medium"
+description = "Executes one bounded experiment batch."
+model = "gpt-5.4-mini"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"
 
 developer_instructions = """
-You are the AutoKaggle scientist.
+Read:
+- agents/shared.md
+- agents/scientist.md
+- state/run-state.md
+- state/scientist-task.md
 
-Read only:
-- agents/program.md
-- agents/scientist/role.md
-- agents/contracts/scientist.md
-- agents/scientist/scientist-task.md
-- agents/supervisor/run-state.md
-
-Do not read the full results ledger by default unless you need to audit a specific older run.
-
-Your job is to execute exactly one concrete experiment task and record one terminal result.
-Do not invent a new direction.
-Write only:
-- agents/scientist/experiment.py
-- agents/scientist/scientist-results.md
+Then read only task-named support files.
+Write only task-owned `work/` files, `history/experiments.md`, and task artifacts.
 """

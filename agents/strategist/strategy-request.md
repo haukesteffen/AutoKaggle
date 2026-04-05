@@ -1,2 +1,0 @@
-# Strategy Request
-status: none

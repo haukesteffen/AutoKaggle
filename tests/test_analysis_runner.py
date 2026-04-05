@@ -12,24 +12,18 @@ from harness import analysis_runner
 
 
 class AnalysisRunnerTests(unittest.TestCase):
-    def test_inactive_hypothesis_exits_without_running(self) -> None:
+    def test_inactive_task_exits_without_running(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            hypothesis_file = root / "analyst-hypothesis.md"
-            findings_file = root / "analyst-findings.md"
-            hypothesis_file.write_text("# Active Analyst Hypothesis\nstatus: none\n")
+            root = Path(tmpdir).resolve()
+            task_file = root / "state/analyst-task.md"
+            task_file.parent.mkdir(parents=True)
+            task_file.write_text("# Active Analyst Task\nstatus: none\n")
 
             stdout = io.StringIO()
-            with mock.patch.object(
+            with mock.patch.object(analysis_runner, "REPO_ROOT", root), mock.patch.object(
                 sys,
                 "argv",
-                [
-                    "analysis_runner",
-                    "--hypothesis-file",
-                    str(hypothesis_file),
-                    "--findings-file",
-                    str(findings_file),
-                ],
+                ["analysis_runner"],
             ), mock.patch("harness.analysis_runner.subprocess.run") as run, mock.patch(
                 "sys.stdout",
                 stdout,
@@ -38,16 +32,15 @@ class AnalysisRunnerTests(unittest.TestCase):
 
             run.assert_not_called()
             self.assertEqual(stdout.getvalue().strip(), "status: no_active_hypothesis")
-            self.assertFalse(findings_file.exists())
-            self.assertFalse((root / "analysis-errors.md").exists())
+            self.assertFalse((root / "artifacts").exists())
 
-    def test_success_appends_findings_without_stderr(self) -> None:
+    def test_success_writes_stdout_artifact_without_stderr(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            hypothesis_file = root / "analyst-hypothesis.md"
-            findings_file = root / "analyst-findings.md"
-            hypothesis_file.write_text(
-                "# Active Analyst Hypothesis\n"
+            root = Path(tmpdir).resolve()
+            task_file = root / "state/analyst-task.md"
+            task_file.parent.mkdir(parents=True)
+            task_file.write_text(
+                "# Active Analyst Task\n"
                 "status: active\n"
                 "id: A-001\n"
                 "at: 2026-03-29T10:45Z\n"
@@ -62,38 +55,32 @@ class AnalysisRunnerTests(unittest.TestCase):
                 stderr="debug noise\n",
             )
 
-            with mock.patch.object(
+            stdout = io.StringIO()
+            with mock.patch.object(analysis_runner, "REPO_ROOT", root), mock.patch.object(
                 sys,
                 "argv",
-                [
-                    "analysis_runner",
-                    "--hypothesis-file",
-                    str(hypothesis_file),
-                    "--findings-file",
-                    str(findings_file),
-                ],
-            ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed):
+                ["analysis_runner"],
+            ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed), mock.patch(
+                "sys.stdout",
+                stdout,
+            ):
                 analysis_runner.main()
 
-            findings = findings_file.read_text()
-            self.assertIn("## A-001", findings)
-            self.assertIn("q: Does feature hashing help?", findings)
-            self.assertIn("conf: *(fill in: high | medium | low)*", findings)
-            self.assertIn("reference: experiment=abc123, knowledge=AK-001", findings)
-            self.assertIn("evidence:\nFinding: yes", findings)
-            self.assertIn("follow_up:\n- *(fill in yes/no hypothesis)*", findings)
-            self.assertEqual(findings.count("- *(fill in yes/no hypothesis)*"), 3)
-            self.assertNotIn("debug noise", findings)
-            self.assertFalse((root / "analysis-errors.md").exists())
+            stdout_file = root / "artifacts/A-001/analysis-stdout.txt"
+            self.assertEqual(stdout_file.read_text(), "Finding: yes\n")
+            self.assertFalse((root / "artifacts/A-001/analysis-run.log").exists())
+            self.assertEqual(
+                stdout.getvalue().strip(),
+                "status: success; stdout written to artifacts/A-001/analysis-stdout.txt",
+            )
 
-    def test_failure_skips_findings_and_writes_error_log(self) -> None:
+    def test_failure_writes_error_log_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            hypothesis_file = root / "analyst-hypothesis.md"
-            findings_file = root / "analyst-findings.md"
-            findings_file.write_text("## Existing finding\n")
-            hypothesis_file.write_text(
-                "# Active Analyst Hypothesis\n"
+            root = Path(tmpdir).resolve()
+            task_file = root / "state/analyst-task.md"
+            task_file.parent.mkdir(parents=True)
+            task_file.write_text(
+                "# Active Analyst Task\n"
                 "status: active\n"
                 "id: A-001\n"
                 "at: 2026-03-29T10:45Z\n"
@@ -108,16 +95,10 @@ class AnalysisRunnerTests(unittest.TestCase):
             )
 
             stderr = io.StringIO()
-            with mock.patch.object(
+            with mock.patch.object(analysis_runner, "REPO_ROOT", root), mock.patch.object(
                 sys,
                 "argv",
-                [
-                    "analysis_runner",
-                    "--hypothesis-file",
-                    str(hypothesis_file),
-                    "--findings-file",
-                    str(findings_file),
-                ],
+                ["analysis_runner"],
             ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed), redirect_stderr(
                 stderr
             ):
@@ -125,12 +106,12 @@ class AnalysisRunnerTests(unittest.TestCase):
                     analysis_runner.main()
 
             self.assertEqual(exc.exception.code, 2)
-            self.assertEqual(findings_file.read_text(), "## Existing finding\n")
+            self.assertFalse((root / "artifacts/A-001/analysis-stdout.txt").exists())
 
-            errors = (root / "analysis-errors.md").read_text()
-            self.assertIn("## A-001", errors)
+            errors = (root / "artifacts/A-001/analysis-run.log").read_text()
+            self.assertIn("id: A-001", errors)
             self.assertIn("q: Does feature hashing help?", errors)
-            self.assertIn("exit_code: `2`", errors)
+            self.assertIn("exit_code: 2", errors)
             self.assertIn("stdout:\npartial output", errors)
             self.assertIn("stderr:\nTraceback: boom", errors)
 
@@ -139,26 +120,13 @@ class AnalysisRunnerTests(unittest.TestCase):
             self.assertIn("[analysis stdout]", stderr_text)
             self.assertIn("[analysis stderr]", stderr_text)
 
-    def test_extract_title_prefers_id_and_supports_legacy_formats(self) -> None:
-        self.assertEqual(
-            analysis_runner._extract_title(
-                "# Active Analyst Hypothesis\n"
-                "status: active\n"
-                "id: A-001\n"
-                "q: Does feature hashing help?\n"
-            ),
-            "A-001",
-        )
-        self.assertEqual(analysis_runner._extract_title("**Question:** Legacy title"), "Legacy title")
-
-    def test_success_normalizes_relative_repo_paths(self) -> None:
+    def test_success_normalizes_default_repo_relative_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as otherdir:
-            root = Path(tmpdir)
-            hypothesis_file = root / "agents/analyst/analyst-hypothesis.md"
-            findings_file = root / "agents/analyst/analyst-findings.md"
-            hypothesis_file.parent.mkdir(parents=True)
-            hypothesis_file.write_text(
-                "# Active Analyst Hypothesis\n"
+            root = Path(tmpdir).resolve()
+            task_file = root / "state/analyst-task.md"
+            task_file.parent.mkdir(parents=True)
+            task_file.write_text(
+                "# Active Analyst Task\n"
                 "status: active\n"
                 "id: A-001\n"
                 "q: Does feature hashing help?\n"
@@ -181,29 +149,28 @@ class AnalysisRunnerTests(unittest.TestCase):
                 ), mock.patch.object(
                     sys,
                     "argv",
-                    [
-                        "analysis_runner",
-                        "--hypothesis-file",
-                        "agents/analyst/analyst-hypothesis.md",
-                        "--findings-file",
-                        "agents/analyst/analyst-findings.md",
-                    ],
+                    ["analysis_runner"],
                 ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed):
                     analysis_runner.main()
             finally:
                 os.chdir(original_cwd)
 
-            findings = findings_file.read_text()
-            self.assertIn("## A-001", findings)
+            stdout_file = root / "artifacts/A-001/analysis-stdout.txt"
+            self.assertEqual(stdout_file.read_text(), "Finding: yes\n")
 
-    def test_failure_normalizes_default_error_log_path(self) -> None:
+    def test_parse_args_has_no_findings_file_option(self) -> None:
+        with mock.patch.object(sys, "argv", ["analysis_runner"]):
+            args = analysis_runner._parse_args()
+
+        self.assertFalse(hasattr(args, "findings_file"))
+
+    def test_failure_normalizes_relative_error_log_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir, tempfile.TemporaryDirectory() as otherdir:
-            root = Path(tmpdir)
-            hypothesis_file = root / "agents/analyst/analyst-hypothesis.md"
-            findings_file = root / "agents/analyst/analyst-findings.md"
-            hypothesis_file.parent.mkdir(parents=True)
-            hypothesis_file.write_text(
-                "# Active Analyst Hypothesis\n"
+            root = Path(tmpdir).resolve()
+            task_file = root / "state/analyst-task.md"
+            task_file.parent.mkdir(parents=True)
+            task_file.write_text(
+                "# Active Analyst Task\n"
                 "status: active\n"
                 "id: A-001\n"
                 "q: Does feature hashing help?\n"
@@ -228,10 +195,8 @@ class AnalysisRunnerTests(unittest.TestCase):
                     "argv",
                     [
                         "analysis_runner",
-                        "--hypothesis-file",
-                        "agents/analyst/analyst-hypothesis.md",
-                        "--findings-file",
-                        "agents/analyst/analyst-findings.md",
+                        "--errors-file",
+                        "reports/analysis-run.log",
                     ],
                 ), mock.patch("harness.analysis_runner.subprocess.run", return_value=completed):
                     with self.assertRaises(SystemExit):
@@ -239,8 +204,8 @@ class AnalysisRunnerTests(unittest.TestCase):
             finally:
                 os.chdir(original_cwd)
 
-            errors = (root / "agents/analyst/analysis-errors.md").read_text()
-            self.assertIn("## A-001", errors)
+            errors = (root / "reports/analysis-run.log").read_text()
+            self.assertIn("id: A-001", errors)
 
 
 if __name__ == "__main__":
