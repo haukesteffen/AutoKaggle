@@ -7,14 +7,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ANALYSIS_PATH = Path("agents/analyst/analysis.py")
-DEFAULT_ERRORS_FILENAME = "analysis-errors.md"
+DEFAULT_ANALYSIS_PATH = Path("work/analysis.py")
+DEFAULT_TASK_PATH = Path("state/analyst-task.md")
+DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
+DEFAULT_STDOUT_FILENAME = "analysis-stdout.txt"
+DEFAULT_FAILURE_FILENAME = "analysis-run.log"
 
 
 @dataclass(frozen=True)
-class HypothesisMetadata:
+class AnalysisTaskMetadata:
     status: str
-    title: str
+    task_id: str
     question: str
     reference: str | None
 
@@ -22,19 +25,25 @@ class HypothesisMetadata:
 def main() -> None:
     args = _parse_args()
     analysis_path = _normalize_repo_path(args.analysis_path)
-    hypothesis_file = _normalize_repo_path(args.hypothesis_file)
-    findings_file = _normalize_repo_path(args.findings_file)
-    errors_file = (
-        _normalize_repo_path(args.errors_file)
-        if args.errors_file
-        else findings_file.with_name(DEFAULT_ERRORS_FILENAME)
-    )
+    task_file = _normalize_repo_path(args.hypothesis_file)
 
-    hypothesis_text = hypothesis_file.read_text()
-    metadata = _extract_hypothesis_metadata(hypothesis_text)
+    try:
+        metadata = _read_task_metadata(task_file)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
     if metadata.status != "active":
         print("status: no_active_hypothesis")
         return
+
+    artifact_dir = _artifact_dir(metadata.task_id)
+    stdout_file = artifact_dir / DEFAULT_STDOUT_FILENAME
+    errors_file = (
+        _normalize_repo_path(args.errors_file)
+        if args.errors_file
+        else artifact_dir / DEFAULT_FAILURE_FILENAME
+    )
 
     completed = subprocess.run(
         [sys.executable, str(analysis_path)],
@@ -45,7 +54,7 @@ def main() -> None:
     )
 
     if completed.returncode != 0:
-        _append_failure_entry(
+        _write_failure_artifact(
             errors_file=errors_file,
             metadata=metadata,
             analysis_path=analysis_path,
@@ -54,18 +63,14 @@ def main() -> None:
         _report_failure(analysis_path=analysis_path, errors_file=errors_file, completed=completed)
         raise SystemExit(completed.returncode)
 
-    _append_findings_entry(
-        findings_file=findings_file,
-        metadata=metadata,
-        stdout=completed.stdout,
-    )
+    _write_stdout_artifact(stdout_file=stdout_file, stdout=completed.stdout)
+    print(f"status: success; stdout written to {_display_path(stdout_file)}")
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--analysis-path", type=Path, default=DEFAULT_ANALYSIS_PATH)
-    parser.add_argument("--hypothesis-file", type=Path, required=True)
-    parser.add_argument("--findings-file", type=Path, required=True)
+    parser.add_argument("--hypothesis-file", type=Path, default=DEFAULT_TASK_PATH)
     parser.add_argument("--errors-file", type=Path)
     return parser.parse_args()
 
@@ -84,30 +89,41 @@ def _analysis_env() -> dict[str, str]:
     return env
 
 
-def _extract_hypothesis_metadata(hypothesis_text: str) -> HypothesisMetadata:
-    fields = _parse_key_value_fields(hypothesis_text)
-    question = fields.get("q") or _extract_legacy_question(hypothesis_text) or "Analysis"
-    return HypothesisMetadata(
-        status=fields.get("status", "none"),
-        title=fields.get("id") or question,
+def _read_task_metadata(task_file: Path) -> AnalysisTaskMetadata:
+    fields = _parse_key_value_fields(task_file.read_text())
+    status = fields.get("status", "none")
+    if status != "active":
+        return AnalysisTaskMetadata(
+            status=status,
+            task_id=fields.get("id", "none"),
+            question=fields.get("q", "none"),
+            reference=fields.get("reference"),
+        )
+
+    task_id = fields.get("id")
+    if not task_id or task_id == "none":
+        raise ValueError("active analyst task is missing id")
+    question = fields.get("q")
+    if not question or question == "none":
+        raise ValueError("active analyst task is missing q")
+
+    return AnalysisTaskMetadata(
+        status=status,
+        task_id=task_id,
         question=question,
         reference=fields.get("reference"),
     )
 
 
-def _extract_title(hypothesis_text: str) -> str:
-    return _extract_hypothesis_metadata(hypothesis_text).title
-
-
-def _parse_key_value_fields(hypothesis_text: str) -> dict[str, str]:
+def _parse_key_value_fields(task_text: str) -> dict[str, str]:
     fields: dict[str, str] = {}
-    for line in hypothesis_text.splitlines():
+    for line in task_text.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or ":" not in stripped:
             continue
         key, value = stripped.split(":", 1)
         normalized_key = key.strip().lower()
-        if normalized_key not in {"status", "id", "at", "q", "reference"}:
+        if normalized_key not in {"status", "id", "at", "q", "decision_use", "reference"}:
             continue
         normalized_value = value.strip()
         if normalized_value and normalized_key not in fields:
@@ -115,67 +131,42 @@ def _parse_key_value_fields(hypothesis_text: str) -> dict[str, str]:
     return fields
 
 
-def _extract_legacy_question(hypothesis_text: str) -> str | None:
-    lines = hypothesis_text.splitlines()
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        for prefix in ("**Hypothesis:**", "**Question:**"):
-            if not stripped.startswith(prefix):
-                continue
-            title = stripped.removeprefix(prefix).strip()
-            if title:
-                return title
-            fallback_title = _next_nonempty_line(lines[index + 1 :])
-            if fallback_title:
-                return fallback_title
-    return None
-
-
 def _utc_timestamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
 
 
-def _append_findings_entry(findings_file: Path, metadata: HypothesisMetadata, stdout: str) -> None:
-    findings_file.parent.mkdir(parents=True, exist_ok=True)
-    with findings_file.open("a") as f:
-        if f.tell() > 0:
-            f.write("\n\n")
-        f.write(f"## {metadata.title}\n")
-        f.write(f"at: {_utc_timestamp()}\n")
-        f.write(f"q: {metadata.question}\n")
-        f.write("verdict: *(fill in: supported | rejected | inconclusive)*\n")
-        f.write("conf: *(fill in: high | medium | low)*\n")
-        if metadata.reference:
-            f.write(f"reference: {metadata.reference}\n")
-        f.write("evidence:\n")
-        f.write(f"{_format_stream(stdout)}\n\n")
-        f.write("follow_up:\n")
-        f.write("- *(fill in yes/no hypothesis)*\n")
-        f.write("- *(fill in yes/no hypothesis)*\n")
-        f.write("- *(fill in yes/no hypothesis)*\n")
+def _write_stdout_artifact(stdout_file: Path, stdout: str) -> None:
+    stdout_file.parent.mkdir(parents=True, exist_ok=True)
+    stdout_file.write_text(stdout)
 
 
-def _append_failure_entry(
+def _write_failure_artifact(
     errors_file: Path,
-    metadata: HypothesisMetadata,
+    metadata: AnalysisTaskMetadata,
     analysis_path: Path,
     completed: subprocess.CompletedProcess[str],
 ) -> None:
     errors_file.parent.mkdir(parents=True, exist_ok=True)
-    with errors_file.open("a") as f:
-        if f.tell() > 0:
-            f.write("\n\n")
-        f.write(f"## {metadata.title}\n")
-        f.write(f"at: {_utc_timestamp()}\n")
-        f.write(f"q: {metadata.question}\n")
-        if metadata.reference:
-            f.write(f"reference: {metadata.reference}\n")
-        f.write(f"analysis_path: `{_display_path(analysis_path)}`\n")
-        f.write(f"exit_code: `{completed.returncode}`\n")
-        f.write("stdout:\n")
-        f.write(f"{_format_stream(completed.stdout)}\n\n")
-        f.write("stderr:\n")
-        f.write(f"{_format_stream(completed.stderr)}\n")
+    details = [
+        f"at: {_utc_timestamp()}",
+        f"id: {metadata.task_id}",
+        f"q: {metadata.question}",
+    ]
+    if metadata.reference:
+        details.append(f"reference: {metadata.reference}")
+    details.extend(
+        [
+            f"analysis_path: {_display_path(analysis_path)}",
+            f"exit_code: {completed.returncode}",
+            "stdout:",
+            _format_stream(completed.stdout),
+            "",
+            "stderr:",
+            _format_stream(completed.stderr),
+            "",
+        ]
+    )
+    errors_file.write_text("\n".join(details))
 
 
 def _report_failure(
@@ -193,12 +184,8 @@ def _report_failure(
         print(completed.stderr.rstrip(), file=sys.stderr)
 
 
-def _next_nonempty_line(lines: list[str]) -> str | None:
-    for line in lines:
-        stripped = line.strip()
-        if stripped:
-            return stripped
-    return None
+def _artifact_dir(task_id: str) -> Path:
+    return _normalize_repo_path(DEFAULT_ARTIFACTS_ROOT / task_id)
 
 
 def _display_path(path: Path) -> str:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Iterable
 
@@ -7,8 +8,6 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
-
-from harness.dataset import FOLD_COLUMN, TARGET_COLUMN, encode_target_labels, load_train_with_folds
 
 
 TASK_ID = "S-105"
@@ -21,7 +20,14 @@ EXPERIMENT_NAME = TASK_ID
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[1]
+
+
+REPO_ROOT = _repo_root()
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from harness.dataset import FOLD_COLUMN, TARGET_COLUMN, encode_target_labels, load_train_with_folds
 
 
 def _artifacts_root() -> Path:

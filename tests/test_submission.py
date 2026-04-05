@@ -6,7 +6,7 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 
-from agents.supervisor import submission
+from harness import submission
 
 
 class SubmissionTests(unittest.TestCase):

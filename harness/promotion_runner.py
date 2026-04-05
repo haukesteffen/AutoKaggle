@@ -17,11 +17,11 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 from kagglesdk.competitions.types.competition_api_service import ApiGetLeaderboardRequest
 from kagglesdk.competitions.types.submission_status import SubmissionStatus
 
-from agents.supervisor.submission import create_submission_csv
 from harness.dataset import COMPETITION
+from harness.submission import create_submission_csv
 
 DEFAULT_ARTIFACTS_ROOT = Path("artifacts")
-DEFAULT_RESULTS_PATH = Path("agents/scientist/scientist-results.md")
+DEFAULT_RESULTS_PATH = Path("history/experiments.md")
 DEFAULT_SUBMISSION_FILENAME = "submission.csv"
 DEFAULT_POLL_INTERVAL_SECONDS = 30.0
 DEFAULT_TIMEOUT_SECONDS = 30.0 * 60.0
@@ -279,7 +279,7 @@ def _validate_inputs(
             exit_code=1,
             terminal_status="error",
             error_category="validation_error",
-            error_message=f"task_id {args.task_id!r} does not have a numeric CV score in scientist-results.md",
+            error_message=f"task_id {args.task_id!r} does not have a numeric CV score in history/experiments.md",
         )
     if submission_file.exists() and not submission_file.is_file():
         _fail(
@@ -501,19 +501,16 @@ def read_result_row(task_id: str, results_path: Path = DEFAULT_RESULTS_PATH) -> 
 
     matches: list[ResultRow] = []
     for line in resolved.read_text().splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("|") or stripped.startswith("| id ") or stripped.startswith("|----"):
-            continue
-        columns = [column.strip() for column in stripped.strip("|").split("|")]
-        if len(columns) != 5 or columns[0] != task_id:
+        columns = _parse_markdown_table_row(line)
+        if columns is None or len(columns) != 8 or columns[0] != task_id:
             continue
         matches.append(
             ResultRow(
                 task_id=columns[0],
-                score=_maybe_float(columns[1]),
-                std=_maybe_float(columns[2]),
-                delta_best=_maybe_float(columns[3]),
-                desc=columns[4],
+                score=_maybe_float(columns[3]),
+                std=None,
+                delta_best=_maybe_float(columns[4]),
+                desc=columns[7] or columns[5],
             )
         )
 
@@ -522,6 +519,16 @@ def read_result_row(task_id: str, results_path: Path = DEFAULT_RESULTS_PATH) -> 
     if len(matches) > 1:
         raise ValueError(f"task_id {task_id!r} appears multiple times in {resolved}")
     return matches[0]
+
+
+def _parse_markdown_table_row(line: str) -> list[str] | None:
+    stripped = line.strip()
+    if not stripped.startswith("|") or stripped.startswith("|----"):
+        return None
+    columns = [column.strip() for column in stripped.strip("|").split("|")]
+    if columns and columns[0] == "task_id":
+        return None
+    return columns
 
 
 def _maybe_float(value: str | None) -> float | None:
