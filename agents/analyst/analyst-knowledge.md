@@ -462,3 +462,15 @@ OOF comparison of S-104 (shrunk S-052 Medium pairwise) against S-094 and S-102:
 - The shrinkage probe also increases new true-High regressions versus both baselines: 9 for S-104 vs 4 for S-102
 
 Durable conclusion: S-104 preserves near-S-094 CV and slightly improves Medium recall, but its Medium-class error-shape improvement over S-102 is only marginal and comes with more new true-High regressions.
+
+## AK-037 — S-105 Improves CV Over S-094 but Still Fails the Medium-Reallocation Gate
+source: A-019
+at: 2026-04-05
+
+OOF comparison of S-105 (multinomial LR C=4.0 balanced on S-094 OVR logits + shrunk S-052 High/Low) vs S-094:
+- Balanced accuracy is higher: 0.972308 vs 0.972299 (delta +0.000009)
+- New true-High regressions stay below the S-102 unsafe mark: 1 vs the 4-row threshold
+- But true-Medium reallocation is still net negative: 30 beneficial changes vs 49 harmful ones, for a net of -19
+- The largest changed-case flow remains harmful true Medium drift: Medium -> High on 44 rows, followed by true Medium: High -> Medium on 28 rows
+
+Durable conclusion: S-105 is a safer perturbation than S-102 on true High rows, but it still does not clear a behavior gate that requires positive true-Medium reallocation relative to S-094.

@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-A-018: Test whether S-104 materially improves Medium-class behavior versus S-102
-while staying within 0.00003 balanced accuracy of S-094.
+A-019: Test whether S-105 clears the practical behavior gate versus S-094.
 
 This script:
 - loads existing OOF probability artifacts only
-- compares balanced accuracy and classwise recall for S-094, S-102, and S-104
-- measures changed-row flows focused on harmful true-Medium regressions and
-  true-Medium Medium->High drift
+- compares balanced accuracy and classwise recall for S-094, S-102, and S-105
+- measures true-Medium changed-row reallocation and new true-High regressions
 
 No model training is performed.
 """
@@ -30,7 +28,7 @@ ARTIFACT_ROOT = REPO_ROOT / "artifacts"
 MODEL_PATHS = {
     "S-094": ARTIFACT_ROOT / "S-094" / "oof-preds.npy",
     "S-102": ARTIFACT_ROOT / "S-102" / "oof-preds.npy",
-    "S-104": ARTIFACT_ROOT / "S-104" / "oof-preds.npy",
+    "S-105": ARTIFACT_ROOT / "S-105" / "oof-preds.npy",
 }
 
 CLASS_TO_IDX = {label: idx for idx, label in enumerate(CLASS_LABELS)}
@@ -80,6 +78,7 @@ def summarize_vs_benchmark(
         "harmful_true_medium": int(harmful_medium.sum()),
         "true_medium_medium_to_high": int(medium_to_high.sum()),
         "beneficial_true_medium": int(beneficial_medium.sum()),
+        "net_true_medium_reallocation": int(beneficial_medium.sum() - harmful_medium.sum()),
         "new_true_high_regressions": int(high_regressions.sum()),
     }
 
@@ -105,12 +104,12 @@ def main() -> None:
     recalls = {name: class_recalls(y, pred) for name, pred in preds.items()}
     vs_094 = {
         "S-102": summarize_vs_benchmark(y, preds["S-094"], preds["S-102"]),
-        "S-104": summarize_vs_benchmark(y, preds["S-094"], preds["S-104"]),
+        "S-105": summarize_vs_benchmark(y, preds["S-094"], preds["S-105"]),
     }
-    flows_104_vs_094 = flow_counter(y, preds["S-094"], preds["S-104"])
+    flows_105_vs_094 = flow_counter(y, preds["S-094"], preds["S-105"])
 
     print("=" * 80)
-    print("A-018: S-104 practical Medium-behavior check versus S-102")
+    print("A-019: S-105 practical behavior gate versus S-094")
     print("Method: existing OOF probability artifacts only; no training")
     print(f"Rows: {len(y):,}")
     print(f"Classes: {CLASS_LABELS}")
@@ -121,10 +120,9 @@ def main() -> None:
         print(f"- {name}: {path.relative_to(REPO_ROOT)}")
 
     print("\nBalanced Accuracy")
-    for name in ("S-094", "S-102", "S-104"):
+    for name in ("S-094", "S-102", "S-105"):
         print(f"- {name}: {scores[name]:.6f}")
-    print(f"- S-104 minus S-094: {scores['S-104'] - scores['S-094']:+.6f}")
-    print(f"- Within 0.00003 of S-094: {'yes' if (scores['S-094'] - scores['S-104']) <= 0.00003 else 'no'}")
+    print(f"- S-105 minus S-094: {scores['S-105'] - scores['S-094']:+.6f}")
 
     print("\nClasswise Recall")
     for label in CLASS_LABELS:
@@ -132,11 +130,11 @@ def main() -> None:
             f"- {label}: "
             f"S-094={recalls['S-094'][label]:.6f}, "
             f"S-102={recalls['S-102'][label]:.6f}, "
-            f"S-104={recalls['S-104'][label]:.6f}"
+            f"S-105={recalls['S-105'][label]:.6f}"
         )
 
     print("\nChanged-Row Comparison Against S-094 Benchmark")
-    for name in ("S-102", "S-104"):
+    for name in ("S-102", "S-105"):
         stats = vs_094[name]
         print(
             f"- {name} vs S-094: changed_rows={stats['changed_rows']}, "
@@ -144,42 +142,43 @@ def main() -> None:
             f"harmful_true_Medium={stats['harmful_true_medium']}, "
             f"true_Medium_Medium_to_High={stats['true_medium_medium_to_high']}, "
             f"beneficial_true_Medium={stats['beneficial_true_medium']}, "
+            f"net_true_Medium_reallocation={stats['net_true_medium_reallocation']}, "
             f"new_true_High_regressions={stats['new_true_high_regressions']}"
         )
 
-    print("\nS-104 Delta Relative to S-102")
+    print("\nS-105 Gate Check")
     print(
-        "- Harmful true-Medium regressions reduced versus S-102 "
-        f"({vs_094['S-102']['harmful_true_medium']} -> {vs_094['S-104']['harmful_true_medium']}): "
-        f"{'yes' if vs_094['S-104']['harmful_true_medium'] < vs_094['S-102']['harmful_true_medium'] else 'no'}"
+        "- Higher balanced accuracy than S-094: "
+        f"{'yes' if scores['S-105'] > scores['S-094'] else 'no'} "
+        f"({scores['S-094']:.6f} -> {scores['S-105']:.6f})"
     )
     print(
-        "- True-Medium Medium->High drift reduced versus S-102 "
-        f"({vs_094['S-102']['true_medium_medium_to_high']} -> {vs_094['S-104']['true_medium_medium_to_high']}): "
-        f"{'yes' if vs_094['S-104']['true_medium_medium_to_high'] < vs_094['S-102']['true_medium_medium_to_high'] else 'no'}"
+        "- Net positive true-Medium reallocation versus S-094: "
+        f"{'yes' if vs_094['S-105']['net_true_medium_reallocation'] > 0 else 'no'} "
+        f"({vs_094['S-105']['net_true_medium_reallocation']:+d})"
     )
     print(
-        "- Medium recall improves over S-102: "
-        f"{'yes' if recalls['S-104']['Medium'] > recalls['S-102']['Medium'] else 'no'} "
-        f"({recalls['S-102']['Medium']:.6f} -> {recalls['S-104']['Medium']:.6f})"
+        "- New true-High regressions stay within S-102 unsafe threshold of 4: "
+        f"{'yes' if vs_094['S-105']['new_true_high_regressions'] <= 4 else 'no'} "
+        f"({vs_094['S-105']['new_true_high_regressions']})"
     )
 
-    print("\nLargest S-094 -> S-104 Changed Flows")
-    for (truth, pred_a, pred_b), count in flows_104_vs_094.most_common(8):
+    print("\nLargest S-094 -> S-105 Changed Flows")
+    for (truth, pred_a, pred_b), count in flows_105_vs_094.most_common(8):
         print(f"- true={truth}: {pred_a} -> {pred_b}: {count}")
 
     print("\nDecision Facts")
     print(
-        "- S-104 reduces harmful true-Medium regressions versus S-102: "
-        f"{'yes' if vs_094['S-104']['harmful_true_medium'] < vs_094['S-102']['harmful_true_medium'] else 'no'}"
+        "- S-105 has higher balanced accuracy than S-094: "
+        f"{'yes' if scores['S-105'] > scores['S-094'] else 'no'}"
     )
     print(
-        "- S-104 reduces true-Medium Medium->High drift versus S-102: "
-        f"{'yes' if vs_094['S-104']['true_medium_medium_to_high'] < vs_094['S-102']['true_medium_medium_to_high'] else 'no'}"
+        "- S-105 has net positive true-Medium reallocation versus S-094: "
+        f"{'yes' if vs_094['S-105']['net_true_medium_reallocation'] > 0 else 'no'}"
     )
     print(
-        "- S-104 stays within 0.00003 balanced accuracy of S-094: "
-        f"{'yes' if (scores['S-094'] - scores['S-104']) <= 0.00003 else 'no'}"
+        "- S-105 stays at or below 4 new true-High regressions versus S-094: "
+        f"{'yes' if vs_094['S-105']['new_true_high_regressions'] <= 4 else 'no'}"
     )
 
 

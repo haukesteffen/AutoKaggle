@@ -1867,3 +1867,63 @@ follow_up:
 - Does the `S-104` shrinkage change improve probability calibration or log-loss enough to offset its extra true-`High` regressions versus `S-102` and `S-094`?
 - Are the 87 true-`Medium` `High -> Medium` corrections in `S-104` concentrated in one feature region that can be isolated without adding the 9 new true-`High` regressions?
 - Is there any shrinkage setting between `S-102` and `S-104` that keeps the `S-104` Medium gains while reducing the added true-`High` regressions back toward `S-102`?
+
+
+## A-019
+at: 2026-04-05T08:07Z
+q: Does `S-105` clear the behavior gate to become the new leading offline challenger, specifically: compared with `S-094`, does its higher balanced accuracy come with a net positive true-`Medium` reallocation and without exceeding the `4` new true-`High` regressions that made `S-102` unsafe?
+verdict: rejected
+conf: high
+reference: Use the OOF artifacts for `S-094`, `S-102`, and `S-105`; include changed-row flows and classwise recall only as needed.
+evidence:
+================================================================================
+A-019: S-105 practical behavior gate versus S-094
+Method: existing OOF probability artifacts only; no training
+Rows: 630,000
+Classes: ('High', 'Low', 'Medium')
+================================================================================
+
+Artifacts
+- S-094: artifacts/S-094/oof-preds.npy
+- S-102: artifacts/S-102/oof-preds.npy
+- S-105: artifacts/S-105/oof-preds.npy
+
+Balanced Accuracy
+- S-094: 0.972299
+- S-102: 0.972297
+- S-105: 0.972308
+- S-105 minus S-094: +0.000009
+
+Classwise Recall
+- High: S-094=0.962683, S-102=0.962778, S-105=0.962778
+- Low: S-094=0.995031, S-102=0.995034, S-105=0.995042
+- Medium: S-094=0.959184, S-102=0.959080, S-105=0.959105
+
+Changed-Row Comparison Against S-094 Benchmark
+- S-102 vs S-094: changed_rows=170, true_Medium_changed=139, harmful_true_Medium=82, true_Medium_Medium_to_High=77, beneficial_true_Medium=57, net_true_Medium_reallocation=-25, new_true_High_regressions=4
+- S-105 vs S-094: changed_rows=101, true_Medium_changed=79, harmful_true_Medium=49, true_Medium_Medium_to_High=44, beneficial_true_Medium=30, net_true_Medium_reallocation=-19, new_true_High_regressions=1
+
+S-105 Gate Check
+- Higher balanced accuracy than S-094: yes (0.972299 -> 0.972308)
+- Net positive true-Medium reallocation versus S-094: no (-19)
+- New true-High regressions stay within S-102 unsafe threshold of 4: yes (1)
+
+Largest S-094 -> S-105 Changed Flows
+- true=Medium: Medium -> High: 44
+- true=Medium: High -> Medium: 28
+- true=Low: Medium -> Low: 11
+- true=Low: Low -> Medium: 7
+- true=Medium: Medium -> Low: 5
+- true=High: Medium -> High: 3
+- true=Medium: Low -> Medium: 2
+- true=High: High -> Medium: 1
+
+Decision Facts
+- S-105 has higher balanced accuracy than S-094: yes
+- S-105 has net positive true-Medium reallocation versus S-094: no
+- S-105 stays at or below 4 new true-High regressions versus S-094: yes
+
+follow_up:
+- Does any `S-105`-adjacent shrinkage setting keep its `+0.000009` balanced-accuracy gain over `S-094` while turning the true-`Medium` reallocation from `-19` to positive?
+- Are the `44` true-`Medium` `Medium -> High` regressions in `S-105` concentrated in one score band that can be corrected without adding more than `1` new true-`High` regression?
+- Does `S-105`'s lower changed-row count versus `S-102` (`101` vs `170`) reflect a more stable signal source rather than just a smaller perturbation around `S-094`?
