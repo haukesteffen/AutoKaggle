@@ -8,12 +8,15 @@ import pandas as pd
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 
+from harness.dataset import FOLD_COLUMN, TARGET_COLUMN, encode_target_labels, load_train_with_folds
 
-TASK_ID = "S-103"
+
+TASK_ID = "S-104"
 SOURCE_IDS = ("S-014", "S-082", "S-073")
 MEDIUM_ONLY_SOURCE_ID = "S-052"
 CLASSES = ["High", "Low", "Medium"]
 EPS = 1e-6
+SHRINKAGE_GRID = (0.0, 0.25, 0.5, 0.75, 1.0)
 EXPERIMENT_NAME = TASK_ID
 
 
@@ -136,23 +139,36 @@ def _prepare_split(split: str) -> pd.DataFrame:
     medium_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Medium"].clip(EPS, 1.0)
     high_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_High"].clip(EPS, 1.0)
     low_prob = merged[f"{MEDIUM_ONLY_SOURCE_ID}_Low"].clip(EPS, 1.0)
-    feature_blocks.append(
-        pd.DataFrame(
-            {
-                f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_High_logit": np.log(medium_prob / high_prob),
-                f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_Low_logit": np.log(medium_prob / low_prob),
-            },
-            index=merged.index,
-        )
-    )
+    feature_blocks.append(_medium_feature_block(medium_prob, high_prob, low_prob, shrinkage=1.0, index=merged.index))
     features = pd.concat(feature_blocks, axis=1)
     if "id" in merged.columns:
         features.index = merged["id"].to_numpy()
     return features
 
 
+def _medium_feature_block(
+    medium_prob: pd.Series,
+    high_prob: pd.Series,
+    low_prob: pd.Series,
+    shrinkage: float,
+    index: pd.Index,
+) -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_High_logit": shrinkage * np.log(medium_prob / high_prob),
+            f"{MEDIUM_ONLY_SOURCE_ID}_Medium_vs_Low_logit": shrinkage * np.log(medium_prob / low_prob),
+        },
+        index=index,
+    )
+
+
 OOF_FEATURES = _prepare_split("oof")
 TEST_FEATURES = _prepare_split("test")
+TRAIN_WITH_FOLDS = load_train_with_folds()
+TRAIN_FOLDS = TRAIN_WITH_FOLDS[FOLD_COLUMN].to_numpy()
+TRAIN_Y = encode_target_labels(TRAIN_WITH_FOLDS[TARGET_COLUMN])
+BASE_FEATURE_COLUMNS = [col for col in OOF_FEATURES.columns if not col.startswith(f"{MEDIUM_ONLY_SOURCE_ID}_")]
+MEDIUM_FEATURE_COLUMNS = [col for col in OOF_FEATURES.columns if col.startswith(f"{MEDIUM_ONLY_SOURCE_ID}_")]
 
 
 def _row_keys(x: pd.DataFrame | np.ndarray) -> np.ndarray:
@@ -165,18 +181,20 @@ def _row_keys(x: pd.DataFrame | np.ndarray) -> np.ndarray:
 
 class ExternalStacker(BaseEstimator, ClassifierMixin):
     def __init__(self) -> None:
-        self.model = LogisticRegression(
-            C=4.0,
-            class_weight="balanced",
-            max_iter=2000,
-            solver="lbfgs",
-        )
+        self.model: LogisticRegression | None = None
+        self.best_shrinkage_: float = 1.0
         self.classes_ = np.arange(len(CLASSES))
 
     def fit(self, x: pd.DataFrame, y: np.ndarray) -> "ExternalStacker":
         train_keys = _row_keys(x)
-        train_x = OOF_FEATURES.iloc[train_keys] if np.issubdtype(np.asarray(train_keys).dtype, np.integer) else OOF_FEATURES.loc[train_keys]
-        self.model.fit(train_x, y)
+        train_x = (
+            OOF_FEATURES.iloc[train_keys]
+            if np.issubdtype(np.asarray(train_keys).dtype, np.integer)
+            else OOF_FEATURES.loc[train_keys]
+        )
+        self.best_shrinkage_ = BEST_SHRINKAGE
+        self.model = self._build_lr()
+        self.model.fit(self._apply_shrinkage(train_x, self.best_shrinkage_), y)
         return self
 
     def predict_proba(self, x: pd.DataFrame) -> np.ndarray:
@@ -187,10 +205,64 @@ class ExternalStacker(BaseEstimator, ClassifierMixin):
             pred_x = feature_bank.iloc[keys] if not use_test else feature_bank
         else:
             pred_x = feature_bank.loc[keys]
+        if self.model is None:
+            raise ValueError("model must be fit before predict_proba")
+        pred_x = self._apply_shrinkage(pred_x, self.best_shrinkage_)
         return self.model.predict_proba(pred_x)
 
     def predict(self, x: pd.DataFrame) -> np.ndarray:
         return self.predict_proba(x).argmax(axis=1)
+
+    def _build_lr(self) -> LogisticRegression:
+        return LogisticRegression(
+            C=4.0,
+            class_weight="balanced",
+            max_iter=2000,
+            solver="lbfgs",
+        )
+
+    def _apply_shrinkage(self, features: pd.DataFrame, shrinkage: float) -> pd.DataFrame:
+        out = features.copy()
+        out.loc[:, BASE_FEATURE_COLUMNS] = features.loc[:, BASE_FEATURE_COLUMNS].to_numpy()
+        out.loc[:, MEDIUM_FEATURE_COLUMNS] = shrinkage * features.loc[:, MEDIUM_FEATURE_COLUMNS].to_numpy()
+        return out
+
+
+def _balanced_accuracy_from_labels(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    per_class = []
+    for cls in range(len(CLASSES)):
+        mask = y_true == cls
+        if mask.any():
+            per_class.append(float((y_pred[mask] == cls).mean()))
+    return float(np.mean(per_class))
+
+
+def _select_offline_shrinkage() -> float:
+    best_shrinkage = 1.0
+    best_score = -np.inf
+    unique_folds = np.unique(TRAIN_FOLDS)
+    helper = ExternalStacker()
+    for shrinkage in SHRINKAGE_GRID:
+        scaled_x = helper._apply_shrinkage(OOF_FEATURES, shrinkage)
+        fold_scores: list[float] = []
+        for fold in unique_folds:
+            train_mask = TRAIN_FOLDS != fold
+            valid_mask = ~train_mask
+            model = helper._build_lr()
+            model.fit(scaled_x.iloc[train_mask], TRAIN_Y[train_mask])
+            fold_pred = model.predict(scaled_x.iloc[valid_mask])
+            fold_scores.append(_balanced_accuracy_from_labels(TRAIN_Y[valid_mask], fold_pred))
+        mean_score = float(np.mean(fold_scores))
+        if mean_score > best_score + 1e-12 or (
+            abs(mean_score - best_score) <= 1e-12 and abs(shrinkage - 1.0) < abs(best_shrinkage - 1.0)
+        ):
+            best_score = mean_score
+            best_shrinkage = shrinkage
+    return best_shrinkage
+
+
+BEST_SHRINKAGE = _select_offline_shrinkage()
+EXPERIMENT_NAME = f"{TASK_ID}-shrink-{BEST_SHRINKAGE:.2f}"
 
 
 def build_model(_: pd.DataFrame | None = None) -> ExternalStacker:
