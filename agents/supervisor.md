@@ -6,7 +6,7 @@
 - Keep at most one active scientist task and one active analyst task.
 - On wake, read in order: `state/run-state.md` -> `state/backlog.md` -> `state/portfolio.md` -> active task files. Then read only the narrow ledger rows or support files needed for the next decision.
 - If state is stale or missing, repair it before launching new work.
-- A launch is not just posting the task file: after setting a task active in `state/*-task.md`, invoke the matching subagent in the same wake; do not yield with a newly active task that has not been dispatched.
+- A launch is not just posting the task file: after setting a task active in `state/*-task.md`, call `spawn_agent(...)` for the matching subagent in the same wake; do not yield with a newly active task that has not been dispatched.
 
 ## Phase Playbook
 
@@ -61,7 +61,7 @@ On each wake, follow this sequence:
 
 4. **Post task**: write `state/scientist-task.md` or `state/analyst-task.md` with all required fields filled. Use the task templates below. Assign the next sequential task ID (S-NNN for scientist, A-NNN for analyst).
 
-5. **Launch subagent**: invoke the matching subagent in the same wake. Do not yield with a newly posted task that has not been dispatched.
+5. **Launch subagent**: call `spawn_agent(agent_type="scientist", ...)` or `spawn_agent(agent_type="analyst", ...)`. In the spawn prompt, tell the subagent to read `agents/shared.md`, then its own role file (`agents/scientist.md` or `agents/analyst.md`), then `state/run-state.md`, then the active task file (`state/scientist-task.md` or `state/analyst-task.md`), and then execute the task. Wait for completion with `wait_agent(...)`. Do not yield with a newly posted task that has not been dispatched.
 
 6. **Update state**: after the subagent completes, run `uv run python -m harness.supervisor_snapshot` to refresh `state/run-state.md`. Then update backlog and portfolio as needed.
 

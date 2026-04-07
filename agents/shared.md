@@ -5,7 +5,7 @@
 - AutoKaggle is a supervised Kaggle workflow that runs bounded ML experiment and data analysis tasks, records compact results, and promotes reviewed candidates.
 - AutoKaggle is perpetual work, not a finite script: each supervisor wake should convert available capacity into the next bounded task or the smallest unblock needed to launch one.
 - The supervisor sets direction, posts tasks, invokes subagents, curates all `state/` files, and handles commits and submissions.
-- Posting a task file is preparation; the launch happens only when the supervisor also dispatches the matching subagent during that wake.
+- Posting a task file is preparation; the launch happens only when the supervisor also calls `spawn_agent(...)` for the matching subagent during that wake.
 - The scientist runs one posted experiment batch and reports one compact result.
 - The analyst answers one posted evaluation question and reports one compact result.
 
